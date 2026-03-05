@@ -1,0 +1,268 @@
+import { search } from "../../data/searchIndex.js";
+import { findRoute } from "../../data/pathfinding.js";
+import { setActiveRoute, setSearchFocused } from "../state.js";
+import type { SearchEntry } from "../../types/index.js";
+
+const DEBOUNCE_MS = 50;
+
+interface RouteField {
+  inputEl: HTMLInputElement;
+  suggestionsEl: HTMLElement;
+  results: SearchEntry[];
+  activeIndex: number;
+  selectedId: string | null;
+  selectedLabel: string;
+  debounceTimer: ReturnType<typeof setTimeout> | null;
+}
+
+export class RoutePanel {
+  private containerEl: HTMLElement;
+  private panelEl: HTMLElement;
+  private toggleEl: HTMLButtonElement;
+  private infoEl: HTMLElement;
+  private fromField: RouteField;
+  private toField: RouteField;
+  private open = false;
+
+  constructor() {
+    this.containerEl = document.createElement("div");
+    this.containerEl.id = "route-container";
+
+    // Toggle button
+    this.toggleEl = document.createElement("button");
+    this.toggleEl.className = "route-toggle";
+    this.toggleEl.textContent = "Route";
+    this.toggleEl.addEventListener("click", () => this.toggle());
+
+    // Panel
+    this.panelEl = document.createElement("div");
+    this.panelEl.className = "route-panel";
+
+    // From field
+    this.fromField = this.createField("From");
+    // To field
+    this.toField = this.createField("To");
+
+    // Info line
+    this.infoEl = document.createElement("div");
+    this.infoEl.className = "route-info";
+
+    // Clear button
+    const clearBtn = document.createElement("button");
+    clearBtn.className = "route-clear";
+    clearBtn.textContent = "Clear Route";
+    clearBtn.addEventListener("click", () => this.clearRoute());
+
+    this.panelEl.appendChild(this.fromField.inputEl.parentElement!);
+    this.panelEl.appendChild(this.toField.inputEl.parentElement!);
+    this.panelEl.appendChild(this.infoEl);
+    this.panelEl.appendChild(clearBtn);
+
+    this.containerEl.appendChild(this.toggleEl);
+    this.containerEl.appendChild(this.panelEl);
+    document.body.appendChild(this.containerEl);
+  }
+
+  private createField(label: string): RouteField {
+    const wrapper = document.createElement("div");
+    wrapper.className = "route-field";
+
+    const labelEl = document.createElement("div");
+    labelEl.className = "route-label";
+    labelEl.textContent = label;
+
+    const inputEl = document.createElement("input");
+    inputEl.type = "text";
+    inputEl.className = "route-input";
+    inputEl.placeholder = `${label} system...`;
+    inputEl.autocomplete = "off";
+    inputEl.spellcheck = false;
+
+    const suggestionsEl = document.createElement("div");
+    suggestionsEl.className = "route-suggestions";
+
+    wrapper.appendChild(labelEl);
+    wrapper.appendChild(inputEl);
+    wrapper.appendChild(suggestionsEl);
+
+    const field: RouteField = {
+      inputEl,
+      suggestionsEl,
+      results: [],
+      activeIndex: -1,
+      selectedId: null,
+      selectedLabel: "",
+      debounceTimer: null,
+    };
+
+    inputEl.addEventListener("input", () => this.onFieldInput(field));
+    inputEl.addEventListener("focus", () => {
+      setSearchFocused(true);
+      // If user clears a selection and types again, reset selectedId
+      if (field.selectedId && inputEl.value !== field.selectedLabel) {
+        field.selectedId = null;
+      }
+      if (inputEl.value && !field.selectedId) {
+        this.runFieldSearch(field);
+      }
+    });
+    inputEl.addEventListener("blur", () => {
+      setSearchFocused(false);
+      setTimeout(() => this.hideFieldSuggestions(field), 150);
+    });
+    inputEl.addEventListener("keydown", (e) => this.onFieldKeyDown(e, field));
+
+    return field;
+  }
+
+  private toggle(): void {
+    this.open = !this.open;
+    this.panelEl.classList.toggle("route-panel-open", this.open);
+    this.toggleEl.classList.toggle("route-toggle-active", this.open);
+  }
+
+  private onFieldInput(field: RouteField): void {
+    // User typing clears previous selection
+    if (field.selectedId) {
+      field.selectedId = null;
+    }
+    if (field.debounceTimer !== null) {
+      clearTimeout(field.debounceTimer);
+    }
+    field.debounceTimer = setTimeout(() => {
+      this.runFieldSearch(field);
+    }, DEBOUNCE_MS);
+  }
+
+  private onFieldKeyDown(e: KeyboardEvent, field: RouteField): void {
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        this.moveFieldSelection(field, 1);
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        this.moveFieldSelection(field, -1);
+        break;
+      case "Enter":
+        e.preventDefault();
+        if (field.activeIndex >= 0 && field.activeIndex < field.results.length) {
+          this.selectFieldResult(field, field.results[field.activeIndex]!);
+        }
+        break;
+      case "Escape":
+        e.preventDefault();
+        e.stopPropagation();
+        this.hideFieldSuggestions(field);
+        field.inputEl.blur();
+        break;
+    }
+  }
+
+  private runFieldSearch(field: RouteField): void {
+    const query = field.inputEl.value.trim();
+    if (!query) {
+      field.results = [];
+      this.hideFieldSuggestions(field);
+      return;
+    }
+
+    // Filter to systems only
+    field.results = search(query, 8).filter((e) => e.type === "system");
+    field.activeIndex = field.results.length > 0 ? 0 : -1;
+    this.renderFieldSuggestions(field);
+  }
+
+  private renderFieldSuggestions(field: RouteField): void {
+    if (field.results.length === 0) {
+      this.hideFieldSuggestions(field);
+      return;
+    }
+
+    field.suggestionsEl.innerHTML = field.results
+      .map((r, i) => {
+        const activeClass = i === field.activeIndex ? " search-result-active" : "";
+        return `<div class="search-result${activeClass}" data-index="${i}">
+          <span class="search-result-name">${esc(r.name)}</span>
+          <span class="search-result-meta">
+            <span class="search-result-id">${esc(r.naturalId)}</span>
+          </span>
+        </div>`;
+      })
+      .join("");
+
+    field.suggestionsEl.classList.add("route-suggestions-open");
+
+    field.suggestionsEl.querySelectorAll(".search-result").forEach((el) => {
+      el.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        const idx = parseInt((el as HTMLElement).dataset["index"] ?? "-1", 10);
+        if (idx >= 0 && idx < field.results.length) {
+          this.selectFieldResult(field, field.results[idx]!);
+        }
+      });
+    });
+  }
+
+  private hideFieldSuggestions(field: RouteField): void {
+    field.suggestionsEl.classList.remove("route-suggestions-open");
+    field.suggestionsEl.innerHTML = "";
+    field.results = [];
+    field.activeIndex = -1;
+  }
+
+  private moveFieldSelection(field: RouteField, delta: number): void {
+    if (field.results.length === 0) return;
+    field.activeIndex = Math.max(
+      0,
+      Math.min(field.results.length - 1, field.activeIndex + delta)
+    );
+    field.suggestionsEl.querySelectorAll(".search-result").forEach((el, i) => {
+      el.classList.toggle("search-result-active", i === field.activeIndex);
+    });
+  }
+
+  private selectFieldResult(field: RouteField, entry: SearchEntry): void {
+    field.selectedId = entry.systemId;
+    field.selectedLabel = `${entry.name} (${entry.naturalId})`;
+    field.inputEl.value = field.selectedLabel;
+    this.hideFieldSuggestions(field);
+
+    this.tryCalculateRoute();
+  }
+
+  private tryCalculateRoute(): void {
+    const fromId = this.fromField.selectedId;
+    const toId = this.toField.selectedId;
+
+    if (!fromId || !toId) {
+      this.infoEl.textContent = "";
+      return;
+    }
+
+    const route = findRoute(fromId, toId);
+    if (route) {
+      setActiveRoute(route);
+      const jumpWord = route.jumpCount === 1 ? "jump" : "jumps";
+      this.infoEl.innerHTML = `<span class="route-info-jumps">${route.jumpCount} ${jumpWord}</span>`;
+    } else {
+      setActiveRoute(null);
+      this.infoEl.textContent = "No route found";
+    }
+  }
+
+  private clearRoute(): void {
+    this.fromField.selectedId = null;
+    this.fromField.inputEl.value = "";
+    this.toField.selectedId = null;
+    this.toField.inputEl.value = "";
+    this.infoEl.textContent = "";
+    setActiveRoute(null);
+  }
+}
+
+function esc(text: string): string {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
