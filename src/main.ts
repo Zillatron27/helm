@@ -1,5 +1,5 @@
 import { VERSION } from "./version.js";
-import { loadSystemData, getSystems } from "./data/cache.js";
+import { loadSystemData, loadCxStations, getSystems } from "./data/cache.js";
 import { fetchAllPlanetNames } from "./data/fio.js";
 import { buildSearchIndex } from "./data/searchIndex.js";
 import { MapRenderer } from "./renderer/MapRenderer.js";
@@ -32,12 +32,15 @@ document.body.appendChild(loading);
 
 async function boot(): Promise<void> {
   try {
-    // Parallel fetch: system data + planet name index
+    // Parallel fetch: system data + planet name index + CX stations
     const [, planetSummaries] = await Promise.all([
       loadSystemData(),
       fetchAllPlanetNames().catch((err) => {
         console.warn("Planet index fetch failed, search will be systems-only:", err);
         return [];
+      }),
+      loadCxStations().catch((err) => {
+        console.warn("CX station fetch failed, CX markers will be hidden:", err);
       }),
     ]);
 
@@ -56,7 +59,7 @@ async function boot(): Promise<void> {
 
     const viewport = renderer.getViewport();
     if (viewport) {
-      setupControls(viewport, panelManager, searchBar);
+      setupControls(viewport, panelManager, searchBar, renderer);
     }
   } catch (err) {
     loading.textContent = "";

@@ -1,6 +1,7 @@
 import type {
   FioSystem,
   FioPlanet,
+  FioCxStation,
   StarSystem,
   JumpConnection,
   SpectralType,
@@ -8,7 +9,7 @@ import type {
   Planet,
   SectorHex,
 } from "../types/index.js";
-import { fetchSystems, fetchSystemPlanets } from "./fio.js";
+import { fetchSystems, fetchSystemPlanets, fetchCxStations } from "./fio.js";
 import { getTheme } from "../ui/theme.js";
 
 const WORLD_SCALE = 4;
@@ -43,6 +44,9 @@ const planetsBySystem: Map<string, Planet[]> = new Map();
 
 // Track in-flight fetches to avoid duplicate requests
 const pendingFetches: Map<string, Promise<Planet[]>> = new Map();
+
+// CX stations keyed by SystemId
+const cxBySystem: Map<string, FioCxStation> = new Map();
 
 function validateSpectralType(type: string): SpectralType {
   if (VALID_SPECTRAL.has(type)) {
@@ -314,4 +318,20 @@ export async function loadPlanetsForSystem(naturalId: string): Promise<Planet[]>
 
   pendingFetches.set(naturalId, promise);
   return promise;
+}
+
+export async function loadCxStations(): Promise<void> {
+  const stations = await fetchCxStations();
+  for (const s of stations) {
+    cxBySystem.set(s.SystemId, s);
+  }
+  console.log(`Loaded ${stations.length} CX stations`);
+}
+
+export function getCxForSystem(systemId: string): FioCxStation | null {
+  return cxBySystem.get(systemId) ?? null;
+}
+
+export function getAllCxStations(): FioCxStation[] {
+  return Array.from(cxBySystem.values());
 }

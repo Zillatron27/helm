@@ -1,4 +1,4 @@
-import type { FioSystem, FioPlanet, FioPlanetSummary } from "../types/index.js";
+import type { FioSystem, FioPlanet, FioPlanetSummary, FioCxStation } from "../types/index.js";
 
 const FIO_BASE = "https://rest.fnar.net";
 
@@ -106,4 +106,30 @@ export async function fetchAllPlanetNames(): Promise<FioPlanetSummary[]> {
   }
 
   return data as FioPlanetSummary[];
+}
+
+export async function fetchCxStations(): Promise<FioCxStation[]> {
+  const response = await fetch(`${FIO_BASE}/exchange/station`);
+
+  if (!response.ok) {
+    throw new Error(
+      `FIO CX station API error: ${response.status} ${response.statusText}`
+    );
+  }
+
+  const data: unknown = await response.json();
+
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error("FIO CX station API returned empty or invalid data");
+  }
+
+  const sample = data[0] as Record<string, unknown>;
+  const required = ["ComexCode", "Name", "SystemId", "CountryCode", "CurrencyCode"];
+  for (const field of required) {
+    if (!(field in sample)) {
+      throw new Error(`FIO CX station response missing required field: ${field}`);
+    }
+  }
+
+  return data as FioCxStation[];
 }

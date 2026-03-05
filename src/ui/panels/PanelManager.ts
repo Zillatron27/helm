@@ -12,6 +12,7 @@ import {
   getSystemById,
   getPlanetsForSystem,
   loadPlanetsForSystem,
+  getCxForSystem,
 } from "../../data/cache.js";
 import type { MapRenderer } from "../../renderer/MapRenderer.js";
 
@@ -88,6 +89,7 @@ export class PanelManager {
         <button class="panel-close" aria-label="Close panel">&times;</button>
       </div>
       <div class="panel-body">
+        ${this.renderCxSection(system.id)}
         ${this.renderPlanetsSection(planets)}
         ${this.renderConnectionsSection(system)}
         ${this.renderZoomButton(system)}
@@ -116,6 +118,42 @@ export class PanelManager {
         this.navigateToSystem(targetId);
       });
     });
+  }
+
+  private renderCxSection(systemId: string): string {
+    const cx = getCxForSystem(systemId);
+    if (!cx) return "";
+
+    const factionNames: Record<string, string> = {
+      AI: "Antares Initiative",
+      CI: "Castillo-Ito Mercantile",
+      IC: "Insitor Cooperative",
+      NC: "NEO Charter Exploration",
+    };
+
+    const faction = factionNames[cx.CountryCode] ?? cx.CountryCode;
+
+    return `
+      <div class="panel-section">
+        <h3 class="panel-section-title">Commodity Exchange</h3>
+        <div class="panel-row">
+          <span class="panel-row-label">Station</span>
+          <span class="panel-row-value">${esc(cx.Name)}</span>
+        </div>
+        <div class="panel-row">
+          <span class="panel-row-label">Code</span>
+          <span class="panel-row-value">${esc(cx.ComexCode)}</span>
+        </div>
+        <div class="panel-row">
+          <span class="panel-row-label">Faction</span>
+          <span class="panel-row-value">${esc(faction)}</span>
+        </div>
+        <div class="panel-row">
+          <span class="panel-row-label">Currency</span>
+          <span class="panel-row-value">${esc(cx.CurrencyCode)}</span>
+        </div>
+      </div>
+    `;
   }
 
   private renderPlanetsSection(planets: Planet[] | null): string {

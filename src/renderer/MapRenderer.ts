@@ -18,8 +18,11 @@ import { SystemLayer } from "./SystemLayer.js";
 import {
   getViewLevel,
   getFocusedSystemId,
+  getSelectedEntity,
   getActiveRoute,
   setSelectedEntity,
+  setFocusedSystem,
+  setViewLevel,
   onStateChange,
 } from "../ui/state.js";
 
@@ -28,6 +31,10 @@ const MAX_ZOOM = 8.0;
 const WORLD_PADDING = 500;
 const SYSTEM_ZOOM_SCALE = 1.3;
 const TRANSITION_MS = 800;
+const NEIGHBOURHOOD_SCALE_FACTOR = 4;
+const SYSTEM_VIEW_HEX_ALPHA = 0.05;
+const SYSTEM_DISMISS_THRESHOLD = SYSTEM_ZOOM_SCALE * 0.8;
+const DESELECT_THRESHOLD_FACTOR = 1.5;
 
 export class MapRenderer {
   private app: Application | null = null;
@@ -38,6 +45,9 @@ export class MapRenderer {
   private systemLayer: SystemLayer | null = null;
   private fitScale = 1;
   private prevViewLevel: "galaxy" | "system" = "galaxy";
+  private lastFocusedSystemId: string | null = null;
+  private isAnimating = false;
+  private suppressTransitionAnimation = false;
 
   async init(container: HTMLElement): Promise<void> {
     const theme = getTheme();
@@ -107,11 +117,24 @@ export class MapRenderer {
     });
     this.background.updateParallax(viewport);
 
-    // Empty-space click closes panel
+    // Zoom threshold auto-dismiss
+    viewport.on("zoomed", () => this.checkZoomThresholds());
+
+    // Empty-space click cascade (mirrors Escape key behaviour)
+    // Guard against double-click cascading through two steps
+    let lastEmptyClickTime = 0;
     viewport.on("pointertap", (e) => {
-      // Only deselect if the click target is the viewport itself (not a star/planet)
-      if (e.target === viewport) {
+      if (e.target !== viewport) return;
+
+      const now = performance.now();
+      if (now - lastEmptyClickTime < 300) return;
+      lastEmptyClickTime = now;
+
+      if (getSelectedEntity() !== null) {
         setSelectedEntity(null);
+      } else if (getViewLevel() === "system") {
+        setFocusedSystem(null);
+        setViewLevel("galaxy");
       }
     });
 
@@ -129,12 +152,24 @@ export class MapRenderer {
     const focusedId = getFocusedSystemId();
 
     if (viewLevel === "system" && this.prevViewLevel === "galaxy" && focusedId) {
+      this.lastFocusedSystemId = focusedId;
       this.zoomToSystem(focusedId);
     } else if (viewLevel === "galaxy" && this.prevViewLevel === "system") {
-      this.zoomToGalaxy();
+      if (!this.suppressTransitionAnimation) {
+        this.zoomToNeighbourhood();
+      }
+      this.suppressTransitionAnimation = false;
     }
 
     this.prevViewLevel = viewLevel;
+
+    // Connection highlight for selected system (galaxy view only)
+    if (viewLevel === "galaxy") {
+      const selected = getSelectedEntity();
+      const selectedSystemId =
+        selected && selected.type === "system" ? selected.id : null;
+      this.galaxy?.setSelectedSystem(selectedSystemId);
+    }
 
     // Route overlay
     const route = getActiveRoute();
@@ -153,33 +188,102 @@ export class MapRenderer {
     if (!system) return;
 
     // Animate camera to system position
+    this.isAnimating = true;
     viewport.animate({
       position: { x: system.worldX, y: system.worldY },
       scale: SYSTEM_ZOOM_SCALE,
       time: TRANSITION_MS,
       ease: "easeInOutCubic",
       callbackOnComplete: () => {
-        // Dim galaxy layer, show system
+        this.isAnimating = false;
+        // Dim galaxy + hex grid, show system
         this.galaxy?.dimExcept(systemId);
+        if (this.hexGrid) {
+          this.hexGrid.container.alpha = SYSTEM_VIEW_HEX_ALPHA;
+        }
         this.showSystemView(system);
       },
     });
   }
 
-  private zoomToGalaxy(): void {
+  private zoomToNeighbourhood(): void {
     const viewport = this.viewport;
     if (!viewport) return;
 
-    // Hide system layer first
+    // Hide system layer, restore galaxy + hex grid
     this.systemLayer?.hide();
     this.galaxy?.restore();
+    if (this.hexGrid) {
+      this.hexGrid.container.alpha = 1;
+    }
 
+    // Zoom to sector neighbourhood centred on the system we just left
+    const system = this.lastFocusedSystemId
+      ? getSystemById(this.lastFocusedSystemId)
+      : null;
+    const centreX = system ? system.worldX : 0;
+    const centreY = system ? system.worldY : 0;
+    const targetScale = system
+      ? this.fitScale * NEIGHBOURHOOD_SCALE_FACTOR
+      : this.fitScale;
+
+    this.isAnimating = true;
+    viewport.animate({
+      position: { x: centreX, y: centreY },
+      scale: targetScale,
+      time: TRANSITION_MS,
+      ease: "easeInOutCubic",
+      callbackOnComplete: () => {
+        this.isAnimating = false;
+      },
+    });
+  }
+
+  zoomToGalaxyFit(): void {
+    const viewport = this.viewport;
+    if (!viewport) return;
+
+    this.isAnimating = true;
     viewport.animate({
       position: { x: 0, y: 0 },
       scale: this.fitScale,
       time: TRANSITION_MS,
       ease: "easeInOutCubic",
+      callbackOnComplete: () => {
+        this.isAnimating = false;
+      },
     });
+  }
+
+  private checkZoomThresholds(): void {
+    if (this.isAnimating) return;
+    const viewport = this.viewport;
+    if (!viewport) return;
+    const scale = viewport.scaled;
+
+    // Auto-dismiss system view when zooming out
+    if (getViewLevel() === "system" && scale < SYSTEM_DISMISS_THRESHOLD) {
+      // Direct cleanup — no animated transition
+      this.systemLayer?.hide();
+      this.galaxy?.restore();
+      if (this.hexGrid) {
+        this.hexGrid.container.alpha = 1;
+      }
+      this.suppressTransitionAnimation = true;
+      setSelectedEntity(null);
+      setFocusedSystem(null);
+      setViewLevel("galaxy");
+      return;
+    }
+
+    // Auto-deselect at galaxy level when zoomed out far
+    if (
+      getViewLevel() === "galaxy" &&
+      getSelectedEntity() !== null &&
+      scale < this.fitScale * DESELECT_THRESHOLD_FACTOR
+    ) {
+      setSelectedEntity(null);
+    }
   }
 
   private showSystemView(system: StarSystem): void {
@@ -221,11 +325,15 @@ export class MapRenderer {
     const system = getSystemById(systemId);
     if (!system) return;
 
+    this.isAnimating = true;
     viewport.animate({
       position: { x: system.worldX, y: system.worldY },
       scale: Math.max(viewport.scaled, this.fitScale * 2),
       time: TRANSITION_MS,
       ease: "easeInOutCubic",
+      callbackOnComplete: () => {
+        this.isAnimating = false;
+      },
     });
 
     setSelectedEntity({ type: "system", id: systemId });

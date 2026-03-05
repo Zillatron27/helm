@@ -7,6 +7,7 @@ import {
 } from "./state.js";
 import type { PanelManager } from "./panels/PanelManager.js";
 import type { SearchBar } from "./search/SearchBar.js";
+import type { MapRenderer } from "../renderer/MapRenderer.js";
 
 const PAN_SPEED = 300; // pixels of visual movement per keypress
 const ZOOM_STEP = 0.15; // fraction per keypress
@@ -16,7 +17,8 @@ let handler: ((e: KeyboardEvent) => void) | null = null;
 export function setupControls(
   viewport: Viewport,
   panelManager: PanelManager,
-  searchBar: SearchBar
+  searchBar: SearchBar,
+  renderer: MapRenderer
 ): void {
   handler = (e: KeyboardEvent) => {
     // Skip if user is typing in an input
@@ -43,9 +45,12 @@ export function setupControls(
           // Close panel first
           setSelectedEntity(null);
         } else if (getViewLevel() === "system") {
-          // Zoom out to galaxy
+          // First escape: exit system view to neighbourhood
           setFocusedSystem(null);
           setViewLevel("galaxy");
+        } else {
+          // Second escape: zoom to full galaxy fit
+          renderer.zoomToGalaxyFit();
         }
         break;
       case "ArrowLeft":

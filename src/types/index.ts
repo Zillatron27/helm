@@ -133,6 +133,17 @@ export interface SectorHex {
   worldY: number;
 }
 
+// FIO CX station from GET /exchange/station
+export interface FioCxStation {
+  ComexCode: string;
+  Name: string;
+  SystemId: string;
+  SystemNaturalId: string;
+  SystemName: string;
+  CountryCode: string;
+  CurrencyCode: string;
+}
+
 // Lightweight planet index from GET /planet/allplanets
 export interface FioPlanetSummary {
   PlanetNaturalId: string;
