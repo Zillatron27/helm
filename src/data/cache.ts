@@ -9,7 +9,7 @@ import type {
   Planet,
   SectorHex,
 } from "../types/index.js";
-import { fetchSystems, fetchSystemPlanets, fetchCxStations } from "./fio.js";
+import { fetchSystems, fetchSystemPlanets, fetchCxStations, fetchMaterials } from "./fio.js";
 import { getTheme } from "../ui/theme.js";
 
 const WORLD_SCALE = 4;
@@ -47,6 +47,9 @@ const pendingFetches: Map<string, Promise<Planet[]>> = new Map();
 
 // CX stations keyed by SystemId
 const cxBySystem: Map<string, FioCxStation> = new Map();
+
+// Material ticker lookup: MaterialId → Ticker
+const materialTickers: Map<string, string> = new Map();
 
 function validateSpectralType(type: string): SpectralType {
   if (VALID_SPECTRAL.has(type)) {
@@ -334,4 +337,16 @@ export function getCxForSystem(systemId: string): FioCxStation | null {
 
 export function getAllCxStations(): FioCxStation[] {
   return Array.from(cxBySystem.values());
+}
+
+export async function loadMaterials(): Promise<void> {
+  const materials = await fetchMaterials();
+  for (const m of materials) {
+    materialTickers.set(m.MaterialId, m.Ticker);
+  }
+  console.log(`Loaded ${materials.length} material tickers`);
+}
+
+export function getMaterialTicker(materialId: string): string {
+  return materialTickers.get(materialId) ?? materialId;
 }

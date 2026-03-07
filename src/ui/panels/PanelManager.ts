@@ -13,6 +13,7 @@ import {
   getPlanetsForSystem,
   loadPlanetsForSystem,
   getCxForSystem,
+  getMaterialTicker,
 } from "../../data/cache.js";
 import type { MapRenderer } from "../../renderer/MapRenderer.js";
 
@@ -307,7 +308,7 @@ export class PanelManager {
       .map(
         (r) => `
           <div class="panel-resource">
-            <span class="panel-resource-ticker">${esc(r.MaterialId)}</span>
+            <span class="panel-resource-ticker">${esc(getMaterialTicker(r.MaterialId))}</span>
             <span class="panel-resource-type">${esc(formatResourceType(r.ResourceType))}</span>
             <div class="panel-resource-bar">
               <div class="panel-resource-bar-fill" style="width: ${Math.round(r.Factor * 100)}%"></div>

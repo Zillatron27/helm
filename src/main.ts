@@ -1,5 +1,5 @@
 import { VERSION } from "./version.js";
-import { loadSystemData, loadCxStations, getSystems } from "./data/cache.js";
+import { loadSystemData, loadCxStations, loadMaterials, getSystems } from "./data/cache.js";
 import { fetchAllPlanetNames } from "./data/fio.js";
 import { buildSearchIndex } from "./data/searchIndex.js";
 import { MapRenderer } from "./renderer/MapRenderer.js";
@@ -41,6 +41,9 @@ async function boot(): Promise<void> {
       }),
       loadCxStations().catch((err) => {
         console.warn("CX station fetch failed, CX markers will be hidden:", err);
+      }),
+      loadMaterials().catch((err) => {
+        console.warn("Materials fetch failed, resource codes will show IDs:", err);
       }),
     ]);
 

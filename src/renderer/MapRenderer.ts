@@ -15,6 +15,7 @@ import { BackgroundLayer } from "./BackgroundLayer.js";
 import { HexGridLayer } from "./HexGridLayer.js";
 import { GalaxyLayer } from "./GalaxyLayer.js";
 import { SystemLayer } from "./SystemLayer.js";
+import { TweenManager } from "./Tween.js";
 import {
   getViewLevel,
   getFocusedSystemId,
@@ -48,6 +49,8 @@ export class MapRenderer {
   private lastFocusedSystemId: string | null = null;
   private isAnimating = false;
   private suppressTransitionAnimation = false;
+  private elapsedTime = 0;
+  private tweens = new TweenManager();
 
   async init(container: HTMLElement): Promise<void> {
     const theme = getTheme();
@@ -99,7 +102,7 @@ export class MapRenderer {
     viewport.addChild(this.hexGrid.container);
 
     // Galaxy layer — inside viewport (pans/zooms with camera)
-    this.galaxy = new GalaxyLayer(getSystems(), getConnections());
+    this.galaxy = new GalaxyLayer(getSystems(), getConnections(), this.tweens);
     viewport.addChild(this.galaxy.container);
 
     // System layer — also inside viewport, above galaxy
@@ -111,11 +114,38 @@ export class MapRenderer {
     viewport.fitWorld(true);
     this.fitScale = viewport.scaled;
 
-    // Wire parallax updates
+    // Wire parallax + zoom-responsive line weight updates
     viewport.on("moved", () => {
       this.background?.updateParallax(viewport);
+
+      const scale = viewport.scaled;
+      this.galaxy?.redrawConnections(scale);
+      this.galaxy?.redrawRoute(scale);
+      this.galaxy?.updateHighlightScale(scale);
+      this.galaxy?.updateLabelVisibility(scale);
+      this.hexGrid?.redraw(scale);
     });
     this.background.updateParallax(viewport);
+
+    // Initial zoom-responsive draw at fitWorld scale
+    const initialScale = viewport.scaled;
+    this.galaxy?.redrawConnections(initialScale);
+    this.galaxy?.updateLabelVisibility(initialScale);
+    this.hexGrid?.redraw(initialScale);
+
+    // Per-frame animation ticker
+    app.ticker.add((ticker) => {
+      const dt = ticker.deltaMS / 1000;
+      this.tweens.update(dt);
+      this.galaxy?.updateParticles(dt);
+      this.elapsedTime += dt;
+      if (getViewLevel() === "galaxy") {
+        this.galaxy?.updateCxPulse(this.elapsedTime);
+        this.galaxy?.updateTwinkle(this.elapsedTime);
+      } else {
+        this.systemLayer?.update(dt, this.elapsedTime);
+      }
+    });
 
     // Zoom threshold auto-dismiss
     viewport.on("zoomed", () => this.checkZoomThresholds());
@@ -187,6 +217,12 @@ export class MapRenderer {
     const system = getSystemById(systemId);
     if (!system) return;
 
+    // Start dim tweens concurrent with camera animation
+    this.galaxy?.dimExcept(systemId, this.tweens);
+    if (this.hexGrid) {
+      this.tweens.to(this.hexGrid.container, "alpha", SYSTEM_VIEW_HEX_ALPHA, 0.6);
+    }
+
     // Animate camera to system position
     this.isAnimating = true;
     viewport.animate({
@@ -196,11 +232,6 @@ export class MapRenderer {
       ease: "easeInOutCubic",
       callbackOnComplete: () => {
         this.isAnimating = false;
-        // Dim galaxy + hex grid, show system
-        this.galaxy?.dimExcept(systemId);
-        if (this.hexGrid) {
-          this.hexGrid.container.alpha = SYSTEM_VIEW_HEX_ALPHA;
-        }
         this.showSystemView(system);
       },
     });
@@ -210,11 +241,11 @@ export class MapRenderer {
     const viewport = this.viewport;
     if (!viewport) return;
 
-    // Hide system layer, restore galaxy + hex grid
+    // Hide system layer, restore galaxy + hex grid with tweened fade-in
     this.systemLayer?.hide();
-    this.galaxy?.restore();
+    this.galaxy?.restore(this.tweens);
     if (this.hexGrid) {
-      this.hexGrid.container.alpha = 1;
+      this.tweens.to(this.hexGrid.container, "alpha", 1, 0.4);
     }
 
     // Zoom to sector neighbourhood centred on the system we just left
@@ -263,11 +294,11 @@ export class MapRenderer {
 
     // Auto-dismiss system view when zooming out
     if (getViewLevel() === "system" && scale < SYSTEM_DISMISS_THRESHOLD) {
-      // Direct cleanup — no animated transition
+      // Direct cleanup — tweened restore
       this.systemLayer?.hide();
-      this.galaxy?.restore();
+      this.galaxy?.restore(this.tweens);
       if (this.hexGrid) {
-        this.hexGrid.container.alpha = 1;
+        this.tweens.to(this.hexGrid.container, "alpha", 1, 0.3);
       }
       this.suppressTransitionAnimation = true;
       setSelectedEntity(null);

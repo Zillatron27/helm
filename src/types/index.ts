@@ -144,6 +144,14 @@ export interface FioCxStation {
   CurrencyCode: string;
 }
 
+// FIO material from GET /material/allmaterials
+export interface FioMaterial {
+  MaterialId: string;
+  Ticker: string;
+  Name: string;
+  CategoryName: string;
+}
+
 // Lightweight planet index from GET /planet/allplanets
 export interface FioPlanetSummary {
   PlanetNaturalId: string;
