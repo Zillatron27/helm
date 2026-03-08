@@ -31,10 +31,10 @@ loading.style.cssText = `
 loading.textContent = "Loading galaxy data...";
 document.body.appendChild(loading);
 
-const GATEWAY_ICON_SVG = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-  <path d="M2 18 Q2 8 12 8 Q22 8 22 18"/>
-  <circle cx="2" cy="18" r="2"/>
-  <circle cx="22" cy="18" r="2"/>
+const GATEWAY_ICON_SVG = `<svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+  <circle cx="4" cy="18" r="3"/>
+  <circle cx="22" cy="18" r="3"/>
+  <path d="M4 15 C4 3 22 3 22 15"/>
 </svg>`;
 
 async function boot(): Promise<void> {
