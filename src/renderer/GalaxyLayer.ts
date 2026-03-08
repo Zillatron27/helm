@@ -6,7 +6,7 @@ import {
   setViewLevel,
   setFocusedSystem,
 } from "../ui/state.js";
-import { getAllCxStations } from "../data/cache.js";
+import { getAllCxStations, getGalaxyGatewayConnections, isGatewaySystem } from "../data/cache.js";
 import { StarParticles } from "./StarParticles.js";
 import { TweenManager } from "./Tween.js";
 
@@ -44,7 +44,7 @@ const CX_DIAMOND_RADIUS = 40;
 const CX_STROKE_WIDTH = 3;
 const CX_STROKE_ALPHA = 0.7;
 const CX_FILL_ALPHA = 0.1;
-const CX_LABEL_SIZE = 28;
+const CX_LABEL_SIZE = 40;
 const CX_LABEL_ALPHA = 0.8;
 const CX_LABEL_OFFSET_Y = 48;
 
@@ -59,8 +59,8 @@ const SYSTEM_VIEW_FOCUSED_STAR_ALPHA = 0.3;
 const SYSTEM_VIEW_OTHER_STAR_ALPHA = 0.15;
 
 // Ambient system name labels
-const LABEL_FONT_SIZE = 14;
-const LABEL_TARGET_SCREEN_SIZE = 11;
+const LABEL_FONT_SIZE = 18;
+const LABEL_TARGET_SCREEN_SIZE = 14;
 const LABEL_SCALE_MIN = 0.5;
 const LABEL_SCALE_MAX = 4.0;
 const LABEL_COLOUR = 0xaaaaaa;
@@ -71,7 +71,7 @@ const LABEL_FADE_RANGE = 0.1;
 const LABEL_DIM_ALPHA = 0.15;
 
 // CX label zoom-responsive scaling
-const CX_LABEL_TARGET_SCREEN_SIZE = 14;
+const CX_LABEL_TARGET_SCREEN_SIZE = 18;
 const CX_LABEL_SCALE_MIN = 0.3;
 const CX_LABEL_SCALE_MAX = 3.0;
 
@@ -80,6 +80,19 @@ const GLOW_RADIUS_MULT = 2.5;
 const GLOW_ALPHA = 0.25;
 const GLOW_DIM_FACTOR = 0.15;
 const GLOW_HOVER_BOOST = 2.0;
+
+// Gateway visual parameters
+const GATEWAY_COLOUR = 0xbb77ff;
+const GATEWAY_INDICATOR_RADIUS = 7;
+const GATEWAY_INDICATOR_STROKE = 1.5;
+const GATEWAY_INDICATOR_ALPHA = 0.8;
+const GATEWAY_INDICATOR_OFFSET = 14; // offset from star centre (top-right)
+const GATEWAY_ARC_BASE = 1.5;
+const GATEWAY_ARC_MIN = 0.5;
+const GATEWAY_ARC_MAX = 5.0;
+const GATEWAY_ARC_ALPHA = 0.6;
+const GATEWAY_ARC_HEIGHT_FACTOR = 0.3;
+const GATEWAY_ARC_HEIGHT_MAX = 200;
 
 let glowTexture: Texture | null = null;
 function getGlowTexture(): Texture {
@@ -117,6 +130,11 @@ export class GalaxyLayer {
   private routeOverlay: Graphics;
   private cxMarkers: Container;
   private cxBeacons: { diamond: Graphics; label: Text; phaseOffset: number }[] = [];
+
+  // Gateway layers
+  private gatewayIndicators: Container;
+  private gatewayArcs: Graphics;
+  private lastGatewayArcScale = 0;
 
   // Highlight state
   private hoveredSystemId: string | null = null;
@@ -183,6 +201,10 @@ export class GalaxyLayer {
     // Base connections — drawn via redrawConnections(), initially empty
     this.baseConnections = new Graphics();
     this.container.addChild(this.baseConnections);
+
+    // Gateway arcs — curved lines between gateway-linked systems
+    this.gatewayArcs = new Graphics();
+    this.container.addChild(this.gatewayArcs);
 
     // Highlight layer — on top of base connections, below route overlay
     this.highlightLayer = new Graphics();
@@ -341,10 +363,24 @@ export class GalaxyLayer {
       this.cxMarkers.addChild(marker);
     }
 
-    // Insert CX markers above stars but below route overlay
+    // Gateway system indicators — small purple rings offset top-right of star
+    this.gatewayIndicators = new Container();
+    this.gatewayIndicators.eventMode = "none";
+    for (const system of systems) {
+      if (!isGatewaySystem(system.id)) continue;
+      const indicator = new Graphics();
+      indicator.circle(0, 0, GATEWAY_INDICATOR_RADIUS);
+      indicator.stroke({ width: GATEWAY_INDICATOR_STROKE, color: GATEWAY_COLOUR, alpha: GATEWAY_INDICATOR_ALPHA });
+      indicator.x = system.worldX + GATEWAY_INDICATOR_OFFSET;
+      indicator.y = system.worldY - GATEWAY_INDICATOR_OFFSET;
+      this.gatewayIndicators.addChild(indicator);
+    }
+
+    // Insert CX markers and gateway indicators above stars but below route overlay
     // Stars are already added; re-add route overlay on top
     this.container.removeChild(this.routeOverlay);
     this.container.addChild(this.cxMarkers);
+    this.container.addChild(this.gatewayIndicators);
     this.container.addChild(this.routeOverlay);
   }
 
@@ -510,6 +546,8 @@ export class GalaxyLayer {
       tw.to(this.routeOverlay, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
       tw.to(this.cxMarkers, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
       tw.to(this.glowContainer, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
+      tw.to(this.gatewayArcs, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
+      tw.to(this.gatewayIndicators, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
       // Fade out ambient labels then hide
       tw.to(this.ambientLabels, "alpha", 0, 0.3);
     } else {
@@ -517,6 +555,8 @@ export class GalaxyLayer {
       this.routeOverlay.alpha = SYSTEM_VIEW_LINES_ALPHA;
       this.cxMarkers.alpha = SYSTEM_VIEW_LINES_ALPHA;
       this.glowContainer.alpha = SYSTEM_VIEW_LINES_ALPHA;
+      this.gatewayArcs.alpha = SYSTEM_VIEW_LINES_ALPHA;
+      this.gatewayIndicators.alpha = SYSTEM_VIEW_LINES_ALPHA;
       this.ambientLabels.visible = false;
     }
 
@@ -543,11 +583,15 @@ export class GalaxyLayer {
       tw.to(this.routeOverlay, "alpha", 1, dur);
       tw.to(this.cxMarkers, "alpha", 1, dur);
       tw.to(this.glowContainer, "alpha", 1, dur);
+      tw.to(this.gatewayArcs, "alpha", 1, dur);
+      tw.to(this.gatewayIndicators, "alpha", 1, dur);
     } else {
       this.baseConnections.alpha = 1;
       this.routeOverlay.alpha = 1;
       this.cxMarkers.alpha = 1;
       this.glowContainer.alpha = 1;
+      this.gatewayArcs.alpha = 1;
+      this.gatewayIndicators.alpha = 1;
     }
 
     for (const star of this.starGraphics.values()) {
@@ -657,6 +701,36 @@ export class GalaxyLayer {
       this.baseConnections.lineTo(to.worldX, to.worldY);
     }
     this.baseConnections.stroke({ width, color: theme.jumpLine, alpha: theme.jumpLineAlpha });
+  }
+
+  /** Redraw gateway arcs if zoom changed significantly. */
+  redrawGatewayArcs(scale: number): void {
+    if (this.lastGatewayArcScale > 0) {
+      const ratio = scale / this.lastGatewayArcScale;
+      if (ratio > REDRAW_THRESHOLD_LOW && ratio < REDRAW_THRESHOLD_HIGH) return;
+    }
+    this.lastGatewayArcScale = scale;
+
+    const width = scaledWidth(GATEWAY_ARC_BASE, GATEWAY_ARC_MIN, GATEWAY_ARC_MAX, scale);
+    const gwConns = getGalaxyGatewayConnections();
+
+    this.gatewayArcs.clear();
+    for (const gw of gwConns) {
+      const from = this.systemLookup.get(gw.fromSystemId);
+      const to = this.systemLookup.get(gw.toSystemId);
+      if (!from || !to) continue;
+
+      const midX = (from.worldX + to.worldX) / 2;
+      const midY = (from.worldY + to.worldY) / 2;
+      const dx = to.worldX - from.worldX;
+      const dy = to.worldY - from.worldY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const arcHeight = Math.min(dist * GATEWAY_ARC_HEIGHT_FACTOR, GATEWAY_ARC_HEIGHT_MAX);
+
+      this.gatewayArcs.moveTo(from.worldX, from.worldY);
+      this.gatewayArcs.quadraticCurveTo(midX, midY - arcHeight, to.worldX, to.worldY);
+    }
+    this.gatewayArcs.stroke({ width, color: GATEWAY_COLOUR, alpha: GATEWAY_ARC_ALPHA });
   }
 
   /** Redraw route overlay if zoom changed significantly. */
