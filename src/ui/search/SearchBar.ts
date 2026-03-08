@@ -5,9 +5,9 @@ import type { MapRenderer } from "../../renderer/MapRenderer.js";
 
 const DEBOUNCE_MS = 50;
 
-const SEARCH_ICON_SVG = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-  <circle cx="7.5" cy="7.5" r="5.5"/>
-  <line x1="11.5" y1="11.5" x2="16" y2="16"/>
+const SEARCH_ICON_SVG = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+  <circle cx="10" cy="10" r="7"/>
+  <line x1="15.5" y1="15.5" x2="21" y2="21"/>
 </svg>`;
 
 export class SearchBar {

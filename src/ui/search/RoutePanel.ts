@@ -5,10 +5,10 @@ import type { SearchEntry } from "../../types/index.js";
 
 const DEBOUNCE_MS = 50;
 
-const ROUTE_ICON_SVG = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-  <circle cx="4" cy="4" r="2"/>
-  <circle cx="14" cy="14" r="2"/>
-  <line x1="6" y1="6" x2="12" y2="12"/>
+const ROUTE_ICON_SVG = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+  <circle cx="5" cy="5" r="3"/>
+  <circle cx="19" cy="19" r="3"/>
+  <line x1="8" y1="8" x2="16" y2="16"/>
 </svg>`;
 
 interface RouteField {
