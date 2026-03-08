@@ -32,9 +32,9 @@ loading.textContent = "Loading galaxy data...";
 document.body.appendChild(loading);
 
 const GATEWAY_ICON_SVG = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-  <path d="M3 15 Q3 5 9 5 Q15 5 15 15"/>
-  <circle cx="3" cy="15" r="1.5" fill="currentColor" stroke="none"/>
-  <circle cx="15" cy="15" r="1.5" fill="currentColor" stroke="none"/>
+  <path d="M1 14 Q1 6 9 6 Q17 6 17 14"/>
+  <circle cx="1" cy="14" r="1.5"/>
+  <circle cx="17" cy="14" r="1.5"/>
 </svg>`;
 
 async function boot(): Promise<void> {
