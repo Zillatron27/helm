@@ -5,26 +5,30 @@ import type { MapRenderer } from "../../renderer/MapRenderer.js";
 
 const DEBOUNCE_MS = 50;
 
+// SVG magnifying glass icon
+const SEARCH_ICON_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`;
+
 export class SearchBar {
-  private containerEl: HTMLElement;
+  private rowEl: HTMLElement;
+  private buttonEl: HTMLButtonElement;
+  private expandedEl: HTMLElement;
   private inputEl: HTMLInputElement;
-  private hintEl: HTMLElement;
   private dropdownEl: HTMLElement;
   private renderer: MapRenderer | null = null;
   private results: SearchEntry[] = [];
   private activeIndex = -1;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private expanded = false;
 
   constructor() {
-    // Container
-    this.containerEl = document.createElement("div");
-    this.containerEl.id = "search-container";
+    // Row container — holds expanded field + icon button
+    this.rowEl = document.createElement("div");
+    this.rowEl.className = "toolbar-row";
 
-    // Search bar wrapper
-    const bar = document.createElement("div");
-    bar.className = "search-bar";
+    // Expanded search field (hidden by default)
+    this.expandedEl = document.createElement("div");
+    this.expandedEl.className = "toolbar-expand toolbar-expand-search";
 
-    // Input
     this.inputEl = document.createElement("input");
     this.inputEl.type = "text";
     this.inputEl.className = "search-input";
@@ -32,23 +36,28 @@ export class SearchBar {
     this.inputEl.autocomplete = "off";
     this.inputEl.spellcheck = false;
 
-    // Keyboard hint
-    this.hintEl = document.createElement("kbd");
-    this.hintEl.className = "search-hint";
-    this.hintEl.textContent = "/";
-
-    bar.appendChild(this.inputEl);
-    bar.appendChild(this.hintEl);
+    this.expandedEl.appendChild(this.inputEl);
 
     // Dropdown
     this.dropdownEl = document.createElement("div");
     this.dropdownEl.className = "search-dropdown";
+    this.expandedEl.appendChild(this.dropdownEl);
 
-    this.containerEl.appendChild(bar);
-    this.containerEl.appendChild(this.dropdownEl);
-    document.body.appendChild(this.containerEl);
+    // Icon button
+    this.buttonEl = document.createElement("button");
+    this.buttonEl.className = "toolbar-btn";
+    this.buttonEl.innerHTML = SEARCH_ICON_SVG;
+    this.buttonEl.title = "Search (/)";
+    this.buttonEl.addEventListener("click", () => this.toggleExpand());
+
+    this.rowEl.appendChild(this.expandedEl);
+    this.rowEl.appendChild(this.buttonEl);
 
     this.bindEvents();
+  }
+
+  getElement(): HTMLElement {
+    return this.rowEl;
   }
 
   init(renderer: MapRenderer): void {
@@ -56,7 +65,34 @@ export class SearchBar {
   }
 
   focus(): void {
+    if (!this.expanded) {
+      this.expand();
+    }
     this.inputEl.focus();
+  }
+
+  private toggleExpand(): void {
+    if (this.expanded) {
+      this.collapse();
+    } else {
+      this.expand();
+    }
+  }
+
+  private expand(): void {
+    this.expanded = true;
+    this.expandedEl.classList.add("toolbar-expand-open");
+    this.buttonEl.classList.add("toolbar-btn-active");
+    // Focus after transition
+    setTimeout(() => this.inputEl.focus(), 50);
+  }
+
+  private collapse(): void {
+    this.expanded = false;
+    this.expandedEl.classList.remove("toolbar-expand-open");
+    this.buttonEl.classList.remove("toolbar-btn-active");
+    this.inputEl.value = "";
+    this.hideDropdown();
   }
 
   private bindEvents(): void {
@@ -77,7 +113,6 @@ export class SearchBar {
 
   private onFocus(): void {
     setSearchFocused(true);
-    this.hintEl.style.display = "none";
     if (this.inputEl.value) {
       this.runSearch();
     }
@@ -85,9 +120,14 @@ export class SearchBar {
 
   private onBlur(): void {
     setSearchFocused(false);
-    this.hintEl.style.display = "";
     // Delay hide so mousedown on results fires first
-    setTimeout(() => this.hideDropdown(), 150);
+    setTimeout(() => {
+      this.hideDropdown();
+      // Collapse if input is empty
+      if (!this.inputEl.value) {
+        this.collapse();
+      }
+    }, 150);
   }
 
   private onKeyDown(e: KeyboardEvent): void {
@@ -109,8 +149,7 @@ export class SearchBar {
       case "Escape":
         e.preventDefault();
         e.stopPropagation();
-        this.inputEl.value = "";
-        this.hideDropdown();
+        this.collapse();
         this.inputEl.blur();
         break;
     }
@@ -156,48 +195,4 @@ export class SearchBar {
 
     // Bind mousedown (not click) to fire before blur
     this.dropdownEl.querySelectorAll(".search-result").forEach((el) => {
-      el.addEventListener("mousedown", (e) => {
-        e.preventDefault();
-        const idx = parseInt((el as HTMLElement).dataset["index"] ?? "-1", 10);
-        if (idx >= 0 && idx < this.results.length) {
-          this.selectResult(this.results[idx]!);
-        }
-      });
-    });
-  }
-
-  private hideDropdown(): void {
-    this.dropdownEl.classList.remove("search-dropdown-open");
-    this.dropdownEl.innerHTML = "";
-    this.results = [];
-    this.activeIndex = -1;
-  }
-
-  private moveSelection(delta: number): void {
-    if (this.results.length === 0) return;
-    this.activeIndex = Math.max(
-      0,
-      Math.min(this.results.length - 1, this.activeIndex + delta)
-    );
-    // Update active highlight without full re-render
-    this.dropdownEl.querySelectorAll(".search-result").forEach((el, i) => {
-      el.classList.toggle("search-result-active", i === this.activeIndex);
-    });
-  }
-
-  private selectResult(entry: SearchEntry): void {
-    this.inputEl.value = "";
-    this.hideDropdown();
-    this.inputEl.blur();
-
-    // Navigate camera to parent system and select it
-    setSelectedEntity({ type: "system", id: entry.systemId });
-    this.renderer?.panToSystem(entry.systemId);
-  }
-}
-
-function esc(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-  return div.innerHTML;
-}
+      el.
