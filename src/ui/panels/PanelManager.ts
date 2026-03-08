@@ -21,6 +21,7 @@ export class PanelManager {
   private containerEl: HTMLElement;
   private panelEl: HTMLElement;
   private renderer: MapRenderer | null = null;
+  private isOpen = false;
 
   constructor() {
     this.containerEl = document.createElement("div");
@@ -96,27 +97,28 @@ export class PanelManager {
         ${this.renderZoomButton(system)}
       </div>
     `;
-    this.setContent(html);
-    this.open();
+    this.setContent(html, () => {
+      this.open();
 
-    // Wire close button
-    this.panelEl.querySelector(".panel-close")?.addEventListener("click", () => {
-      setSelectedEntity(null);
-    });
+      // Wire close button
+      this.panelEl.querySelector(".panel-close")?.addEventListener("click", () => {
+        setSelectedEntity(null);
+      });
 
-    // Wire zoom button
-    this.panelEl.querySelector("[data-action='zoom']")?.addEventListener("click", () => {
-      setFocusedSystem(system.id);
-      setViewLevel("system");
-    });
+      // Wire zoom button
+      this.panelEl.querySelector("[data-action='zoom']")?.addEventListener("click", () => {
+        setFocusedSystem(system.id);
+        setViewLevel("system");
+      });
 
-    // Wire connection links
-    this.panelEl.querySelectorAll("[data-system-id]").forEach((el) => {
-      el.addEventListener("click", (e) => {
-        e.preventDefault();
-        const targetId = (el as HTMLElement).dataset["systemId"];
-        if (!targetId) return;
-        this.navigateToSystem(targetId);
+      // Wire connection links
+      this.panelEl.querySelectorAll("[data-system-id]").forEach((el) => {
+        el.addEventListener("click", (e) => {
+          e.preventDefault();
+          const targetId = (el as HTMLElement).dataset["systemId"];
+          if (!targetId) return;
+          this.navigateToSystem(targetId);
+        });
       });
     });
   }
@@ -247,11 +249,12 @@ export class PanelManager {
         ${this.renderFactionSection(planet)}
       </div>
     `;
-    this.setContent(html);
-    this.open();
+    this.setContent(html, () => {
+      this.open();
 
-    this.panelEl.querySelector(".panel-close")?.addEventListener("click", () => {
-      setSelectedEntity(null);
+      this.panelEl.querySelector(".panel-close")?.addEventListener("click", () => {
+        setSelectedEntity(null);
+      });
     });
   }
 
@@ -382,18 +385,37 @@ export class PanelManager {
     }
   }
 
-  private setContent(html: string): void {
-    this.panelEl.innerHTML = html;
+  private setContent(html: string, onReady?: () => void): void {
+    if (this.isOpen) {
+      // Panel already visible — cross-fade content
+      this.panelEl.style.transition = "opacity 0.12s ease";
+      this.panelEl.style.opacity = "0.3";
+
+      setTimeout(() => {
+        this.panelEl.innerHTML = html;
+        this.panelEl.style.opacity = "1";
+        setTimeout(() => {
+          this.panelEl.style.transition = "";
+          this.panelEl.style.opacity = "";
+        }, 150);
+        onReady?.();
+      }, 120);
+    } else {
+      this.panelEl.innerHTML = html;
+      onReady?.();
+    }
   }
 
   private open(): void {
     // Force reflow for transition
     void this.panelEl.offsetHeight;
     this.panelEl.classList.add("panel-open");
+    this.isOpen = true;
   }
 
   hide(): void {
     this.panelEl.classList.remove("panel-open");
+    this.isOpen = false;
   }
 
   isVisible(): boolean {

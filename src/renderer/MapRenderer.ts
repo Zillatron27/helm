@@ -114,12 +114,17 @@ export class MapRenderer {
     viewport.fitWorld(true);
     this.fitScale = viewport.scaled;
 
+    // Default zoom: closer than fitWorld so the galaxy fills the screen
+    const initialZoom = this.fitScale * 1.5;
+    viewport.setZoom(initialZoom, true);
+
     // Wire parallax + zoom-responsive line weight updates
     viewport.on("moved", () => {
       this.background?.updateParallax(viewport);
 
       const scale = viewport.scaled;
       this.galaxy?.redrawConnections(scale);
+      this.galaxy?.redrawGatewayArcs(scale);
       this.galaxy?.redrawRoute(scale);
       this.galaxy?.updateHighlightScale(scale);
       this.galaxy?.updateLabelVisibility(scale);
@@ -130,6 +135,7 @@ export class MapRenderer {
     // Initial zoom-responsive draw at fitWorld scale
     const initialScale = viewport.scaled;
     this.galaxy?.redrawConnections(initialScale);
+    this.galaxy?.redrawGatewayArcs(initialScale);
     this.galaxy?.updateLabelVisibility(initialScale);
     this.hexGrid?.redraw(initialScale);
 
@@ -181,9 +187,15 @@ export class MapRenderer {
     const viewLevel = getViewLevel();
     const focusedId = getFocusedSystemId();
 
-    if (viewLevel === "system" && this.prevViewLevel === "galaxy" && focusedId) {
-      this.lastFocusedSystemId = focusedId;
-      this.zoomToSystem(focusedId);
+    if (viewLevel === "system" && focusedId) {
+      if (this.prevViewLevel === "galaxy" || focusedId !== this.lastFocusedSystemId) {
+        // Fade out existing system layer if switching between systems
+        if (this.prevViewLevel === "system" && this.systemLayer) {
+          this.systemLayer.hide();
+        }
+        this.lastFocusedSystemId = focusedId;
+        this.zoomToSystem(focusedId);
+      }
     } else if (viewLevel === "galaxy" && this.prevViewLevel === "system") {
       if (!this.suppressTransitionAnimation) {
         this.zoomToNeighbourhood();
@@ -241,8 +253,13 @@ export class MapRenderer {
     const viewport = this.viewport;
     if (!viewport) return;
 
-    // Hide system layer, restore galaxy + hex grid with tweened fade-in
-    this.systemLayer?.hide();
+    // Fade out system layer, then hide after fade completes
+    if (this.systemLayer) {
+      this.tweens.to(this.systemLayer.container, "alpha", 0, 0.3);
+      setTimeout(() => {
+        this.systemLayer?.hide();
+      }, 300);
+    }
     this.galaxy?.restore(this.tweens);
     if (this.hexGrid) {
       this.tweens.to(this.hexGrid.container, "alpha", 1, 0.4);
@@ -294,8 +311,13 @@ export class MapRenderer {
 
     // Auto-dismiss system view when zooming out
     if (getViewLevel() === "system" && scale < SYSTEM_DISMISS_THRESHOLD) {
-      // Direct cleanup — tweened restore
-      this.systemLayer?.hide();
+      // Fade out system layer, then hide after fade completes
+      if (this.systemLayer) {
+        this.tweens.to(this.systemLayer.container, "alpha", 0, 0.3);
+        setTimeout(() => {
+          this.systemLayer?.hide();
+        }, 300);
+      }
       this.galaxy?.restore(this.tweens);
       if (this.hexGrid) {
         this.tweens.to(this.hexGrid.container, "alpha", 1, 0.3);
@@ -318,25 +340,20 @@ export class MapRenderer {
   }
 
   private showSystemView(system: StarSystem): void {
-    // Show system layer with cached planets or loading state
     const cached = getPlanetsForSystem(system.naturalId);
-    if (cached) {
-      this.systemLayer?.show(system, cached);
-      // Position at system world coordinates
-      if (this.systemLayer) {
-        this.systemLayer.container.x = system.worldX;
-        this.systemLayer.container.y = system.worldY;
-      }
-    } else {
-      // Show empty system layer while loading, then update
-      this.systemLayer?.show(system, []);
-      if (this.systemLayer) {
-        this.systemLayer.container.x = system.worldX;
-        this.systemLayer.container.y = system.worldY;
-      }
 
+    // First show — fade in from transparent
+    this.systemLayer?.show(system, cached ?? []);
+    if (this.systemLayer) {
+      this.systemLayer.container.x = system.worldX;
+      this.systemLayer.container.y = system.worldY;
+      this.systemLayer.container.alpha = 0;
+      this.tweens.to(this.systemLayer.container, "alpha", 1.0, 0.4);
+    }
+
+    // If planets weren't cached, fetch and update (no alpha change)
+    if (!cached) {
       loadPlanetsForSystem(system.naturalId).then((planets) => {
-        // Only update if still viewing this system
         if (getFocusedSystemId() === system.id && getViewLevel() === "system") {
           this.systemLayer?.show(system, planets);
           if (this.systemLayer) {
