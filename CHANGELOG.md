@@ -19,7 +19,7 @@ UI toolbar refactor and gateway toggle.
 
 ## 0.2.0 — 2026-03-05
 
-Phase 4a: Visual polish and interaction improvements.
+Phase 4: Visual polish, interaction improvements, and atmosphere.
 
 ### Added
 
@@ -29,11 +29,26 @@ Phase 4a: Visual polish and interaction improvements.
 - **Two-stage Escape from system view** — first Escape exits to sector neighbourhood (centred on the system you were viewing), second Escape zooms to full galaxy fit.
 - **Empty-space click cascade** — clicking empty space mirrors Escape behaviour: close panel, then exit system view. Double-click guard prevents cascading through two steps at once.
 - **Zoom-based auto-dismiss** — manually zooming out past the system view threshold automatically exits system view. Zooming out far at galaxy level auto-deselects.
+- **Nebula clouds** — Canvas2D radial gradient sprites at parallax 0.25, adding atmospheric depth to the galaxy view.
+- **Star twinkle** — per-star sine wave brightness oscillation with deterministic frequency/phase from system ID.
+- **System view glow** — radial gradient sprite on central star in system view.
+- **System view ambient particles** — 20 orbiting particles with 30-point trails around the central star.
+- **Procedural planet rendering** — Canvas2D sphere textures with data-driven colours, animated cloud wisps, seeded from planet ID hash.
+- **Procedural star spheres** — Canvas2D sphere lighting for stars in system view.
+- **System view fade-in/out** — 400ms fade-in on arrival, 300ms fade-out on exit.
+- **Panel content transitions** — cross-fade on content swap with deferred event wiring.
+- **System-to-system navigation** — double-click a star in system view to transition directly.
+- **Gateway connections** — purple bezier arcs between gateway-linked systems, small ring indicators on gateway systems, hover labels on gateway rings in system view.
+- **Floating detail panel** — compact card in bottom-right with backdrop blur.
+- **Material ticker resolution** — `/material/allmaterials` lookup resolves UUIDs to readable ticker codes in planet resource lists.
 
 ### Changed
 
-- Galaxy layer dims properly during system view — base connections, hex grid, route overlay, and CX markers all fade to near-invisible, not just stars.
+- Galaxy layer dims properly during system view — base connections, hex grid, route overlay, CX markers, and gateway layers all fade to near-invisible.
 - Star base radius increased from 4 to 7 with proportional hit area (24px).
+- All label sizes increased for readability at a glance.
+- Default zoom set to 1.5× fitWorld on initial load.
+- Smooth alpha transitions (TweenManager) for all state changes instead of instant snaps.
 
 ## 0.1.0 — 2026-03-04
 
