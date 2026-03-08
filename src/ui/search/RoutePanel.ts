@@ -111,6 +111,7 @@ export class RoutePanel {
     this.expanded = false;
     this.expandEl.classList.remove("toolbar-expand-open");
     this.btnEl.classList.remove("toolbar-btn-active");
+    this.clearRoute();
   }
 
   private createField(label: string): RouteField {
