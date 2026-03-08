@@ -7,7 +7,6 @@ let selectedEntity: SelectedEntity = null;
 let focusedSystemId: string | null = null;
 let activeRoute: Route | null = null;
 let searchFocused = false;
-let gatewaysVisible = true;
 
 const listeners: Set<StateListener> = new Set();
 
@@ -70,16 +69,6 @@ export function getSearchFocused(): boolean {
 
 export function setSearchFocused(focused: boolean): void {
   searchFocused = focused;
-}
-
-export function getGatewaysVisible(): boolean {
-  return gatewaysVisible;
-}
-
-export function setGatewaysVisible(visible: boolean): void {
-  if (visible === gatewaysVisible) return;
-  gatewaysVisible = visible;
-  notify();
 }
 
 export function onStateChange(listener: StateListener): void {
