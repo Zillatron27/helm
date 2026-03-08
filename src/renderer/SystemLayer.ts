@@ -1,7 +1,7 @@
 import { CanvasSource, Container, Graphics, Sprite, Text, Texture, Circle } from "pixi.js";
 import type { StarSystem, Planet } from "../types/index.js";
 import { getTheme, getSpectralColour } from "../ui/theme.js";
-import { setSelectedEntity } from "../ui/state.js";
+import { setSelectedEntity, getSelectedEntity, onStateChange } from "../ui/state.js";
 import { getGatewaysForPlanet, getSystemById } from "../data/cache.js";
 import type { GatewayEndpoint } from "../types/index.js";
 import { generatePlanetTexture, generateStarTexture, getCloudTexture, getCloudTint } from "./PlanetTexture.js";
@@ -64,6 +64,15 @@ const GATEWAY_RING_SPACING = 14; // horizontal spacing for multiple rings
 const GATEWAY_LINE_LENGTH = 60;
 const GATEWAY_LINE_SEGMENTS = 4;
 
+// Selection halo — Elite Dangerous-style blue arc
+const HALO_COLOUR = 0x3399ff;
+const HALO_ALPHA = 0.7;
+const HALO_STROKE = 2.0;
+const HALO_GAP = 6; // gap between planet edge and halo
+const HALO_ARC_SPAN = Math.PI * 0.7; // each arc covers 70% of a semicircle
+const HALO_PULSE_FREQUENCY = 2.0;
+const HALO_PULSE_AMPLITUDE = 0.2;
+
 interface PlanetCloud {
   sprite: Sprite;
   mask: Graphics;
@@ -89,17 +98,32 @@ interface AmbientParticle {
 export class SystemLayer {
   readonly container: Container;
   private planetSprites: Map<string, Sprite> = new Map();
+  private planetPositions: Map<string, { x: number; y: number; radius: number }> = new Map();
   private planetClouds: PlanetCloud[] = [];
   private ambientParticles: AmbientParticle[] = [];
   private particleGfx: Graphics;
   private particleColour = 0xffffff;
   private gatewayHoverLabel: Text | null = null;
+  private selectionHalo: Graphics;
+  private selectedPlanetId: string | null = null;
 
   constructor() {
     this.container = new Container();
     this.container.visible = false;
     this.particleGfx = new Graphics();
     this.particleGfx.eventMode = "none";
+    this.selectionHalo = new Graphics();
+    this.selectionHalo.eventMode = "none";
+
+    // Listen for selection changes to update halo
+    onStateChange(() => {
+      const entity = getSelectedEntity();
+      const newId = entity?.type === "planet" ? entity.id : null;
+      if (newId !== this.selectedPlanetId) {
+        this.selectedPlanetId = newId;
+        this.updateHalo();
+      }
+    });
   }
 
   show(system: StarSystem, planets: Planet[]): void {
@@ -238,6 +262,9 @@ export class SystemLayer {
       });
 
       this.planetSprites.set(planet.id, planetSprite);
+      this.planetPositions.set(planet.id, { x: px, y: py, radius: planet.displayRadius });
+      // Also store by naturalId for search-based selection
+      this.planetPositions.set(planet.naturalId, { x: px, y: py, radius: planet.displayRadius });
       this.container.addChild(planetContainer);
 
       // Planet label
@@ -261,10 +288,15 @@ export class SystemLayer {
       }
     }
 
+    // Selection halo — on top of everything
+    this.container.addChild(this.selectionHalo);
+    this.updateHalo();
+
     this.container.visible = true;
   }
 
   hide(): void {
+    this.selectedPlanetId = null;
     this.clear();
     this.container.visible = false;
   }
@@ -276,6 +308,12 @@ export class SystemLayer {
     for (const cloud of this.planetClouds) {
       cloud.sprite.x = cloud.baseX + Math.sin(elapsed * cloud.speedX + cloud.phaseX) * cloud.driftRadius;
       cloud.sprite.y = cloud.baseY + Math.sin(elapsed * cloud.speedY + cloud.phaseY) * cloud.driftRadius;
+    }
+
+    // Pulse selection halo
+    if (this.selectedPlanetId) {
+      const pulse = Math.sin(elapsed * HALO_PULSE_FREQUENCY * Math.PI * 2);
+      this.selectionHalo.alpha = HALO_ALPHA + HALO_PULSE_AMPLITUDE * pulse;
     }
 
     if (this.ambientParticles.length === 0) return;
@@ -311,6 +349,25 @@ export class SystemLayer {
       this.particleGfx.circle(x, y, AMBIENT_PARTICLE_SIZE);
       this.particleGfx.fill({ color: this.particleColour, alpha: headAlpha });
     }
+  }
+
+  private updateHalo(): void {
+    this.selectionHalo.clear();
+    if (!this.selectedPlanetId || !this.container.visible) return;
+
+    const pos = this.planetPositions.get(this.selectedPlanetId);
+    if (!pos) return;
+
+    const haloRadius = pos.radius + HALO_GAP;
+
+    // Draw two arcs — left and right, with gaps at top and bottom
+    // Right arc: from -HALO_ARC_SPAN/2 to +HALO_ARC_SPAN/2
+    this.selectionHalo.arc(pos.x, pos.y, haloRadius, -HALO_ARC_SPAN / 2, HALO_ARC_SPAN / 2);
+    this.selectionHalo.stroke({ width: HALO_STROKE, color: HALO_COLOUR, alpha: HALO_ALPHA });
+
+    // Left arc: from PI - HALO_ARC_SPAN/2 to PI + HALO_ARC_SPAN/2
+    this.selectionHalo.arc(pos.x, pos.y, haloRadius, Math.PI - HALO_ARC_SPAN / 2, Math.PI + HALO_ARC_SPAN / 2);
+    this.selectionHalo.stroke({ width: HALO_STROKE, color: HALO_COLOUR, alpha: HALO_ALPHA });
   }
 
   private renderGatewayRings(
@@ -405,9 +462,11 @@ export class SystemLayer {
   private clear(): void {
     this.container.removeChildren();
     this.planetSprites.clear();
+    this.planetPositions.clear();
     this.planetClouds = [];
     this.ambientParticles = [];
     this.particleGfx.clear();
+    this.selectionHalo.clear();
     this.gatewayHoverLabel = null;
   }
 }

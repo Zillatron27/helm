@@ -1,5 +1,11 @@
 import { search } from "../../data/searchIndex.js";
-import { setSearchFocused, setSelectedEntity } from "../state.js";
+import {
+  setSearchFocused,
+  setSelectedEntity,
+  setFocusedSystem,
+  setViewLevel,
+  getViewLevel,
+} from "../state.js";
 import type { SearchEntry } from "../../types/index.js";
 import type { MapRenderer } from "../../renderer/MapRenderer.js";
 
@@ -237,9 +243,18 @@ export class SearchBar {
     this.collapse();
     this.inputEl.blur();
 
+    // Exit system view first if we're in one
+    if (getViewLevel() === "system") {
+      setSelectedEntity(null);
+      setFocusedSystem(null);
+      setViewLevel("galaxy");
+    }
+
     if (entry.type === "planet") {
-      // Zoom into system view and select the planet
-      this.renderer?.panToPlanet(entry.systemId, entry.id);
+      // Wait for system view exit, then zoom into target system + planet
+      setTimeout(() => {
+        this.renderer?.panToPlanet(entry.systemId, entry.id);
+      }, 100);
     } else {
       // Navigate camera to system and select it
       setSelectedEntity({ type: "system", id: entry.systemId });
