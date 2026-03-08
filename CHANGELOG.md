@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.0 — 2026-03-08
+
+UI toolbar refactor and gateway toggle.
+
+### Added
+
+- **Top-right toolbar** — search, route planner, and gateway toggle relocated from centre-top to a vertical toolbar in the top-right corner. Panels expand leftward on click with smooth CSS transitions.
+- **Gateway visibility toggle** — circular button with hexagon icon toggles gateway arcs and indicators on/off. Purple accent when on, subdued when off. `G` keyboard shortcut.
+- **Version indicator** — subtle `v0.3.0` label in the bottom-right corner.
+
+### Changed
+
+- SearchBar and RoutePanel no longer self-append to `document.body`. Main.ts creates the toolbar container and mounts all rows.
+- Search bar collapses when empty and blurred; expands on `/` or button click.
+- Route panel uses same expand/collapse pattern as search.
+- Removed `#search-container`, `#route-container`, `.route-toggle` elements — replaced by toolbar row pattern.
+
 ## 0.2.0 — 2026-03-05
 
 Phase 4a: Visual polish and interaction improvements.

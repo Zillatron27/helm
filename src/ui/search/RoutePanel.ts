@@ -5,6 +5,12 @@ import type { SearchEntry } from "../../types/index.js";
 
 const DEBOUNCE_MS = 50;
 
+const ROUTE_ICON_SVG = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+  <circle cx="4" cy="4" r="2"/>
+  <circle cx="14" cy="14" r="2"/>
+  <line x1="6" y1="6" x2="12" y2="12"/>
+</svg>`;
+
 interface RouteField {
   inputEl: HTMLInputElement;
   suggestionsEl: HTMLElement;
@@ -16,27 +22,27 @@ interface RouteField {
 }
 
 export class RoutePanel {
-  private containerEl: HTMLElement;
-  private panelEl: HTMLElement;
-  private toggleEl: HTMLButtonElement;
+  private rowEl: HTMLElement;
+  private expandEl: HTMLElement;
+  private btnEl: HTMLButtonElement;
+  private panelContent: HTMLElement;
   private infoEl: HTMLElement;
   private fromField: RouteField;
   private toField: RouteField;
-  private open = false;
+  private expanded = false;
 
   constructor() {
-    this.containerEl = document.createElement("div");
-    this.containerEl.id = "route-container";
+    // Toolbar row: [expand panel] [button]
+    this.rowEl = document.createElement("div");
+    this.rowEl.className = "toolbar-row";
 
-    // Toggle button
-    this.toggleEl = document.createElement("button");
-    this.toggleEl.className = "route-toggle";
-    this.toggleEl.textContent = "Route";
-    this.toggleEl.addEventListener("click", () => this.toggle());
+    // Expandable panel (left of button)
+    this.expandEl = document.createElement("div");
+    this.expandEl.className = "toolbar-expand toolbar-expand-route";
 
-    // Panel
-    this.panelEl = document.createElement("div");
-    this.panelEl.className = "route-panel";
+    // Panel content inside expand
+    this.panelContent = document.createElement("div");
+    this.panelContent.className = "route-panel-content";
 
     // From field
     this.fromField = this.createField("From");
@@ -53,14 +59,45 @@ export class RoutePanel {
     clearBtn.textContent = "Clear Route";
     clearBtn.addEventListener("click", () => this.clearRoute());
 
-    this.panelEl.appendChild(this.fromField.inputEl.parentElement!);
-    this.panelEl.appendChild(this.toField.inputEl.parentElement!);
-    this.panelEl.appendChild(this.infoEl);
-    this.panelEl.appendChild(clearBtn);
+    this.panelContent.appendChild(this.fromField.inputEl.parentElement!);
+    this.panelContent.appendChild(this.toField.inputEl.parentElement!);
+    this.panelContent.appendChild(this.infoEl);
+    this.panelContent.appendChild(clearBtn);
 
-    this.containerEl.appendChild(this.toggleEl);
-    this.containerEl.appendChild(this.panelEl);
-    document.body.appendChild(this.containerEl);
+    this.expandEl.appendChild(this.panelContent);
+
+    // Circular button (right)
+    this.btnEl = document.createElement("button");
+    this.btnEl.className = "toolbar-btn";
+    this.btnEl.innerHTML = ROUTE_ICON_SVG;
+    this.btnEl.addEventListener("click", () => this.toggleExpand());
+
+    this.rowEl.appendChild(this.expandEl);
+    this.rowEl.appendChild(this.btnEl);
+  }
+
+  getElement(): HTMLElement {
+    return this.rowEl;
+  }
+
+  private toggleExpand(): void {
+    if (this.expanded) {
+      this.collapse();
+    } else {
+      this.expand();
+    }
+  }
+
+  private expand(): void {
+    this.expanded = true;
+    this.expandEl.classList.add("toolbar-expand-open");
+    this.btnEl.classList.add("toolbar-btn-active");
+  }
+
+  private collapse(): void {
+    this.expanded = false;
+    this.expandEl.classList.remove("toolbar-expand-open");
+    this.btnEl.classList.remove("toolbar-btn-active");
   }
 
   private createField(label: string): RouteField {
@@ -113,12 +150,6 @@ export class RoutePanel {
     inputEl.addEventListener("keydown", (e) => this.onFieldKeyDown(e, field));
 
     return field;
-  }
-
-  private toggle(): void {
-    this.open = !this.open;
-    this.panelEl.classList.toggle("route-panel-open", this.open);
-    this.toggleEl.classList.toggle("route-toggle-active", this.open);
   }
 
   private onFieldInput(field: RouteField): void {

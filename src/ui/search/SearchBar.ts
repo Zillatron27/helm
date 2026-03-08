@@ -5,26 +5,36 @@ import type { MapRenderer } from "../../renderer/MapRenderer.js";
 
 const DEBOUNCE_MS = 50;
 
+const SEARCH_ICON_SVG = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+  <circle cx="7.5" cy="7.5" r="5.5"/>
+  <line x1="11.5" y1="11.5" x2="16" y2="16"/>
+</svg>`;
+
 export class SearchBar {
-  private containerEl: HTMLElement;
+  private rowEl: HTMLElement;
+  private expandEl: HTMLElement;
+  private btnEl: HTMLButtonElement;
   private inputEl: HTMLInputElement;
-  private hintEl: HTMLElement;
   private dropdownEl: HTMLElement;
   private renderer: MapRenderer | null = null;
   private results: SearchEntry[] = [];
   private activeIndex = -1;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private expanded = false;
 
   constructor() {
-    // Container
-    this.containerEl = document.createElement("div");
-    this.containerEl.id = "search-container";
+    // Toolbar row: [expand panel] [button]
+    this.rowEl = document.createElement("div");
+    this.rowEl.className = "toolbar-row";
 
-    // Search bar wrapper
+    // Expandable panel (left of button)
+    this.expandEl = document.createElement("div");
+    this.expandEl.className = "toolbar-expand toolbar-expand-search";
+
+    // Search bar wrapper inside expand panel
     const bar = document.createElement("div");
     bar.className = "search-bar";
 
-    // Input
     this.inputEl = document.createElement("input");
     this.inputEl.type = "text";
     this.inputEl.className = "search-input";
@@ -32,23 +42,29 @@ export class SearchBar {
     this.inputEl.autocomplete = "off";
     this.inputEl.spellcheck = false;
 
-    // Keyboard hint
-    this.hintEl = document.createElement("kbd");
-    this.hintEl.className = "search-hint";
-    this.hintEl.textContent = "/";
-
     bar.appendChild(this.inputEl);
-    bar.appendChild(this.hintEl);
 
-    // Dropdown
+    // Dropdown inside expand panel
     this.dropdownEl = document.createElement("div");
     this.dropdownEl.className = "search-dropdown";
 
-    this.containerEl.appendChild(bar);
-    this.containerEl.appendChild(this.dropdownEl);
-    document.body.appendChild(this.containerEl);
+    this.expandEl.appendChild(bar);
+    this.expandEl.appendChild(this.dropdownEl);
+
+    // Circular button (right)
+    this.btnEl = document.createElement("button");
+    this.btnEl.className = "toolbar-btn";
+    this.btnEl.innerHTML = SEARCH_ICON_SVG;
+    this.btnEl.addEventListener("click", () => this.toggleExpand());
+
+    this.rowEl.appendChild(this.expandEl);
+    this.rowEl.appendChild(this.btnEl);
 
     this.bindEvents();
+  }
+
+  getElement(): HTMLElement {
+    return this.rowEl;
   }
 
   init(renderer: MapRenderer): void {
@@ -56,7 +72,34 @@ export class SearchBar {
   }
 
   focus(): void {
+    if (!this.expanded) {
+      this.expand();
+    }
     this.inputEl.focus();
+  }
+
+  private toggleExpand(): void {
+    if (this.expanded) {
+      this.collapse();
+    } else {
+      this.expand();
+    }
+  }
+
+  private expand(): void {
+    this.expanded = true;
+    this.expandEl.classList.add("toolbar-expand-open");
+    this.btnEl.classList.add("toolbar-btn-active");
+    // Focus input after CSS transition
+    setTimeout(() => this.inputEl.focus(), 260);
+  }
+
+  private collapse(): void {
+    this.expanded = false;
+    this.expandEl.classList.remove("toolbar-expand-open");
+    this.btnEl.classList.remove("toolbar-btn-active");
+    this.inputEl.value = "";
+    this.hideDropdown();
   }
 
   private bindEvents(): void {
@@ -77,7 +120,6 @@ export class SearchBar {
 
   private onFocus(): void {
     setSearchFocused(true);
-    this.hintEl.style.display = "none";
     if (this.inputEl.value) {
       this.runSearch();
     }
@@ -85,9 +127,14 @@ export class SearchBar {
 
   private onBlur(): void {
     setSearchFocused(false);
-    this.hintEl.style.display = "";
     // Delay hide so mousedown on results fires first
-    setTimeout(() => this.hideDropdown(), 150);
+    setTimeout(() => {
+      if (!this.inputEl.value) {
+        this.collapse();
+      } else {
+        this.hideDropdown();
+      }
+    }, 150);
   }
 
   private onKeyDown(e: KeyboardEvent): void {
@@ -109,8 +156,7 @@ export class SearchBar {
       case "Escape":
         e.preventDefault();
         e.stopPropagation();
-        this.inputEl.value = "";
-        this.hideDropdown();
+        this.collapse();
         this.inputEl.blur();
         break;
     }
@@ -188,6 +234,7 @@ export class SearchBar {
   private selectResult(entry: SearchEntry): void {
     this.inputEl.value = "";
     this.hideDropdown();
+    this.collapse();
     this.inputEl.blur();
 
     // Navigate camera to parent system and select it

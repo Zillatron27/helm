@@ -387,6 +387,10 @@ export class MapRenderer {
     setSelectedEntity({ type: "system", id: systemId });
   }
 
+  setGatewaysVisible(visible: boolean): void {
+    this.galaxy?.setGatewaysVisible(visible);
+  }
+
   getViewport(): Viewport | null {
     return this.viewport;
   }

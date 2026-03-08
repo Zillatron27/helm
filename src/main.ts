@@ -7,6 +7,7 @@ import { PanelManager } from "./ui/panels/PanelManager.js";
 import { SearchBar } from "./ui/search/SearchBar.js";
 import { RoutePanel } from "./ui/search/RoutePanel.js";
 import { setupControls } from "./ui/controls.js";
+import { onStateChange, getGatewaysVisible, setGatewaysVisible } from "./ui/state.js";
 import "./ui/panels/panel.css";
 import "./ui/search/search.css";
 
@@ -29,6 +30,10 @@ loading.style.cssText = `
 `;
 loading.textContent = "Loading galaxy data...";
 document.body.appendChild(loading);
+
+const GATEWAY_ICON_SVG = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <polygon points="9,1 16,5 16,13 9,17 2,13 2,5"/>
+</svg>`;
 
 async function boot(): Promise<void> {
   try {
@@ -58,7 +63,41 @@ async function boot(): Promise<void> {
 
     const searchBar = new SearchBar();
     searchBar.init(renderer);
-    new RoutePanel();
+    const routePanel = new RoutePanel();
+
+    // Build toolbar container
+    const toolbar = document.createElement("div");
+    toolbar.id = "helm-toolbar";
+    toolbar.appendChild(searchBar.getElement());
+    toolbar.appendChild(routePanel.getElement());
+
+    // Gateway toggle row
+    const gatewayRow = document.createElement("div");
+    gatewayRow.className = "toolbar-row";
+    const gatewayBtn = document.createElement("button");
+    gatewayBtn.className = "toolbar-btn toolbar-btn-gateway-on";
+    gatewayBtn.innerHTML = GATEWAY_ICON_SVG;
+    gatewayBtn.addEventListener("click", () => {
+      setGatewaysVisible(!getGatewaysVisible());
+    });
+    gatewayRow.appendChild(gatewayBtn);
+    toolbar.appendChild(gatewayRow);
+
+    document.body.appendChild(toolbar);
+
+    // Version indicator
+    const versionEl = document.createElement("div");
+    versionEl.id = "helm-version";
+    versionEl.textContent = `v${VERSION}`;
+    document.body.appendChild(versionEl);
+
+    // Sync gateway button with state (handles both button click and G key)
+    onStateChange(() => {
+      const visible = getGatewaysVisible();
+      renderer.setGatewaysVisible(visible);
+      gatewayBtn.classList.toggle("toolbar-btn-gateway-on", visible);
+      gatewayBtn.classList.toggle("toolbar-btn-gateway-off", !visible);
+    });
 
     const viewport = renderer.getViewport();
     if (viewport) {

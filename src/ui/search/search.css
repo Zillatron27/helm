@@ -1,26 +1,110 @@
-/* Search bar */
-#search-container {
+/* Toolbar container — top-right vertical stack */
+#helm-toolbar {
   position: fixed;
   top: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 360px;
+  right: 16px;
   z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
   font-family: "IBM Plex Mono", monospace;
 }
 
-.search-bar {
+/* Toolbar row — expand panel (left) + button (right) */
+.toolbar-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+}
+
+/* Circular toolbar button */
+.toolbar-btn {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  background: #111111;
+  border: 1px solid #2a2a2a;
+  border-radius: 50%;
+  color: #888888;
+  cursor: pointer;
   display: flex;
   align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: border-color 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.toolbar-btn:hover {
+  border-color: #ff8c00;
+  color: #ff8c00;
+}
+
+.toolbar-btn-active {
+  border-color: #ff8c00;
+  color: #ff8c00;
+}
+
+/* Gateway toggle — on state (default): purple neon */
+.toolbar-btn-gateway-on {
+  border-color: #bb77ff;
+  color: #bb77ff;
+}
+
+.toolbar-btn-gateway-on:hover {
+  border-color: #bb77ff;
+  color: #bb77ff;
+}
+
+/* Gateway toggle — off state: subdued */
+.toolbar-btn-gateway-off {
+  border-color: #2a2a2a;
+  color: #e0e0e0;
+}
+
+.toolbar-btn-gateway-off:hover {
+  border-color: #666666;
+  color: #e0e0e0;
+}
+
+/* Expandable panel — slides open leftward */
+.toolbar-expand {
+  overflow: hidden;
+  width: 0;
+  opacity: 0;
+  transition: width 0.25s ease, opacity 0.2s ease;
+  pointer-events: none;
+  margin-right: 8px;
+}
+
+.toolbar-expand-open {
+  width: 320px;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Search expand panel */
+.toolbar-expand-search {
   background: #111111;
   border: 1px solid #2a2a2a;
   border-radius: 6px;
   padding: 0 12px;
-  transition: border-color 0.15s ease;
+  position: relative;
 }
 
-.search-bar:focus-within {
-  border-color: #ff8c00;
+/* Route expand panel */
+.toolbar-expand-route {
+  background: #111111;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+/* Search bar inside expand panel */
+.search-bar {
+  display: flex;
+  align-items: center;
 }
 
 .search-input {
@@ -39,17 +123,7 @@
   color: #555555;
 }
 
-.search-hint {
-  font-size: 11px;
-  color: #555555;
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
-  border-radius: 3px;
-  padding: 1px 6px;
-  pointer-events: none;
-  flex-shrink: 0;
-}
-
+/* Search dropdown */
 .search-dropdown {
   position: absolute;
   top: 100%;
@@ -61,12 +135,14 @@
   border-radius: 6px;
   overflow: hidden;
   display: none;
+  z-index: 62;
 }
 
 .search-dropdown.search-dropdown-open {
   display: block;
 }
 
+/* Search results (shared between search and route suggestions) */
 .search-result {
   display: flex;
   justify-content: space-between;
@@ -122,50 +198,9 @@
   color: #c4a26b;
 }
 
-/* Route panel */
-#route-container {
-  position: fixed;
-  top: 60px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 360px;
-  z-index: 59;
-  font-family: "IBM Plex Mono", monospace;
-}
-
-.route-toggle {
-  background: #111111;
-  border: 1px solid #2a2a2a;
-  border-radius: 4px;
-  color: #888888;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 12px;
-  padding: 4px 12px;
-  cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
-}
-
-.route-toggle:hover {
-  color: #ff8c00;
-  border-color: #ff8c00;
-}
-
-.route-toggle-active {
-  color: #ff8c00;
-  border-color: #ff8c00;
-}
-
-.route-panel {
-  display: none;
-  margin-top: 8px;
-  background: #111111;
-  border: 1px solid #2a2a2a;
-  border-radius: 6px;
-  padding: 12px;
-}
-
-.route-panel-open {
-  display: block;
+/* Route panel content */
+.route-panel-content {
+  min-width: 0;
 }
 
 .route-field {
@@ -215,7 +250,7 @@
   border-radius: 4px;
   overflow: hidden;
   display: none;
-  z-index: 61;
+  z-index: 62;
 }
 
 .route-suggestions.route-suggestions-open {
@@ -272,10 +307,22 @@
   border-radius: 3px;
 }
 
+/* Version indicator */
+#helm-version {
+  position: fixed;
+  bottom: 8px;
+  right: 12px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: #333333;
+  z-index: 50;
+  pointer-events: none;
+  user-select: none;
+}
+
 /* Responsive */
 @media (max-width: 600px) {
-  #search-container,
-  #route-container {
-    width: calc(100% - 32px);
+  .toolbar-expand-open {
+    width: calc(100vw - 80px);
   }
 }

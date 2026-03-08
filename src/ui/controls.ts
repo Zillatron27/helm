@@ -4,6 +4,8 @@ import {
   setSelectedEntity,
   setViewLevel,
   setFocusedSystem,
+  getGatewaysVisible,
+  setGatewaysVisible,
 } from "./state.js";
 import type { PanelManager } from "./panels/PanelManager.js";
 import type { SearchBar } from "./search/SearchBar.js";
@@ -77,6 +79,10 @@ export function setupControls(
       case "-":
         viewport.zoomPercent(-ZOOM_STEP, true);
         e.preventDefault();
+        break;
+      case "g":
+        e.preventDefault();
+        setGatewaysVisible(!getGatewaysVisible());
         break;
     }
   };
