@@ -73,7 +73,7 @@ export class PanelManager {
       const system = getSystemById(focusedId);
       if (!system) return;
       const planets = getPlanetsForSystem(system.naturalId);
-      const planet = planets?.find((p) => p.id === entity.id);
+      const planet = planets?.find((p) => p.id === entity.id || p.naturalId === entity.id);
       if (planet) {
         this.showPlanetPanel(planet);
       }

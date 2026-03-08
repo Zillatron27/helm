@@ -147,12 +147,6 @@ export class SearchBar {
         e.preventDefault();
         this.moveSelection(-1);
         break;
-      case "Tab":
-        if (this.activeIndex >= 0 && this.activeIndex < this.results.length) {
-          e.preventDefault();
-          this.selectResult(this.results[this.activeIndex]!);
-        }
-        break;
       case "Enter":
         e.preventDefault();
         if (this.activeIndex >= 0 && this.activeIndex < this.results.length) {
@@ -243,9 +237,14 @@ export class SearchBar {
     this.collapse();
     this.inputEl.blur();
 
-    // Navigate camera to parent system and select it
-    setSelectedEntity({ type: "system", id: entry.systemId });
-    this.renderer?.panToSystem(entry.systemId);
+    if (entry.type === "planet") {
+      // Zoom into system view and select the planet
+      this.renderer?.panToPlanet(entry.systemId, entry.id);
+    } else {
+      // Navigate camera to system and select it
+      setSelectedEntity({ type: "system", id: entry.systemId });
+      this.renderer?.panToSystem(entry.systemId);
+    }
   }
 }
 

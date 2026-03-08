@@ -387,6 +387,32 @@ export class MapRenderer {
     setSelectedEntity({ type: "system", id: systemId });
   }
 
+  panToPlanet(systemId: string, planetId: string): void {
+    // Enter system view, then select the planet after transition + data load
+    setFocusedSystem(systemId);
+    setViewLevel("system");
+
+    const system = getSystemById(systemId);
+    if (!system) return;
+
+    // Wait for transition to complete, then ensure planets are loaded and select
+    const selectAfterLoad = (): void => {
+      const cached = getPlanetsForSystem(system.naturalId);
+      if (cached) {
+        setSelectedEntity({ type: "planet", id: planetId });
+      } else {
+        loadPlanetsForSystem(system.naturalId).then(() => {
+          if (getFocusedSystemId() === systemId && getViewLevel() === "system") {
+            setSelectedEntity({ type: "planet", id: planetId });
+          }
+        });
+      }
+    };
+
+    // TRANSITION_MS for camera + 100ms buffer for system view fade-in
+    setTimeout(selectAfterLoad, TRANSITION_MS + 100);
+  }
+
   setGatewaysVisible(visible: boolean): void {
     this.galaxy?.setGatewaysVisible(visible);
   }
