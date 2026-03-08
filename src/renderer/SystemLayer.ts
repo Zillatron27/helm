@@ -2,6 +2,9 @@ import { CanvasSource, Container, Graphics, Sprite, Text, Texture, Circle } from
 import type { StarSystem, Planet } from "../types/index.js";
 import { getTheme, getSpectralColour } from "../ui/theme.js";
 import { setSelectedEntity } from "../ui/state.js";
+import { getGatewaysForPlanet, getSystemById } from "../data/cache.js";
+import type { GatewayEndpoint } from "../types/index.js";
+import { generatePlanetTexture, generateStarTexture, getCloudTexture, getCloudTint } from "./PlanetTexture.js";
 
 const CENTRAL_STAR_RADIUS = 30;
 const GLOW_RADIUS = 110;
@@ -29,7 +32,7 @@ function getSystemGlowTexture(): Texture {
 }
 const RING_ALPHA = 0.2;
 const RING_WIDTH = 0.5;
-const LABEL_OFFSET_Y = 8;
+const LABEL_OFFSET_Y = 12;
 
 // Ambient star particle parameters
 const AMBIENT_COUNT = 20;
@@ -44,6 +47,35 @@ const AMBIENT_TRAIL_LENGTH = 30;
 const AMBIENT_TRAIL_ALPHA_DECAY = 0.88;
 const AMBIENT_TRAIL_SIZE_DECAY = 0.95;
 
+// Planet cloud drift parameters
+const CLOUD_ALPHA = 0.4;
+const CLOUD_SCALE = 1.8; // cloud blob size relative to planet
+const CLOUD_DRIFT_SPEED_MIN = 0.4;
+const CLOUD_DRIFT_SPEED_MAX = 0.8;
+const CLOUD_DRIFT_RADIUS = 0.5; // fraction of displayRadius
+
+// Gateway ring visual parameters
+const GATEWAY_COLOUR = 0xbb77ff;
+const GATEWAY_RING_RADIUS = 5;
+const GATEWAY_RING_STROKE = 1.0;
+const GATEWAY_RING_ALPHA = 0.9;
+const GATEWAY_RING_OFFSET_Y = -10; // above the planet
+const GATEWAY_RING_SPACING = 14; // horizontal spacing for multiple rings
+const GATEWAY_LINE_LENGTH = 60;
+const GATEWAY_LINE_SEGMENTS = 4;
+
+interface PlanetCloud {
+  sprite: Sprite;
+  mask: Graphics;
+  baseX: number;
+  baseY: number;
+  driftRadius: number;
+  speedX: number;
+  speedY: number;
+  phaseX: number;
+  phaseY: number;
+}
+
 interface AmbientParticle {
   angle: number;
   baseRadius: number;
@@ -56,10 +88,12 @@ interface AmbientParticle {
 
 export class SystemLayer {
   readonly container: Container;
-  private planetGraphics: Map<string, Graphics> = new Map();
+  private planetSprites: Map<string, Sprite> = new Map();
+  private planetClouds: PlanetCloud[] = [];
   private ambientParticles: AmbientParticle[] = [];
   private particleGfx: Graphics;
   private particleColour = 0xffffff;
+  private gatewayHoverLabel: Text | null = null;
 
   constructor() {
     this.container = new Container();
@@ -82,10 +116,12 @@ export class SystemLayer {
     glow.alpha = GLOW_ALPHA;
     this.container.addChild(glow);
 
-    // Central star
-    const centralStar = new Graphics();
-    centralStar.circle(0, 0, CENTRAL_STAR_RADIUS);
-    centralStar.fill(starColour);
+    // Central star — procedural sphere texture
+    const starTexture = generateStarTexture(starColour, CENTRAL_STAR_RADIUS);
+    const centralStar = new Sprite(starTexture);
+    centralStar.anchor.set(0.5);
+    centralStar.width = CENTRAL_STAR_RADIUS * 2;
+    centralStar.height = CENTRAL_STAR_RADIUS * 2;
     this.container.addChild(centralStar);
 
     // Ambient orbiting particles
@@ -111,7 +147,7 @@ export class SystemLayer {
       text: system.name,
       style: {
         fontFamily: "Audiowide, sans-serif",
-        fontSize: 14,
+        fontSize: 18,
         fill: theme.textPrimary,
       },
     });
@@ -138,40 +174,78 @@ export class SystemLayer {
       const px = Math.cos(angle) * planet.ringRadius;
       const py = Math.sin(angle) * planet.ringRadius;
 
-      // Planet body
-      const planetGfx = new Graphics();
-      planetGfx.circle(0, 0, planet.displayRadius);
-      planetGfx.fill(planet.colour);
-      planetGfx.x = px;
-      planetGfx.y = py;
+      // Planet container — holds body + cloud, masked to circle
+      const planetContainer = new Container();
+      planetContainer.x = px;
+      planetContainer.y = py;
 
-      // Interaction
-      planetGfx.eventMode = "static";
-      planetGfx.cursor = "pointer";
-      planetGfx.hitArea = new Circle(0, 0, Math.max(planet.displayRadius + 5, 15));
+      // Planet body — procedural texture sprite
+      const texture = generatePlanetTexture(planet, planet.displayRadius);
+      const planetSprite = new Sprite(texture);
+      planetSprite.anchor.set(0.5);
+      planetSprite.width = planet.displayRadius * 2;
+      planetSprite.height = planet.displayRadius * 2;
+      planetContainer.addChild(planetSprite);
+
+      // Cloud wisp — drifts slowly across the planet surface
+      const cloudSprite = new Sprite(getCloudTexture());
+      cloudSprite.anchor.set(0.5);
+      const cloudSize = planet.displayRadius * CLOUD_SCALE;
+      cloudSprite.width = cloudSize;
+      cloudSprite.height = cloudSize;
+      cloudSprite.tint = getCloudTint(planet);
+      cloudSprite.alpha = CLOUD_ALPHA;
+
+      // Circle mask to clip cloud to planet bounds
+      const cloudMask = new Graphics();
+      cloudMask.circle(0, 0, planet.displayRadius);
+      cloudMask.fill(0xffffff);
+      planetContainer.addChild(cloudMask);
+      planetContainer.addChild(cloudSprite);
+      cloudSprite.mask = cloudMask;
+
+      // Seeded drift parameters from planet ID
+      let hash = 0;
+      for (let ci = 0; ci < planet.id.length; ci++) {
+        hash = ((hash << 5) - hash + planet.id.charCodeAt(ci)) | 0;
+      }
+      hash = Math.abs(hash);
+      const rng0 = (hash % 1000) / 1000;
+      const rng1 = ((hash >> 10) % 1000) / 1000;
+      const rng2 = ((hash >> 20) % 1000) / 1000;
+
+      this.planetClouds.push({
+        sprite: cloudSprite,
+        mask: cloudMask,
+        baseX: 0,
+        baseY: 0,
+        driftRadius: planet.displayRadius * CLOUD_DRIFT_RADIUS,
+        speedX: CLOUD_DRIFT_SPEED_MIN + rng0 * (CLOUD_DRIFT_SPEED_MAX - CLOUD_DRIFT_SPEED_MIN),
+        speedY: CLOUD_DRIFT_SPEED_MIN + rng1 * (CLOUD_DRIFT_SPEED_MAX - CLOUD_DRIFT_SPEED_MIN),
+        phaseX: rng2 * Math.PI * 2,
+        phaseY: rng0 * Math.PI * 2 + 1.0,
+      });
+
+      // Interaction on the container
+      planetContainer.eventMode = "static";
+      planetContainer.cursor = "pointer";
+      planetContainer.hitArea = new Circle(0, 0, Math.max(planet.displayRadius + 5, 15));
 
       const planetId = planet.id;
-      planetGfx.on("pointertap", (e) => {
+      planetContainer.on("pointertap", (e) => {
         e.stopPropagation();
         setSelectedEntity({ type: "planet", id: planetId });
       });
 
-      planetGfx.on("pointerover", () => {
-        planetGfx.scale.set(1.3);
-      });
-      planetGfx.on("pointerout", () => {
-        planetGfx.scale.set(1);
-      });
-
-      this.planetGraphics.set(planet.id, planetGfx);
-      this.container.addChild(planetGfx);
+      this.planetSprites.set(planet.id, planetSprite);
+      this.container.addChild(planetContainer);
 
       // Planet label
       const label = new Text({
         text: planet.name || planet.naturalId,
         style: {
           fontFamily: "IBM Plex Mono, monospace",
-          fontSize: 10,
+          fontSize: 14,
           fill: theme.textSecondary,
         },
       });
@@ -179,6 +253,12 @@ export class SystemLayer {
       label.x = px;
       label.y = py + planet.displayRadius + LABEL_OFFSET_Y;
       this.container.addChild(label);
+
+      // Gateway rings for this planet
+      const gateways = getGatewaysForPlanet(planet.naturalId);
+      if (gateways && gateways.length > 0) {
+        this.renderGatewayRings(gateways, px, py, planet.displayRadius, system);
+      }
     }
 
     this.container.visible = true;
@@ -190,7 +270,15 @@ export class SystemLayer {
   }
 
   update(dt: number, elapsed: number): void {
-    if (!this.container.visible || this.ambientParticles.length === 0) return;
+    if (!this.container.visible) return;
+
+    // Animate planet cloud drift
+    for (const cloud of this.planetClouds) {
+      cloud.sprite.x = cloud.baseX + Math.sin(elapsed * cloud.speedX + cloud.phaseX) * cloud.driftRadius;
+      cloud.sprite.y = cloud.baseY + Math.sin(elapsed * cloud.speedY + cloud.phaseY) * cloud.driftRadius;
+    }
+
+    if (this.ambientParticles.length === 0) return;
 
     this.particleGfx.clear();
     for (const p of this.ambientParticles) {
@@ -225,10 +313,101 @@ export class SystemLayer {
     }
   }
 
+  private renderGatewayRings(
+    gateways: GatewayEndpoint[],
+    planetX: number,
+    planetY: number,
+    planetRadius: number,
+    system: StarSystem,
+  ): void {
+    const count = gateways.length;
+    // Centre the row of rings above the planet
+    const totalWidth = (count - 1) * GATEWAY_RING_SPACING;
+    const startX = planetX - totalWidth / 2;
+    const ringY = planetY + GATEWAY_RING_OFFSET_Y - planetRadius;
+
+    for (let gi = 0; gi < count; gi++) {
+      const gw = gateways[gi]!;
+      const ringX = startX + gi * GATEWAY_RING_SPACING;
+
+      // Ring — stroke-only circle
+      const ring = new Graphics();
+      ring.circle(0, 0, GATEWAY_RING_RADIUS);
+      ring.stroke({ width: GATEWAY_RING_STROKE, color: GATEWAY_COLOUR, alpha: GATEWAY_RING_ALPHA });
+      ring.x = ringX;
+      ring.y = ringY;
+
+      // Direction line toward destination system
+      const destSys = getSystemById(gw.destinationSystemId);
+      if (destSys) {
+        const dx = destSys.worldX - system.worldX;
+        const dy = destSys.worldY - system.worldY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist > 0) {
+          const dirX = dx / dist;
+          const dirY = dy / dist;
+          // Draw fading line segments
+          for (let si = 0; si < GATEWAY_LINE_SEGMENTS; si++) {
+            const segStart = (si / GATEWAY_LINE_SEGMENTS) * GATEWAY_LINE_LENGTH;
+            const segEnd = ((si + 1) / GATEWAY_LINE_SEGMENTS) * GATEWAY_LINE_LENGTH;
+            const alpha = GATEWAY_RING_ALPHA * (1 - si / GATEWAY_LINE_SEGMENTS) * 0.5;
+            ring.moveTo(dirX * segStart, dirY * segStart);
+            ring.lineTo(dirX * segEnd, dirY * segEnd);
+            ring.stroke({ width: 0.8, color: GATEWAY_COLOUR, alpha });
+          }
+        }
+      }
+
+      // Interaction — hover to show destination label
+      ring.eventMode = "static";
+      ring.cursor = "pointer";
+      ring.hitArea = new Circle(0, 0, GATEWAY_RING_RADIUS + 6);
+
+      const destName = destSys?.name ?? gw.destinationSystemNaturalId;
+      const labelText = `\u2192 ${destName} (${gw.destinationSystemNaturalId})`;
+
+      ring.on("pointerover", () => {
+        this.showGatewayLabel(ringX, ringY - GATEWAY_RING_RADIUS - 4, labelText);
+      });
+      ring.on("pointerout", () => {
+        this.hideGatewayLabel();
+      });
+
+      this.container.addChild(ring);
+    }
+  }
+
+  private showGatewayLabel(x: number, y: number, text: string): void {
+    this.hideGatewayLabel();
+    const label = new Text({
+      text,
+      style: {
+        fontFamily: "IBM Plex Mono, monospace",
+        fontSize: 15,
+        fill: GATEWAY_COLOUR,
+      },
+    });
+    label.anchor.set(0.5, 1);
+    label.x = x;
+    label.y = y;
+    label.eventMode = "none";
+    this.container.addChild(label);
+    this.gatewayHoverLabel = label;
+  }
+
+  private hideGatewayLabel(): void {
+    if (this.gatewayHoverLabel) {
+      this.container.removeChild(this.gatewayHoverLabel);
+      this.gatewayHoverLabel = null;
+    }
+  }
+
   private clear(): void {
     this.container.removeChildren();
-    this.planetGraphics.clear();
+    this.planetSprites.clear();
+    this.planetClouds = [];
     this.ambientParticles = [];
     this.particleGfx.clear();
+    this.gatewayHoverLabel = null;
   }
 }

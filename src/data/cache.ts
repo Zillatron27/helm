@@ -8,9 +8,13 @@ import type {
   WorldBounds,
   Planet,
   SectorHex,
+  GatewayJsonEntry,
+  GatewayConnection,
+  GatewayEndpoint,
 } from "../types/index.js";
 import { fetchSystems, fetchSystemPlanets, fetchCxStations, fetchMaterials } from "./fio.js";
 import { getTheme } from "../ui/theme.js";
+import gatewayData from "./gateways.json" with { type: "json" };
 
 const WORLD_SCALE = 4;
 const VALID_SPECTRAL: Set<string> = new Set(["O", "B", "A", "F", "G", "K", "M"]);
@@ -20,10 +24,10 @@ const RING_MIN = 80;
 const RING_MAX = 400;
 
 // Planet display radius ranges
-const ROCKY_RADIUS_MIN = 6;
-const ROCKY_RADIUS_MAX = 10;
-const GAS_RADIUS_MIN = 12;
-const GAS_RADIUS_MAX = 18;
+const ROCKY_RADIUS_MIN = 10;
+const ROCKY_RADIUS_MAX = 16;
+const GAS_RADIUS_MIN = 18;
+const GAS_RADIUS_MAX = 26;
 
 // Hex grid constants (raw FIO coordinate space, R = 100)
 const HEX_COL_SPACING = 150; // 3/2 * R
@@ -50,6 +54,12 @@ const cxBySystem: Map<string, FioCxStation> = new Map();
 
 // Material ticker lookup: MaterialId → Ticker
 const materialTickers: Map<string, string> = new Map();
+
+// Gateway data
+const systemByNaturalId: Map<string, StarSystem> = new Map();
+let galaxyGatewayConnections: GatewayConnection[] = [];
+const gatewaysByPlanet: Map<string, GatewayEndpoint[]> = new Map();
+const gatewaySystemIds: Set<string> = new Set();
 
 function validateSpectralType(type: string): SpectralType {
   if (VALID_SPECTRAL.has(type)) {
@@ -250,6 +260,64 @@ function processPlanets(raw: FioPlanet[]): Planet[] {
   });
 }
 
+function processGateways(): void {
+  // Build NaturalId → system lookup
+  for (const s of systems) {
+    systemByNaturalId.set(s.naturalId, s);
+  }
+
+  const entries = gatewayData.gateways as GatewayJsonEntry[];
+
+  // Deduplicated system-to-system pairs for galaxy view
+  const pairSet = new Set<string>();
+  const connections: GatewayConnection[] = [];
+
+  for (const entry of entries) {
+    const fromSys = systemByNaturalId.get(entry.fromSystem);
+    const toSys = systemByNaturalId.get(entry.toSystem);
+    if (!fromSys || !toSys) {
+      console.warn(`Gateway: could not resolve systems for "${entry.name}"`);
+      continue;
+    }
+
+    // Galaxy-level: deduplicated system pairs
+    const [a, b] = fromSys.id < toSys.id ? [fromSys.id, toSys.id] : [toSys.id, fromSys.id];
+    const pairKey = `${a}:${b}`;
+    if (!pairSet.has(pairKey)) {
+      pairSet.add(pairKey);
+      connections.push({ fromSystemId: fromSys.id, toSystemId: toSys.id, name: entry.name });
+    }
+
+    // Track gateway systems
+    gatewaySystemIds.add(fromSys.id);
+    gatewaySystemIds.add(toSys.id);
+
+    // System-level: per-planet endpoints (both directions)
+    const fromEndpoint: GatewayEndpoint = {
+      planetNaturalId: entry.fromPlanet,
+      destinationPlanetNaturalId: entry.toPlanet,
+      destinationSystemNaturalId: entry.toSystem,
+      destinationSystemId: toSys.id,
+      name: entry.name,
+    };
+    const toEndpoint: GatewayEndpoint = {
+      planetNaturalId: entry.toPlanet,
+      destinationPlanetNaturalId: entry.fromPlanet,
+      destinationSystemNaturalId: entry.fromSystem,
+      destinationSystemId: fromSys.id,
+      name: entry.name,
+    };
+
+    const fromList = gatewaysByPlanet.get(entry.fromPlanet);
+    if (fromList) { fromList.push(fromEndpoint); } else { gatewaysByPlanet.set(entry.fromPlanet, [fromEndpoint]); }
+    const toList = gatewaysByPlanet.get(entry.toPlanet);
+    if (toList) { toList.push(toEndpoint); } else { gatewaysByPlanet.set(entry.toPlanet, [toEndpoint]); }
+  }
+
+  galaxyGatewayConnections = connections;
+  console.log(`Loaded ${connections.length} gateway connections, ${gatewaySystemIds.size} gateway systems`);
+}
+
 export async function loadSystemData(): Promise<void> {
   const raw = await fetchSystems();
   const result = processSystems(raw);
@@ -258,6 +326,8 @@ export async function loadSystemData(): Promise<void> {
   sectorHexes = result.hexes;
   worldBounds = result.bounds;
   loaded = true;
+
+  processGateways();
 
   console.log(
     `Loaded ${systems.length} systems, ${connections.length} connections`
@@ -349,4 +419,20 @@ export async function loadMaterials(): Promise<void> {
 
 export function getMaterialTicker(materialId: string): string {
   return materialTickers.get(materialId) ?? materialId;
+}
+
+export function getGalaxyGatewayConnections(): GatewayConnection[] {
+  return galaxyGatewayConnections;
+}
+
+export function getGatewaysForPlanet(planetNaturalId: string): GatewayEndpoint[] | null {
+  return gatewaysByPlanet.get(planetNaturalId) ?? null;
+}
+
+export function isGatewaySystem(systemId: string): boolean {
+  return gatewaySystemIds.has(systemId);
+}
+
+export function getSystemByNaturalId(naturalId: string): StarSystem | undefined {
+  return systemByNaturalId.get(naturalId);
 }
