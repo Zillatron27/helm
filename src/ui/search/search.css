@@ -72,32 +72,34 @@
 .toolbar-expand {
   overflow: hidden;
   width: 0;
+  max-height: 0;
   opacity: 0;
-  transition: width 0.25s ease, opacity 0.2s ease;
+  transition: width 0.25s ease, max-height 0.25s ease, opacity 0.2s ease;
   pointer-events: none;
-  margin-right: 8px;
+  margin-right: 0;
+  border: none;
+  padding: 0;
+  background: #111111;
+  border-radius: 6px;
 }
 
 .toolbar-expand-open {
   width: 320px;
+  max-height: 300px;
   opacity: 1;
   pointer-events: auto;
+  margin-right: 8px;
+  border: 1px solid #2a2a2a;
 }
 
 /* Search expand panel */
-.toolbar-expand-search {
-  background: #111111;
-  border: 1px solid #2a2a2a;
-  border-radius: 6px;
+.toolbar-expand-search.toolbar-expand-open {
   padding: 0 12px;
   position: relative;
 }
 
 /* Route expand panel */
-.toolbar-expand-route {
-  background: #111111;
-  border: 1px solid #2a2a2a;
-  border-radius: 6px;
+.toolbar-expand-route.toolbar-expand-open {
   padding: 12px;
 }
 
