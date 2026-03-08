@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.3.1 — 2026-03-08
+
+Search and navigation improvements.
+
+### Added
+
+- **Planet search navigation** — searching for a planet zooms to its system view and selects it with a halo indicator.
+- **Planet selection halo** — Elite-style blue arc indicator with slow pulse animation on selected planets.
+- **Substring search** — search matches anywhere in name/ID, not just prefix.
+- **Tab completion** — Tab key accepts the top search suggestion.
+- **Route framing** — camera fits all route systems into view after calculation.
+- **Route auto-clear** — collapsing the route panel clears the active route overlay.
+- **Exit system view on route** — calculating a route exits system view to show the full path.
+
+### Fixed
+
+- Search dropdown no longer clips behind toolbar elements.
+
+### Changed
+
+- All toolbar icons scaled from 18px to 24px.
+- Gateway icon redesigned: tall arc with ring endpoints.
+- Halo pulse slowed for subtlety.
+
 ## 0.3.0 — 2026-03-08
 
 UI toolbar refactor and gateway toggle.
