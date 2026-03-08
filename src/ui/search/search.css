@@ -72,21 +72,22 @@
 .toolbar-expand {
   overflow: hidden;
   width: 0;
-  max-height: 0;
   opacity: 0;
-  transition: width 0.25s ease, max-height 0.25s ease, opacity 0.2s ease;
+  transition: width 0.25s ease, opacity 0.2s ease;
   pointer-events: none;
   margin-right: 0;
   border: none;
   padding: 0;
   background: #111111;
   border-radius: 6px;
+  height: 0;
 }
 
 .toolbar-expand-open {
   width: 320px;
-  max-height: 300px;
+  height: auto;
   opacity: 1;
+  overflow: visible;
   pointer-events: auto;
   margin-right: 8px;
   border: 1px solid #2a2a2a;

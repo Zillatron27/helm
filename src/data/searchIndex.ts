@@ -59,6 +59,7 @@ export function search(query: string, limit = 10): SearchEntry[] {
   const exact: SearchEntry[] = [];
   const namePrefix: SearchEntry[] = [];
   const idPrefix: SearchEntry[] = [];
+  const substring: SearchEntry[] = [];
 
   for (const entry of entries) {
     const nameLower = entry.name.toLowerCase();
@@ -70,10 +71,12 @@ export function search(query: string, limit = 10): SearchEntry[] {
       namePrefix.push(entry);
     } else if (idLower.startsWith(q)) {
       idPrefix.push(entry);
+    } else if (nameLower.includes(q) || idLower.includes(q)) {
+      substring.push(entry);
     }
   }
 
-  return [...exact, ...namePrefix, ...idPrefix].slice(0, limit);
+  return [...exact, ...namePrefix, ...idPrefix, ...substring].slice(0, limit);
 }
 
 export function getSystemUuidByNaturalId(naturalId: string): string | undefined {

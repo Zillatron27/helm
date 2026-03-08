@@ -175,6 +175,12 @@ export class RoutePanel {
         e.preventDefault();
         this.moveFieldSelection(field, -1);
         break;
+      case "Tab":
+        if (field.activeIndex >= 0 && field.activeIndex < field.results.length) {
+          e.preventDefault();
+          this.selectFieldResult(field, field.results[field.activeIndex]!);
+        }
+        break;
       case "Enter":
         e.preventDefault();
         if (field.activeIndex >= 0 && field.activeIndex < field.results.length) {
