@@ -173,6 +173,30 @@ export interface Route {
   jumpCount: number;
 }
 
+// Gateway types
+
+export interface GatewayJsonEntry {
+  name: string;
+  fromPlanet: string;
+  fromSystem: string;
+  toPlanet: string;
+  toSystem: string;
+}
+
+export interface GatewayConnection {
+  fromSystemId: string;
+  toSystemId: string;
+  name: string;
+}
+
+export interface GatewayEndpoint {
+  planetNaturalId: string;
+  destinationPlanetNaturalId: string;
+  destinationSystemNaturalId: string;
+  destinationSystemId: string;
+  name: string;
+}
+
 // UI state types
 
 export type ViewLevel = "galaxy" | "system";
