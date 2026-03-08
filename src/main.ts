@@ -66,6 +66,7 @@ async function boot(): Promise<void> {
     const searchBar = new SearchBar();
     searchBar.init(renderer);
     const routePanel = new RoutePanel();
+    routePanel.init(renderer);
 
     // Build toolbar container
     const toolbar = document.createElement("div");

@@ -1,6 +1,14 @@
 import { search } from "../../data/searchIndex.js";
 import { findRoute } from "../../data/pathfinding.js";
-import { setActiveRoute, setSearchFocused } from "../state.js";
+import {
+  setActiveRoute,
+  setSearchFocused,
+  setSelectedEntity,
+  setFocusedSystem,
+  setViewLevel,
+  getViewLevel,
+} from "../state.js";
+import type { MapRenderer } from "../../renderer/MapRenderer.js";
 import type { SearchEntry } from "../../types/index.js";
 
 const DEBOUNCE_MS = 50;
@@ -30,6 +38,7 @@ export class RoutePanel {
   private fromField: RouteField;
   private toField: RouteField;
   private expanded = false;
+  private renderer: MapRenderer | null = null;
 
   constructor() {
     // Toolbar row: [expand panel] [button]
@@ -78,6 +87,10 @@ export class RoutePanel {
 
   getElement(): HTMLElement {
     return this.rowEl;
+  }
+
+  init(renderer: MapRenderer): void {
+    this.renderer = renderer;
   }
 
   private toggleExpand(): void {
@@ -271,11 +284,23 @@ export class RoutePanel {
       return;
     }
 
+    // Exit system view if active
+    if (getViewLevel() === "system") {
+      setSelectedEntity(null);
+      setFocusedSystem(null);
+      setViewLevel("galaxy");
+    }
+
     const route = findRoute(fromId, toId);
     if (route) {
       setActiveRoute(route);
       const jumpWord = route.jumpCount === 1 ? "jump" : "jumps";
       this.infoEl.innerHTML = `<span class="route-info-jumps">${route.jumpCount} ${jumpWord}</span>`;
+
+      // Frame the route on the map after a brief delay for system view exit
+      setTimeout(() => {
+        this.renderer?.frameRoute(route.systemIds);
+      }, 150);
     } else {
       setActiveRoute(null);
       this.infoEl.textContent = "No route found";

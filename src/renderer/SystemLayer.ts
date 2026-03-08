@@ -70,7 +70,7 @@ const HALO_ALPHA = 0.7;
 const HALO_STROKE = 2.0;
 const HALO_GAP = 6; // gap between planet edge and halo
 const HALO_ARC_SPAN = Math.PI * 0.7; // each arc covers 70% of a semicircle
-const HALO_PULSE_FREQUENCY = 2.0;
+const HALO_PULSE_FREQUENCY = 1.0;
 const HALO_PULSE_AMPLITUDE = 0.2;
 
 interface PlanetCloud {

@@ -413,6 +413,50 @@ export class MapRenderer {
     setTimeout(selectAfterLoad, TRANSITION_MS + 100);
   }
 
+  frameRoute(systemIds: string[]): void {
+    const viewport = this.viewport;
+    if (!viewport || systemIds.length === 0) return;
+
+    // Compute bounding box of all systems in the route
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+
+    for (const id of systemIds) {
+      const sys = getSystemById(id);
+      if (!sys) continue;
+      minX = Math.min(minX, sys.worldX);
+      maxX = Math.max(maxX, sys.worldX);
+      minY = Math.min(minY, sys.worldY);
+      maxY = Math.max(maxY, sys.worldY);
+    }
+
+    if (!isFinite(minX)) return;
+
+    const centreX = (minX + maxX) / 2;
+    const centreY = (minY + maxY) / 2;
+    const routeWidth = maxX - minX;
+    const routeHeight = maxY - minY;
+
+    // Calculate scale to fit the route with padding
+    const padding = 200;
+    const scaleX = window.innerWidth / (routeWidth + padding * 2);
+    const scaleY = window.innerHeight / (routeHeight + padding * 2);
+    const targetScale = Math.min(scaleX, scaleY, MAX_ZOOM);
+
+    this.isAnimating = true;
+    viewport.animate({
+      position: { x: centreX, y: centreY },
+      scale: targetScale,
+      time: TRANSITION_MS,
+      ease: "easeInOutCubic",
+      callbackOnComplete: () => {
+        this.isAnimating = false;
+      },
+    });
+  }
+
   setGatewaysVisible(visible: boolean): void {
     this.galaxy?.setGatewaysVisible(visible);
   }
