@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.0 — 2026-03-09
+
+Library entry point for APXM embedding.
+
+### Added
+
+- **`createMap()` factory** — async function that loads all data, initialises the renderer and panel manager, and returns a `HelmInstance` with convenience methods. Consumers call one function instead of orchestrating the full boot sequence.
+- **Library entry point** (`src/index.ts`) — re-exports factory, data queries, pathfinding, search, state, theme, and all types. Internal loading functions are not exposed.
+- **`package.json` exports field** — `@27bit/helm` with sub-path exports for `./renderer/*`, `./data/*`, `./state`, `./theme`, `./types`.
+- **Self-contained panel styles** — `panel.css` import moved into `PanelManager.ts` so styles load automatically for library consumers.
+
+### Changed
+
+- `main.ts` simplified to consume `createMap()` for data/renderer init. Standalone chrome (toolbar, search, settings, version label) remains in main.ts.
+- Package renamed from `helm` to `@27bit/helm`.
+
 ## 0.4.0 — 2026-03-09
 
 Theme system with hot-swap, settings panel, and 5 presets.
