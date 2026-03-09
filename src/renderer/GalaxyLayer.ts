@@ -21,6 +21,7 @@ const LINE_MIN = 0.3;
 const LINE_MAX = 4.0;
 
 const ROUTE_COLOUR = 0xff8c00;
+const ROUTE_GATEWAY_COLOUR = 0xffdd00;
 const ROUTE_BASE = 2.5;
 const ROUTE_MIN = 1.5;
 const ROUTE_MAX = 8.0;
@@ -421,19 +422,63 @@ export class GalaxyLayer {
 
     const width = scaledWidth(ROUTE_BASE, ROUTE_MIN, ROUTE_MAX, this.currentViewportScale);
 
+    // Build gateway pair lookup
+    const gwConns = getGalaxyGatewayConnections();
+    const gwPairs = new Set<string>();
+    for (const gw of gwConns) {
+      const [a, b] = gw.fromSystemId < gw.toSystemId
+        ? [gw.fromSystemId, gw.toSystemId]
+        : [gw.toSystemId, gw.fromSystemId];
+      gwPairs.add(`${a}:${b}`);
+    }
+
+    // Jump segments — straight orange lines
+    let hasJumps = false;
     for (let i = 0; i < this.currentRoute.length - 1; i++) {
-      const from = this.systemLookup.get(this.currentRoute[i]!);
-      const to = this.systemLookup.get(this.currentRoute[i + 1]!);
+      const fromId = this.currentRoute[i]!;
+      const toId = this.currentRoute[i + 1]!;
+      const [a, b] = fromId < toId ? [fromId, toId] : [toId, fromId];
+      if (gwPairs.has(`${a}:${b}`)) continue;
+
+      const from = this.systemLookup.get(fromId);
+      const to = this.systemLookup.get(toId);
       if (!from || !to) continue;
 
       this.routeOverlay.moveTo(from.worldX, from.worldY);
       this.routeOverlay.lineTo(to.worldX, to.worldY);
+      hasJumps = true;
     }
-    this.routeOverlay.stroke({
-      width,
-      color: ROUTE_COLOUR,
-      alpha: ROUTE_ALPHA,
-    });
+    if (hasJumps) {
+      this.routeOverlay.stroke({ width, color: ROUTE_COLOUR, alpha: ROUTE_ALPHA });
+    }
+
+    // Gateway segments — yellow bezier arcs
+    let hasGateways = false;
+    for (let i = 0; i < this.currentRoute.length - 1; i++) {
+      const fromId = this.currentRoute[i]!;
+      const toId = this.currentRoute[i + 1]!;
+      const [a, b] = fromId < toId ? [fromId, toId] : [toId, fromId];
+      if (!gwPairs.has(`${a}:${b}`)) continue;
+
+      const from = this.systemLookup.get(fromId);
+      const to = this.systemLookup.get(toId);
+      if (!from || !to) continue;
+
+      const midX = (from.worldX + to.worldX) / 2;
+      const midY = (from.worldY + to.worldY) / 2;
+      const dx = to.worldX - from.worldX;
+      const dy = to.worldY - from.worldY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const arcHeight = Math.min(dist * GATEWAY_ARC_HEIGHT_FACTOR, GATEWAY_ARC_HEIGHT_MAX);
+
+      this.routeOverlay.moveTo(from.worldX, from.worldY);
+      this.routeOverlay.quadraticCurveTo(midX, midY - arcHeight, to.worldX, to.worldY);
+      hasGateways = true;
+    }
+    if (hasGateways) {
+      this.routeOverlay.stroke({ width, color: ROUTE_GATEWAY_COLOUR, alpha: ROUTE_ALPHA });
+    }
+
     this.lastRouteScale = this.currentViewportScale;
   }
 
