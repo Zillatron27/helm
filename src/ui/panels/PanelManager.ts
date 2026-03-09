@@ -1,3 +1,4 @@
+import "./panel.css";
 import type { StarSystem, Planet } from "../../types/index.js";
 import {
   getSelectedEntity,

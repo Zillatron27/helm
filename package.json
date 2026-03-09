@@ -1,8 +1,16 @@
 {
-  "name": "helm",
+  "name": "@27bit/helm",
   "version": "0.4.0",
   "private": true,
   "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./renderer/*": "./src/renderer/*",
+    "./data/*": "./src/data/*",
+    "./state": "./src/ui/state.ts",
+    "./theme": "./src/ui/theme.ts",
+    "./types": "./src/types/index.ts"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

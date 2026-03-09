@@ -1,16 +1,11 @@
 import { VERSION } from "./version.js";
-import { loadSystemData, loadCxStations, loadMaterials, getSystems } from "./data/cache.js";
-import { fetchAllPlanetNames } from "./data/fio.js";
-import { buildSearchIndex } from "./data/searchIndex.js";
-import { MapRenderer } from "./renderer/MapRenderer.js";
-import { PanelManager } from "./ui/panels/PanelManager.js";
+import { createMap } from "./factory.js";
 import { SearchBar } from "./ui/search/SearchBar.js";
 import { RoutePanel } from "./ui/search/RoutePanel.js";
 import { SettingsPanel } from "./ui/SettingsPanel.js";
 import { setupControls } from "./ui/controls.js";
 import { onStateChange, getGatewaysVisible, setGatewaysVisible } from "./ui/state.js";
 import { initTheme, getTheme } from "./ui/theme.js";
-import "./ui/panels/panel.css";
 import "./ui/search/search.css";
 import "./ui/settings.css";
 
@@ -46,29 +41,9 @@ const GATEWAY_ICON_SVG = `<svg width="26" height="26" viewBox="0 0 26 22" fill="
 
 async function boot(): Promise<void> {
   try {
-    // Parallel fetch: system data + planet name index + CX stations
-    const [, planetSummaries] = await Promise.all([
-      loadSystemData(),
-      fetchAllPlanetNames().catch((err) => {
-        console.warn("Planet index fetch failed, search will be systems-only:", err);
-        return [];
-      }),
-      loadCxStations().catch((err) => {
-        console.warn("CX station fetch failed, CX markers will be hidden:", err);
-      }),
-      loadMaterials().catch((err) => {
-        console.warn("Materials fetch failed, resource codes will show IDs:", err);
-      }),
-    ]);
-
-    buildSearchIndex(getSystems(), planetSummaries);
+    const helm = await createMap(container);
+    const { renderer, panelManager } = helm;
     loading.remove();
-
-    const renderer = new MapRenderer();
-    await renderer.init(container);
-
-    const panelManager = new PanelManager();
-    panelManager.init(renderer);
 
     const searchBar = new SearchBar();
     searchBar.init(renderer);
