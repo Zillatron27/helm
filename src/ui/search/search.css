@@ -16,6 +16,8 @@
   display: flex;
   align-items: flex-start;
   justify-content: flex-end;
+  position: relative;
+  height: 40px;
 }
 
 /* Circular toolbar button */
@@ -68,14 +70,16 @@
   color: var(--text-primary);
 }
 
-/* Expandable panel — slides open leftward */
+/* Expandable panel — slides open leftward, absolutely positioned to avoid pushing rows */
 .toolbar-expand {
+  position: absolute;
+  right: 48px;
+  top: 0;
   overflow: hidden;
   width: 0;
   opacity: 0;
   transition: width 0.25s ease, opacity 0.2s ease;
   pointer-events: none;
-  margin-right: 0;
   border: none;
   padding: 0;
   background: var(--bg-secondary);
@@ -89,14 +93,12 @@
   opacity: 1;
   overflow: visible;
   pointer-events: auto;
-  margin-right: 8px;
   border: 1px solid var(--border);
 }
 
 /* Search expand panel */
 .toolbar-expand-search.toolbar-expand-open {
   padding: 0 12px;
-  position: relative;
 }
 
 /* Route expand panel */

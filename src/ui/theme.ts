@@ -109,8 +109,8 @@ export function applyCssProperties(tokens: ThemeTokens): void {
 
   // Positive/negative colours — colorblind theme uses blue/orange
   if (activePresetId === "colorblind") {
-    root.setProperty("--color-positive", "#4a90d9");
-    root.setProperty("--color-negative", "#e68a2e");
+    root.setProperty("--color-positive", "#0088ff");
+    root.setProperty("--color-negative", "#ff8833");
   } else {
     root.setProperty("--color-positive", "#32cd32");
     root.setProperty("--color-negative", "#cd5c5c");
