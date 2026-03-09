@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.4.0 — 2026-03-09
+
+Theme system with hot-swap, settings panel, and 5 presets.
+
+### Added
+
+- **Theme presets** — 5 colour themes: DryDock (default), CRT, PrUn Classic, Vivid, and Colorblind Safe.
+- **Settings panel** — cog button in toolbar opens a theme picker with colour swatch previews.
+- **Runtime theme hot-swap** — switching themes rebuilds all Pixi.js layers and updates CSS custom properties without page reload. Camera position, gateway visibility, active route, and system view state are preserved across switches.
+- **localStorage persistence** — selected theme is saved and restored on page load.
+- **CSS custom properties** — all panel, toolbar, and search colours driven by CSS variables set from theme tokens. Semantic type-specific colours (rocky/gas badges, gateway purple, flag-active green) remain fixed.
+- **Colorblind-safe mode** — positive/negative indicators use blue/orange instead of red/green.
+
+### Changed
+
+- All hardcoded CSS hex colours in panel.css and search.css replaced with CSS custom property references.
+- HexGridLayer reads stroke colour from theme tokens instead of hardcoded constant.
+- `ThemeTokens` interface extended with `hexStroke` field.
+
 ## 0.3.1 — 2026-03-08
 
 Search and navigation improvements.

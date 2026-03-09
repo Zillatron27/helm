@@ -1,7 +1,7 @@
 import { Container, Graphics, Text, TextStyle } from "pixi.js";
 import type { SectorHex } from "../types/index.js";
+import { getTheme } from "../ui/theme.js";
 
-const HEX_STROKE_COLOUR = 0x4a8ab0;
 const HEX_STROKE_ALPHA = 0.6;
 
 // Base stroke width and clamp range for zoom-responsive scaling
@@ -9,7 +9,6 @@ const HEX_BASE = 1.5;
 const HEX_MIN = 0.5;
 const HEX_MAX = 5.0;
 
-const LABEL_COLOUR = "#4a8ab0";
 const LABEL_ALPHA = 0.5;
 const LABEL_FONT_SIZE = 72;
 
@@ -22,12 +21,6 @@ const HEX_ANGLES: number[] = [];
 for (let i = 0; i < 6; i++) {
   HEX_ANGLES.push((i * Math.PI) / 3);
 }
-
-const labelStyle = new TextStyle({
-  fontFamily: "IBM Plex Mono",
-  fontSize: LABEL_FONT_SIZE,
-  fill: LABEL_COLOUR,
-});
 
 export class HexGridLayer {
   readonly container: Container;
@@ -42,6 +35,13 @@ export class HexGridLayer {
     this.circumradius = circumradius;
 
     this.gfx = new Graphics();
+
+    const strokeColour = `#${getTheme().hexStroke.toString(16).padStart(6, "0")}`;
+    const labelStyle = new TextStyle({
+      fontFamily: "IBM Plex Mono",
+      fontSize: LABEL_FONT_SIZE,
+      fill: strokeColour,
+    });
 
     // Add labels (not redrawn — text scales naturally with viewport)
     for (const hex of hexes) {
@@ -84,7 +84,7 @@ export class HexGridLayer {
 
     this.gfx.stroke({
       width,
-      color: HEX_STROKE_COLOUR,
+      color: getTheme().hexStroke,
       alpha: HEX_STROKE_ALPHA,
     });
   }

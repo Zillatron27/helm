@@ -339,3 +339,8 @@ export function generatePlanetTexture(planet: Planet, displayRadius: number): Te
   textureCache.set(planet.id, texture);
   return texture;
 }
+
+export function clearPlanetTextureCache(): void {
+  textureCache.clear();
+  starTextureCache.clear();
+}

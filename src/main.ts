@@ -6,26 +6,33 @@ import { MapRenderer } from "./renderer/MapRenderer.js";
 import { PanelManager } from "./ui/panels/PanelManager.js";
 import { SearchBar } from "./ui/search/SearchBar.js";
 import { RoutePanel } from "./ui/search/RoutePanel.js";
+import { SettingsPanel } from "./ui/SettingsPanel.js";
 import { setupControls } from "./ui/controls.js";
 import { onStateChange, getGatewaysVisible, setGatewaysVisible } from "./ui/state.js";
+import { initTheme, getTheme } from "./ui/theme.js";
 import "./ui/panels/panel.css";
 import "./ui/search/search.css";
+import "./ui/settings.css";
 
 console.log(`Helm v${VERSION}`);
+
+// Load saved theme and apply CSS custom properties before any rendering
+initTheme();
 
 const appEl = document.getElementById("app") as HTMLElement | null;
 if (!appEl) throw new Error("Missing #app element");
 const container: HTMLElement = appEl;
 
-// Loading indicator
+// Loading indicator — uses theme colours
+const theme = getTheme();
 const loading = document.createElement("div");
 loading.style.cssText = `
   position: fixed; inset: 0;
   display: flex; align-items: center; justify-content: center;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 16px;
-  color: #666666;
-  background: #0a0a0a;
+  color: #${theme.textSecondary.toString(16).padStart(6, "0")};
+  background: #${theme.bgPrimary.toString(16).padStart(6, "0")};
   z-index: 100;
 `;
 loading.textContent = "Loading galaxy data...";
@@ -85,6 +92,10 @@ async function boot(): Promise<void> {
     });
     gatewayRow.appendChild(gatewayBtn);
     toolbar.appendChild(gatewayRow);
+
+    // Settings panel row
+    const settingsPanel = new SettingsPanel();
+    toolbar.appendChild(settingsPanel.getElement());
 
     document.body.appendChild(toolbar);
 

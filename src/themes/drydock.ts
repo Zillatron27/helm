@@ -20,6 +20,7 @@ export const drydockTheme: ThemeTokens = {
   fieldStar: 0x334455,
   jumpLine: 0x2a3a4a,
   jumpLineAlpha: 0.7,
+  hexStroke: 0x4a8ab0,
   // Rocky planets: warm earth tones (browns, greens, grays)
   planetRocky: [0x8b7355, 0x6b8e5a, 0x9e8c6c, 0x7a7a7a, 0xa0785a],
   // Gas giants: blue-purple tones

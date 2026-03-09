@@ -219,6 +219,7 @@ export interface ThemeTokens {
   fieldStar: number;
   jumpLine: number;
   jumpLineAlpha: number;
+  hexStroke: number;
   planetRocky: number[];
   planetGas: number[];
 }

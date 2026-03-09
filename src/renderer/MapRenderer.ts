@@ -1,6 +1,7 @@
 import { Application } from "pixi.js";
 import { Viewport } from "pixi-viewport";
 import { getTheme } from "../ui/theme.js";
+import { onThemeChange } from "../ui/theme.js";
 import type { StarSystem } from "../types/index.js";
 import {
   getSystems,
@@ -10,7 +11,9 @@ import {
   getSystemById,
   loadPlanetsForSystem,
   getPlanetsForSystem,
+  recolourCachedPlanets,
 } from "../data/cache.js";
+import { clearPlanetTextureCache } from "./PlanetTexture.js";
 import { BackgroundLayer } from "./BackgroundLayer.js";
 import { HexGridLayer } from "./HexGridLayer.js";
 import { GalaxyLayer } from "./GalaxyLayer.js";
@@ -21,6 +24,7 @@ import {
   getFocusedSystemId,
   getSelectedEntity,
   getActiveRoute,
+  getGatewaysVisible,
   setSelectedEntity,
   setFocusedSystem,
   setViewLevel,
@@ -181,6 +185,90 @@ export class MapRenderer {
 
     // Subscribe to state changes for camera transitions
     onStateChange(() => this.handleStateChange());
+
+    // Rebuild all layers when theme changes
+    onThemeChange(() => this.rebuild());
+  }
+
+  private rebuild(): void {
+    const viewport = this.viewport;
+    const app = this.app;
+    if (!viewport || !app) return;
+
+    // Save camera state
+    const savedCenter = viewport.center.clone();
+    const savedScale = viewport.scaled;
+
+    // Save view state
+    const wasInSystem = getViewLevel() === "system";
+    const focusedId = getFocusedSystemId();
+
+    // Exit system view cleanly if active
+    if (wasInSystem && this.systemLayer) {
+      this.systemLayer.hide();
+      this.galaxy?.restore();
+    }
+
+    // Remove old layer containers
+    if (this.hexGrid) viewport.removeChild(this.hexGrid.container);
+    if (this.galaxy) viewport.removeChild(this.galaxy.container);
+    if (this.systemLayer) viewport.removeChild(this.systemLayer.container);
+    if (this.background) app.stage.removeChild(this.background.container);
+
+    // Update cached planet colours and clear texture caches
+    recolourCachedPlanets();
+    clearPlanetTextureCache();
+
+    // Update renderer background
+    app.renderer.background.color = getTheme().bgPrimary;
+
+    // Reconstruct all layers (constructors read getTheme())
+    const bounds = getWorldBounds();
+    this.background = new BackgroundLayer(bounds);
+    app.stage.addChildAt(this.background.container, 0);
+
+    const HEX_WORLD_CIRCUMRADIUS = 400;
+    this.hexGrid = new HexGridLayer(getSectorHexes(), HEX_WORLD_CIRCUMRADIUS);
+    viewport.addChild(this.hexGrid.container);
+
+    this.galaxy = new GalaxyLayer(getSystems(), getConnections(), this.tweens);
+    viewport.addChild(this.galaxy.container);
+
+    this.systemLayer = new SystemLayer();
+    viewport.addChild(this.systemLayer.container);
+
+    // Restore camera position and zoom (no animation)
+    viewport.moveCenter(savedCenter.x, savedCenter.y);
+    viewport.setZoom(savedScale, true);
+
+    // Trigger initial draws
+    const scale = viewport.scaled;
+    this.galaxy.redrawConnections(scale);
+    this.galaxy.redrawGatewayArcs(scale);
+    this.galaxy.updateLabelVisibility(scale);
+    this.hexGrid.redraw(scale);
+    this.background.updateParallax(viewport);
+
+    // Re-apply gateway visibility
+    this.galaxy.setGatewaysVisible(getGatewaysVisible());
+
+    // Re-apply active route
+    const route = getActiveRoute();
+    if (route && route.systemIds.length >= 2) {
+      this.galaxy.showRoute(route.systemIds);
+    }
+
+    // If was in system view, re-enter
+    if (wasInSystem && focusedId) {
+      const system = getSystemById(focusedId);
+      if (system) {
+        this.galaxy.dimExcept(focusedId);
+        if (this.hexGrid) {
+          this.hexGrid.container.alpha = SYSTEM_VIEW_HEX_ALPHA;
+        }
+        this.showSystemView(system);
+      }
+    }
   }
 
   private handleStateChange(): void {

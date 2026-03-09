@@ -454,3 +454,20 @@ export function isGatewaySystem(systemId: string): boolean {
 export function getSystemByNaturalId(naturalId: string): StarSystem | undefined {
   return systemByNaturalId.get(naturalId);
 }
+
+/** Re-apply theme colours to all cached planets without re-fetching from FIO. */
+export function recolourCachedPlanets(): void {
+  const theme = getTheme();
+  for (const planets of planetsBySystem.values()) {
+    for (let i = 0; i < planets.length; i++) {
+      const p = planets[i]!;
+      if (p.surface) {
+        const colourIndex = Math.abs(Math.round(p.fertility * 2 + p.temperature * 0.01)) % theme.planetRocky.length;
+        p.colour = theme.planetRocky[colourIndex] ?? theme.planetRocky[0]!;
+      } else {
+        const colourIndex = Math.abs(Math.round(i * 1.7)) % theme.planetGas.length;
+        p.colour = theme.planetGas[colourIndex] ?? theme.planetGas[0]!;
+      }
+    }
+  }
+}
