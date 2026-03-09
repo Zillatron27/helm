@@ -1,5 +1,5 @@
 import type { Route } from "../types/index.js";
-import { getSystemById } from "./cache.js";
+import { getSystemById, getNeighbours } from "./cache.js";
 
 // BFS shortest path on the jump graph.
 // All edges have weight 1 (jump count), so BFS is optimal.
@@ -22,10 +22,7 @@ export function findRoute(startId: string, endId: string): Route | null {
   while (head < queue.length) {
     const current = queue[head++]!;
 
-    const system = getSystemById(current);
-    if (!system) continue;
-
-    for (const neighbourId of system.connectionIds) {
+    for (const neighbourId of getNeighbours(current)) {
       if (parent.has(neighbourId)) continue;
 
       parent.set(neighbourId, current);

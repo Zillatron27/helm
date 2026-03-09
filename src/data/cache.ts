@@ -55,6 +55,9 @@ const cxBySystem: Map<string, FioCxStation> = new Map();
 // Material ticker lookup: MaterialId → Ticker
 const materialTickers: Map<string, string> = new Map();
 
+// Merged adjacency index (jump connections + gateway connections)
+const adjacency: Map<string, Set<string>> = new Map();
+
 // Gateway data
 const systemByNaturalId: Map<string, StarSystem> = new Map();
 let galaxyGatewayConnections: GatewayConnection[] = [];
@@ -329,6 +332,16 @@ export async function loadSystemData(): Promise<void> {
 
   processGateways();
 
+  // Build merged adjacency index: jump connections + gateway connections
+  for (const s of systems) {
+    const set = new Set<string>(s.connectionIds);
+    adjacency.set(s.id, set);
+  }
+  for (const gw of galaxyGatewayConnections) {
+    adjacency.get(gw.fromSystemId)?.add(gw.toSystemId);
+    adjacency.get(gw.toSystemId)?.add(gw.fromSystemId);
+  }
+
   console.log(
     `Loaded ${systems.length} systems, ${connections.length} connections`
   );
@@ -419,6 +432,11 @@ export async function loadMaterials(): Promise<void> {
 
 export function getMaterialTicker(materialId: string): string {
   return materialTickers.get(materialId) ?? materialId;
+}
+
+export function getNeighbours(systemId: string): string[] {
+  const set = adjacency.get(systemId);
+  return set ? Array.from(set) : [];
 }
 
 export function getGalaxyGatewayConnections(): GatewayConnection[] {

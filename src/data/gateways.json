@@ -1,6 +1,6 @@
 {
   "description": "Completed gateway connections. Hand-maintained from GTW buffer. Each entry is one linked gateway pair.",
-  "lastUpdated": "2026-03-08",
+  "lastUpdated": "2026-03-09",
   "gateways": [
     {
       "name": "Circe \u2194 Montem",
@@ -57,6 +57,13 @@
       "fromSystem": "OF-375",
       "toPlanet": "VH-331a",
       "toSystem": "VH-331"
+    },
+    {
+      "name": "Sand \u2194 Verdant",
+      "fromPlanet": "WB-675c",
+      "fromSystem": "WB-675",
+      "toPlanet": "YI-715b",
+      "toSystem": "YI-715"
     }
   ]
 }
