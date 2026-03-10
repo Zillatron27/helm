@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0 — 2026-03-10
+
+Bridge API: independent gateway indicator control.
+
+### Added
+
+- **`setGatewayIndicatorsVisible()`** — new method on MapRenderer and GalaxyLayer that hides/shows gateway indicator dots independently of gateway arcs. Enables the APXM shell to re-render indicators at status grid positions while keeping the arc curves visible.
+
 ## 0.5.0 — 2026-03-09
 
 Library entry point for APXM embedding.
