@@ -824,6 +824,10 @@ export class GalaxyLayer {
     this.gatewayIndicators.visible = visible;
   }
 
+  setGatewayIndicatorsVisible(visible: boolean): void {
+    this.gatewayIndicators.visible = visible;
+  }
+
   /** Pulse CX diamond markers like station beacons. */
   updateCxPulse(elapsed: number): void {
     if (this.isDimmedForSystemView) return;

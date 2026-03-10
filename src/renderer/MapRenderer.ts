@@ -549,6 +549,10 @@ export class MapRenderer {
     this.galaxy?.setGatewaysVisible(visible);
   }
 
+  setGatewayIndicatorsVisible(visible: boolean): void {
+    this.galaxy?.setGatewayIndicatorsVisible(visible);
+  }
+
   getViewport(): Viewport | null {
     return this.viewport;
   }
