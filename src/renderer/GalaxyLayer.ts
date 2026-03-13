@@ -766,8 +766,10 @@ export class GalaxyLayer {
     }
     this.emphasisedLabelIds.clear();
 
-    for (const label of this.ambientLabelMap.values()) {
-      this.tweens.to(label, "alpha", 1, 0.2);
+    const hl = this.highlightedSystems;
+    for (const [id, label] of this.ambientLabelMap) {
+      const target = hl && !hl.has(id) ? DIM_HIGHLIGHT_ALPHA : 1;
+      this.tweens.to(label, "alpha", target, 0.2);
     }
   }
 
