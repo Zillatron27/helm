@@ -507,17 +507,26 @@ export class GalaxyLayer {
     const hovered = this.hoveredSystemId;
     const selected = this.selectedSystemId;
 
+    const hl = this.highlightedSystems;
+
     // No highlight active — restore all stars, glows, and labels to default
+    // (respecting empire highlight filter when active)
     if (!hovered && !selected) {
-      this.twinkleActive = true;
-      for (const star of this.starGraphics.values()) {
-        this.tweens.to(star, "alpha", 1, 0.25);
+      this.twinkleActive = !hl;
+      for (const [id, star] of this.starGraphics) {
+        const target = hl && !hl.has(id) ? DIM_HIGHLIGHT_ALPHA : 1;
+        this.tweens.to(star, "alpha", target, 0.25);
       }
-      for (const glow of this.glowGraphics.values()) {
-        this.tweens.to(glow, "alpha", GLOW_ALPHA, 0.25);
+      for (const [id, glow] of this.glowGraphics) {
+        const target = hl && !hl.has(id) ? GLOW_ALPHA * DIM_HIGHLIGHT_ALPHA : GLOW_ALPHA;
+        this.tweens.to(glow, "alpha", target, 0.25);
       }
       this.tweens.to(this.highlightLayer, "alpha", 0, 0.2);
       this.clearLabelEmphasis();
+      // Redraw connections with per-line alpha if empire highlight is active
+      if (hl) {
+        setTimeout(() => this.redrawWithHighlight(), 300);
+      }
       return;
     }
 
@@ -548,18 +557,32 @@ export class GalaxyLayer {
     this.lastHighlightScale = this.currentViewportScale;
 
     // Tween non-connected stars/glows dim, connected ones bright
+    // When empire highlight is active, "bright" for non-empire stars
+    // is still DIM_HIGHLIGHT_ALPHA (they don't get boosted by selection)
     const dur = hovered && !selected ? 0.2 : 0.25;
     for (const [id, star] of this.starGraphics) {
-      this.tweens.to(star, "alpha", connectedIds.has(id) ? CONNECTED_ALPHA : DIM_ALPHA, dur);
+      let target: number;
+      if (connectedIds.has(id)) {
+        target = CONNECTED_ALPHA;
+      } else if (hl && !hl.has(id)) {
+        target = DIM_HIGHLIGHT_ALPHA;
+      } else {
+        target = DIM_ALPHA;
+      }
+      this.tweens.to(star, "alpha", target, dur);
     }
     for (const [id, glow] of this.glowGraphics) {
+      let target: number;
       if (id === hovered) {
-        this.tweens.to(glow, "alpha", Math.min(GLOW_HOVER_BOOST, 1), dur);
+        target = Math.min(GLOW_HOVER_BOOST, 1);
       } else if (connectedIds.has(id)) {
-        this.tweens.to(glow, "alpha", 1, dur);
+        target = 1;
+      } else if (hl && !hl.has(id)) {
+        target = GLOW_ALPHA * DIM_HIGHLIGHT_ALPHA;
       } else {
-        this.tweens.to(glow, "alpha", GLOW_DIM_FACTOR, dur);
+        target = GLOW_DIM_FACTOR;
       }
+      this.tweens.to(glow, "alpha", target, dur);
     }
 
     this.applyLabelEmphasis(connectedIds);
