@@ -57,6 +57,9 @@ export {
   applyCssProperties,
 } from "./ui/theme.js";
 
+export { themePresets } from "./themes/index.js";
+export type { ThemePreset } from "./themes/index.js";
+
 // Types
 export type {
   FioSystemConnection,

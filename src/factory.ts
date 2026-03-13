@@ -15,6 +15,7 @@ export interface HelmInstance {
   frameRoute(systemIds: string[]): void;
   zoomToGalaxyFit(): void;
   setGatewaysVisible(visible: boolean): void;
+  setHighlightedSystems(ids: Set<string> | null): void;
   destroy(): void;
 }
 
@@ -54,6 +55,7 @@ export async function createMap(container: HTMLElement): Promise<HelmInstance> {
     frameRoute: (systemIds) => renderer.frameRoute(systemIds),
     zoomToGalaxyFit: () => renderer.zoomToGalaxyFit(),
     setGatewaysVisible: (visible) => renderer.setGatewaysVisible(visible),
+    setHighlightedSystems: (ids) => renderer.setHighlightedSystems(ids),
     destroy: () => renderer.destroy(),
   };
 }

@@ -59,6 +59,9 @@ const SYSTEM_VIEW_LINES_ALPHA = 0.05;
 const SYSTEM_VIEW_FOCUSED_STAR_ALPHA = 0.3;
 const SYSTEM_VIEW_OTHER_STAR_ALPHA = 0.15;
 
+// Empire highlight filter — per-system brightness control
+const DIM_HIGHLIGHT_ALPHA = 0.12;
+
 // Ambient system name labels
 const LABEL_FONT_SIZE = 18;
 const LABEL_TARGET_SCREEN_SIZE = 14;
@@ -141,6 +144,9 @@ export class GalaxyLayer {
   private hoveredSystemId: string | null = null;
   private selectedSystemId: string | null = null;
   private isDimmedForSystemView = false;
+
+  // Empire highlight filter — which systems stay bright (null = no filter)
+  private highlightedSystems: Set<string> | null = null;
 
   // Ambient system name labels
   private ambientLabels: Container;
@@ -619,38 +625,56 @@ export class GalaxyLayer {
 
   restore(tw?: TweenManager): void {
     this.isDimmedForSystemView = false;
-    this.twinkleActive = true;
+    this.twinkleActive = !this.highlightedSystems;
     this.clearLabelEmphasis();
 
+    const hl = this.highlightedSystems;
     const dur = tw ? 0.4 : 0;
+
+    // Container-level elements restore to full unless highlight is active
+    const containerAlpha = 1;
     if (tw) {
-      tw.to(this.baseConnections, "alpha", 1, dur);
-      tw.to(this.routeOverlay, "alpha", 1, dur);
-      tw.to(this.cxMarkers, "alpha", 1, dur);
-      tw.to(this.glowContainer, "alpha", 1, dur);
-      tw.to(this.gatewayArcs, "alpha", 1, dur);
-      tw.to(this.gatewayIndicators, "alpha", 1, dur);
+      tw.to(this.baseConnections, "alpha", containerAlpha, dur);
+      tw.to(this.routeOverlay, "alpha", containerAlpha, dur);
+      tw.to(this.glowContainer, "alpha", containerAlpha, dur);
+      tw.to(this.gatewayArcs, "alpha", containerAlpha, dur);
+      tw.to(this.gatewayIndicators, "alpha", containerAlpha, dur);
+      // CX markers dim per-system when highlight is active
+      tw.to(this.cxMarkers, "alpha", containerAlpha, dur);
     } else {
-      this.baseConnections.alpha = 1;
-      this.routeOverlay.alpha = 1;
-      this.cxMarkers.alpha = 1;
-      this.glowContainer.alpha = 1;
-      this.gatewayArcs.alpha = 1;
-      this.gatewayIndicators.alpha = 1;
+      this.baseConnections.alpha = containerAlpha;
+      this.routeOverlay.alpha = containerAlpha;
+      this.glowContainer.alpha = containerAlpha;
+      this.gatewayArcs.alpha = containerAlpha;
+      this.gatewayIndicators.alpha = containerAlpha;
+      this.cxMarkers.alpha = containerAlpha;
     }
 
-    for (const star of this.starGraphics.values()) {
+    // Per-star alpha: respect highlight filter when active
+    for (const [id, star] of this.starGraphics) {
+      const targetAlpha = hl && !hl.has(id) ? DIM_HIGHLIGHT_ALPHA : 1;
       if (tw) {
-        tw.to(star, "alpha", 1, dur);
+        tw.to(star, "alpha", targetAlpha, dur);
       } else {
-        star.alpha = 1;
+        star.alpha = targetAlpha;
       }
     }
-    for (const glow of this.glowGraphics.values()) {
+    for (const [id, glow] of this.glowGraphics) {
+      const targetAlpha = hl && !hl.has(id) ? GLOW_ALPHA * DIM_HIGHLIGHT_ALPHA : GLOW_ALPHA;
       if (tw) {
-        tw.to(glow, "alpha", GLOW_ALPHA, dur);
+        tw.to(glow, "alpha", targetAlpha, dur);
       } else {
-        glow.alpha = GLOW_ALPHA;
+        glow.alpha = targetAlpha;
+      }
+    }
+
+    // After restore tween completes, redraw connections/arcs with per-line alpha if highlight active
+    if (hl) {
+      const applyAfter = () => this.redrawWithHighlight();
+      if (tw) {
+        setTimeout(applyAfter, dur * 1000 + 50);
+      } else {
+        applyAfter();
       }
     }
   }
@@ -826,6 +850,160 @@ export class GalaxyLayer {
 
   setGatewayIndicatorsVisible(visible: boolean): void {
     this.gatewayIndicators.visible = visible;
+  }
+
+  /**
+   * Set which systems should stay bright (empire highlight filter).
+   * Pass null to clear the filter and restore all systems.
+   */
+  setHighlightedSystems(ids: Set<string> | null): void {
+    this.highlightedSystems = ids;
+    if (this.isDimmedForSystemView) return; // system view has its own dimming
+    this.applyHighlightFilter();
+  }
+
+  private applyHighlightFilter(): void {
+    const hl = this.highlightedSystems;
+
+    if (!hl) {
+      // Clear filter — restore all to full alpha
+      this.twinkleActive = true;
+      for (const star of this.starGraphics.values()) {
+        star.alpha = 1;
+      }
+      for (const glow of this.glowGraphics.values()) {
+        glow.alpha = GLOW_ALPHA;
+      }
+      for (const label of this.ambientLabelMap.values()) {
+        label.alpha = 1;
+      }
+      // Redraw connections at full alpha
+      this.lastConnectionScale = 0;
+      this.redrawConnections(this.currentViewportScale);
+      this.lastGatewayArcScale = 0;
+      this.redrawGatewayArcs(this.currentViewportScale);
+      return;
+    }
+
+    // Pause twinkle — dimmed stars shouldn't animate
+    this.twinkleActive = false;
+
+    // Per-star alpha
+    for (const [id, star] of this.starGraphics) {
+      star.alpha = hl.has(id) ? 1 : DIM_HIGHLIGHT_ALPHA;
+    }
+    for (const [id, glow] of this.glowGraphics) {
+      glow.alpha = hl.has(id) ? GLOW_ALPHA : GLOW_ALPHA * DIM_HIGHLIGHT_ALPHA;
+    }
+
+    // Per-label alpha
+    for (const [id, label] of this.ambientLabelMap) {
+      label.alpha = hl.has(id) ? 1 : DIM_HIGHLIGHT_ALPHA;
+    }
+
+    // Redraw connections and arcs with per-line alpha
+    this.redrawWithHighlight();
+  }
+
+  /** Redraw connections and gateway arcs with per-line highlight alpha. */
+  private redrawWithHighlight(): void {
+    const hl = this.highlightedSystems;
+    if (!hl) return;
+
+    const theme = getTheme();
+    const scale = this.currentViewportScale;
+    const width = scaledWidth(LINE_BASE, LINE_MIN, LINE_MAX, scale);
+
+    // Base connections — bright if both endpoints highlighted, dim otherwise
+    this.baseConnections.clear();
+    let hasBright = false;
+    let hasDim = false;
+
+    // Collect lines by brightness
+    const brightLines: Array<[number, number, number, number]> = [];
+    const dimLines: Array<[number, number, number, number]> = [];
+
+    for (const conn of this.connections) {
+      const from = this.systemLookup.get(conn.fromId);
+      const to = this.systemLookup.get(conn.toId);
+      if (!from || !to) continue;
+
+      if (hl.has(conn.fromId) && hl.has(conn.toId)) {
+        brightLines.push([from.worldX, from.worldY, to.worldX, to.worldY]);
+        hasBright = true;
+      } else {
+        dimLines.push([from.worldX, from.worldY, to.worldX, to.worldY]);
+        hasDim = true;
+      }
+    }
+
+    if (hasDim) {
+      for (const [x1, y1, x2, y2] of dimLines) {
+        this.baseConnections.moveTo(x1, y1);
+        this.baseConnections.lineTo(x2, y2);
+      }
+      this.baseConnections.stroke({
+        width,
+        color: theme.jumpLine,
+        alpha: theme.jumpLineAlpha * DIM_HIGHLIGHT_ALPHA,
+      });
+    }
+    if (hasBright) {
+      for (const [x1, y1, x2, y2] of brightLines) {
+        this.baseConnections.moveTo(x1, y1);
+        this.baseConnections.lineTo(x2, y2);
+      }
+      this.baseConnections.stroke({ width, color: theme.jumpLine, alpha: theme.jumpLineAlpha });
+    }
+
+    this.lastConnectionScale = scale;
+
+    // Gateway arcs — same treatment
+    const gwConns = getGalaxyGatewayConnections();
+    const gwWidth = scaledWidth(GATEWAY_ARC_BASE, GATEWAY_ARC_MIN, GATEWAY_ARC_MAX, scale);
+
+    this.gatewayArcs.clear();
+    const brightArcs: Array<() => void> = [];
+    const dimArcs: Array<() => void> = [];
+
+    for (const gw of gwConns) {
+      const from = this.systemLookup.get(gw.fromSystemId);
+      const to = this.systemLookup.get(gw.toSystemId);
+      if (!from || !to) continue;
+
+      const midX = (from.worldX + to.worldX) / 2;
+      const midY = (from.worldY + to.worldY) / 2;
+      const dx = to.worldX - from.worldX;
+      const dy = to.worldY - from.worldY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const arcHeight = Math.min(dist * GATEWAY_ARC_HEIGHT_FACTOR, GATEWAY_ARC_HEIGHT_MAX);
+
+      const drawArc = () => {
+        this.gatewayArcs.moveTo(from.worldX, from.worldY);
+        this.gatewayArcs.quadraticCurveTo(midX, midY - arcHeight, to.worldX, to.worldY);
+      };
+
+      if (hl.has(gw.fromSystemId) && hl.has(gw.toSystemId)) {
+        brightArcs.push(drawArc);
+      } else {
+        dimArcs.push(drawArc);
+      }
+    }
+
+    if (dimArcs.length > 0) {
+      for (const draw of dimArcs) draw();
+      this.gatewayArcs.stroke({
+        width: gwWidth,
+        color: GATEWAY_COLOUR,
+        alpha: GATEWAY_ARC_ALPHA * DIM_HIGHLIGHT_ALPHA,
+      });
+    }
+    if (brightArcs.length > 0) {
+      for (const draw of brightArcs) draw();
+      this.gatewayArcs.stroke({ width: gwWidth, color: GATEWAY_COLOUR, alpha: GATEWAY_ARC_ALPHA });
+    }
+
+    this.lastGatewayArcScale = scale;
   }
 
   /** Pulse CX diamond markers like station beacons. */

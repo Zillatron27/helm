@@ -55,6 +55,7 @@ export class MapRenderer {
   private suppressTransitionAnimation = false;
   private elapsedTime = 0;
   private tweens = new TweenManager();
+  private savedHighlightedSystems: Set<string> | null = null;
 
   async init(container: HTMLElement): Promise<void> {
     const theme = getTheme();
@@ -251,6 +252,11 @@ export class MapRenderer {
 
     // Re-apply gateway visibility
     this.galaxy.setGatewaysVisible(getGatewaysVisible());
+
+    // Re-apply empire highlight filter
+    if (this.savedHighlightedSystems) {
+      this.galaxy.setHighlightedSystems(this.savedHighlightedSystems);
+    }
 
     // Re-apply active route
     const route = getActiveRoute();
@@ -551,6 +557,11 @@ export class MapRenderer {
 
   setGatewayIndicatorsVisible(visible: boolean): void {
     this.galaxy?.setGatewayIndicatorsVisible(visible);
+  }
+
+  setHighlightedSystems(ids: Set<string> | null): void {
+    this.savedHighlightedSystems = ids;
+    this.galaxy?.setHighlightedSystems(ids);
   }
 
   getViewport(): Viewport | null {
