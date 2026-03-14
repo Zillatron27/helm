@@ -124,7 +124,7 @@ export async function fetchCxStations(): Promise<FioCxStation[]> {
   }
 
   const sample = data[0] as Record<string, unknown>;
-  const required = ["ComexCode", "Name", "SystemId", "CountryCode", "CurrencyCode"];
+  const required = ["ComexCode", "NaturalId", "Name", "SystemId", "CountryCode", "CurrencyCode"];
   for (const field of required) {
     if (!(field in sample)) {
       throw new Error(`FIO CX station response missing required field: ${field}`);

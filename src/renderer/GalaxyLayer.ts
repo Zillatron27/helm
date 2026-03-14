@@ -354,8 +354,8 @@ export class GalaxyLayer {
       diamond.stroke({ width: CX_STROKE_WIDTH, color: accent, alpha: CX_STROKE_ALPHA });
       marker.addChild(diamond);
 
-      // Label
-      const label = new Text({ text: station.ComexCode, style: cxLabelStyle });
+      // Label — use station natural ID (e.g. "ANT") instead of comex code ("AI1")
+      const label = new Text({ text: station.NaturalId, style: cxLabelStyle });
       label.alpha = CX_LABEL_ALPHA;
       label.anchor.set(0.5, 0);
       label.y = CX_LABEL_OFFSET_Y;
@@ -368,6 +368,10 @@ export class GalaxyLayer {
       cxIndex++;
 
       this.cxMarkers.addChild(marker);
+
+      // Hide ambient system name label — CX code replaces it
+      const ambientLabel = this.ambientLabelMap.get(station.SystemId);
+      if (ambientLabel) ambientLabel.visible = false;
     }
 
     // Gateway system indicators — small purple rings offset top-right of star

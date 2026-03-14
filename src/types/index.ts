@@ -136,6 +136,7 @@ export interface SectorHex {
 // FIO CX station from GET /exchange/station
 export interface FioCxStation {
   ComexCode: string;
+  NaturalId: string;
   Name: string;
   SystemId: string;
   SystemNaturalId: string;
