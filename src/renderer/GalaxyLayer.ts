@@ -65,11 +65,11 @@ const DIM_HIGHLIGHT_ALPHA = 0.12;
 // Ambient system name labels
 const LABEL_FONT_SIZE = 18;
 const LABEL_TARGET_SCREEN_SIZE = 14;
-const LABEL_SCALE_MIN = 0.5;
+const LABEL_SCALE_MIN = 0.7;
 const LABEL_SCALE_MAX = 4.0;
 const LABEL_COLOUR = 0xaaaaaa;
 const LABEL_EMPHASIS_COLOUR = 0xe0e0e0;
-const LABEL_OFFSET_Y = 15;
+const LABEL_OFFSET_Y = 26;
 const LABEL_SHOW_SCALE = 0.4;
 const LABEL_FADE_RANGE = 0.1;
 const LABEL_DIM_ALPHA = 0.15;
