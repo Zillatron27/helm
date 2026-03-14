@@ -9,8 +9,8 @@ const HEX_BASE = 1.5;
 const HEX_MIN = 0.5;
 const HEX_MAX = 5.0;
 
-const LABEL_ALPHA = 0.5;
-const LABEL_FONT_SIZE = 72;
+const LABEL_ALPHA = 0.12;
+const LABEL_FONT_SIZE = 48;
 
 // Redraw threshold — skip if scale changed less than 20%
 const REDRAW_THRESHOLD_LOW = 0.8;
