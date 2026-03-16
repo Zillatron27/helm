@@ -388,20 +388,9 @@ export class PanelManager {
         if (!route) return;
 
         setActiveRoute(route);
-        setSelectedEntity(null);
 
-        // Exit system view if active, then frame the route
-        if (getViewLevel() === "system") {
-          setFocusedSystem(null);
-          setViewLevel("galaxy");
-          setTimeout(() => {
-            this.renderer?.frameRoute(route.systemIds);
-          }, 850);
-        } else {
-          setTimeout(() => {
-            this.renderer?.frameRoute(route.systemIds);
-          }, 150);
-        }
+        // Frame the route — keep the panel open for comparison
+        this.renderer?.frameRoute(route.systemIds);
       });
     });
   }
