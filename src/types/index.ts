@@ -123,6 +123,7 @@ export interface Planet {
   hasWarehouse: boolean;
   hasAdministrationCenter: boolean;
   hasShipyard: boolean;
+  buildRequirements: { ticker: string; amount: number }[];
 }
 
 // Sector hex grid positions (grid-snapped to ideal hex lattice)
@@ -206,6 +207,95 @@ export interface CxDistanceEntry {
   currency: string;    // CurrencyCode, e.g. "AIC"
   jumps: number;       // jump count, -1 if unreachable
   viaGateway: boolean; // true if shortest path crosses a gateway edge
+}
+
+// FIO exchange/all response
+export interface FioExchangeAll {
+  MaterialTicker: string;
+  ExchangeCode: string;
+  MMBuy: number | null;
+  MMSell: number | null;
+  PriceAverage: number;
+  AskCount: number;
+  Ask: number | null;
+  Supply: number;
+  BidCount: number;
+  Bid: number | null;
+  Demand: number;
+}
+
+// Processed exchange price
+export interface ExchangePrice {
+  ticker: string;
+  exchangeCode: string;
+  currency: string;
+  ask: number | null;
+  bid: number | null;
+  supply: number;
+  demand: number;
+  priceAverage: number;
+}
+
+// FIO settled planet response
+export interface FioSettledPlanet {
+  Name: string;
+  NaturalId: string;
+  BaseCount: number;
+  HasADM: boolean;
+  HasLM: boolean;
+  HasWarehouse: boolean;
+  HasCOGC: boolean;
+  GovernorUsername: string | null;
+  GovernorCorporationName: string | null;
+  GovernorCorporationCode: string | null;
+  FactionCode: string | null;
+}
+
+// Governor info
+export interface GovernorInfo {
+  username: string | null;
+  corporationName: string | null;
+  corporationCode: string | null;
+}
+
+// FIO infrastructure per-planet response
+export interface FioInfrastructureReport {
+  SimulationPeriod: number;
+  NextPopulationPioneer: number;
+  NextPopulationSettler: number;
+  NextPopulationTechnician: number;
+  NextPopulationEngineer: number;
+  NextPopulationScientist: number;
+  AverageHappinessPioneer: number;
+  AverageHappinessSettler: number;
+  AverageHappinessTechnician: number;
+  AverageHappinessEngineer: number;
+  AverageHappinessScientist: number;
+  UnemploymentRatePioneer: number;
+  UnemploymentRateSettler: number;
+  UnemploymentRateTechnician: number;
+  UnemploymentRateEngineer: number;
+  UnemploymentRateScientist: number;
+}
+
+export interface FioInfrastructureProject {
+  Ticker: string;
+  Name: string;
+  Level: number;
+  ActiveLevel: number;
+  CurrentLevel: number;
+  UpgradeStatus: string | null;
+}
+
+export interface FioInfrastructurePlanet {
+  InfrastructureProjects: FioInfrastructureProject[];
+  InfrastructureReports: FioInfrastructureReport[];
+}
+
+// Processed infrastructure data
+export interface InfrastructureData {
+  population: { tier: string; count: number; happiness: number; unemployment: number }[];
+  projects: { ticker: string; name: string; level: number }[];
 }
 
 // UI state types

@@ -259,6 +259,10 @@ function processPlanets(raw: FioPlanet[]): Planet[] {
       hasWarehouse: p.HasWarehouse,
       hasAdministrationCenter: p.HasAdministrationCenter,
       hasShipyard: p.HasShipyard,
+      buildRequirements: (p.BuildRequirements as Array<{ MaterialTicker: string; MaterialAmount: number }>).map((br) => ({
+        ticker: br.MaterialTicker,
+        amount: br.MaterialAmount,
+      })),
     };
   });
 }

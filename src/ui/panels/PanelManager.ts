@@ -20,6 +20,9 @@ import {
 import { getCxDistances } from "../../data/cxDistances.js";
 import { findRoute } from "../../data/pathfinding.js";
 import { getPlanetBaseCount } from "../../data/siteCounts.js";
+import { getNearestCxPrice } from "../../data/exchangePrices.js";
+import { getGovernor } from "../../data/settledPlanets.js";
+import { loadPlanetInfrastructure, getPlanetInfrastructure } from "../../data/infrastructure.js";
 import type { MapRenderer } from "../../renderer/MapRenderer.js";
 
 export class PanelManager {
@@ -265,10 +268,13 @@ export class PanelManager {
       <div class="panel-body">
         ${renderCxDistanceSection(planet.systemId)}
         ${renderBaseCountSection(planet.naturalId)}
-        ${this.renderEnvironmentSection(planet)}
         ${this.renderResourcesSection(planet)}
+        ${this.renderEnvironmentSection(planet)}
         ${this.renderInfrastructureSection(planet)}
+        ${renderBuildRequirementsSection(planet)}
+        ${renderPopulationSection(planet.naturalId)}
         ${this.renderFactionSection(planet)}
+        ${renderPlanBaseLink(planet.naturalId)}
       </div>
     `;
     this.setContent(html, () => {
@@ -279,6 +285,28 @@ export class PanelManager {
       });
 
       this.wireCxBadgeClicks();
+      wireCollapsibleSections(this.panelEl);
+
+      // Lazy-load infrastructure data
+      const infraEl = this.panelEl.querySelector("[data-infra-planet]") as HTMLElement | null;
+      if (infraEl) {
+        const pNid = infraEl.dataset["infraPlanet"]!;
+        const cached = getPlanetInfrastructure(pNid);
+        if (cached) {
+          infraEl.innerHTML = renderPopulationContent(cached);
+        } else {
+          loadPlanetInfrastructure(pNid).then((data) => {
+            // Only update if still viewing this planet
+            const current = getSelectedEntity();
+            if (current?.type !== "planet") return;
+            if (data) {
+              infraEl.innerHTML = renderPopulationContent(data);
+            } else {
+              infraEl.innerHTML = `<span class="panel-loading">No data available</span>`;
+            }
+          });
+        }
+      }
     });
   }
 
@@ -333,15 +361,23 @@ export class PanelManager {
     const sorted = [...planet.resources].sort((a, b) => b.Factor - a.Factor);
     const rows = sorted
       .map(
-        (r) => `
+        (r) => {
+          const ticker = getMaterialTicker(r.MaterialId);
+          const price = getNearestCxPrice(ticker, planet.systemId);
+          const priceText = price && price.ask !== null
+            ? `<span class="panel-resource-price">${Math.round(price.ask)} ${esc(price.currency)}</span>`
+            : "";
+          return `
           <div class="panel-resource">
-            <span class="panel-resource-ticker">${esc(getMaterialTicker(r.MaterialId))}</span>
+            <span class="panel-resource-ticker">${esc(ticker)}</span>
             <span class="panel-resource-type">${esc(formatResourceType(r.ResourceType))}</span>
             <div class="panel-resource-bar">
               <div class="panel-resource-bar-fill" style="width: ${Math.round(r.Factor * 100)}%"></div>
             </div>
+            ${priceText}
           </div>
-        `
+        `;
+        }
       )
       .join("");
 
@@ -362,6 +398,14 @@ export class PanelManager {
       { label: "SHY", active: planet.hasShipyard },
     ];
 
+    const gov = getGovernor(planet.naturalId);
+    const govLine = gov && gov.corporationCode
+      ? `<div class="panel-row" style="margin-top: 6px">
+          <span class="panel-row-label">Governor</span>
+          <span class="panel-row-value">${esc(gov.corporationCode)}${gov.corporationName ? ` (${esc(gov.corporationName)})` : ""}</span>
+        </div>`
+      : "";
+
     return `
       <div class="panel-section">
         <h3 class="panel-section-title">Infrastructure</h3>
@@ -373,6 +417,7 @@ export class PanelManager {
             )
             .join("")}
         </div>
+        ${govLine}
       </div>
     `;
   }
@@ -531,4 +576,81 @@ function renderCxDistanceSection(systemId: string): string {
       <div class="panel-cx-row">${badges}</div>
     </div>
   `;
+}
+
+function renderBuildRequirementsSection(planet: Planet): string {
+  if (!planet.buildRequirements || planet.buildRequirements.length === 0) return "";
+
+  const items = planet.buildRequirements
+    .map((br) => `<span class="panel-build-item">${esc(br.ticker)} \u00d7${br.amount}</span>`)
+    .join("");
+
+  return `
+    <div class="panel-section panel-section-collapsible">
+      <h3 class="panel-section-title panel-section-toggle" data-section="build">
+        Build Requirements
+        <span class="panel-section-arrow">\u25b8</span>
+      </h3>
+      <div class="panel-section-content" data-section-content="build">
+        <div class="panel-build-list">${items}</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderPopulationSection(planetNaturalId: string): string {
+  return `
+    <div class="panel-section panel-section-collapsible">
+      <h3 class="panel-section-title panel-section-toggle" data-section="population">
+        Population &amp; Economy
+        <span class="panel-section-arrow">\u25b8</span>
+      </h3>
+      <div class="panel-section-content" data-section-content="population" data-infra-planet="${esc(planetNaturalId)}">
+        <span class="panel-loading">Loading...</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderPopulationContent(data: import("../../types/index.js").InfrastructureData): string {
+  if (data.population.length === 0 && data.projects.length === 0) {
+    return `<span class="panel-loading">No infrastructure data</span>`;
+  }
+
+  let html = "";
+
+  if (data.population.length > 0) {
+    html += data.population.map((t) => `
+      <div class="panel-row">
+        <span class="panel-row-label">${esc(t.tier)}</span>
+        <span class="panel-row-value">${t.count.toLocaleString()} <span class="panel-row-detail">${Math.round(t.happiness * 100)}% happy</span></span>
+      </div>
+    `).join("");
+  }
+
+  if (data.projects.length > 0) {
+    html += `<div class="panel-flags" style="margin-top: 6px">`;
+    html += data.projects.map((p) =>
+      `<span class="panel-flag panel-flag-active">${esc(p.ticker)} Lv${p.level}</span>`
+    ).join("");
+    html += `</div>`;
+  }
+
+  return html;
+}
+
+function renderPlanBaseLink(planetNaturalId: string): string {
+  const url = `https://prunplanner.org/plan/${encodeURIComponent(planetNaturalId)}`;
+  return `<a class="panel-button panel-button-external" href="${url}" target="_blank" rel="noopener">Plan Base in PrUNplanner \u2197</a>`;
+}
+
+function wireCollapsibleSections(panelEl: HTMLElement): void {
+  panelEl.querySelectorAll(".panel-section-toggle").forEach((toggle) => {
+    toggle.addEventListener("click", () => {
+      const section = toggle.closest(".panel-section-collapsible");
+      if (section) {
+        section.classList.toggle("panel-section-expanded");
+      }
+    });
+  });
 }

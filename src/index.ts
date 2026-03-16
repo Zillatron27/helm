@@ -33,6 +33,12 @@ export { getCxDistances } from "./data/cxDistances.js";
 // Site Counts
 export { getSystemBaseCount, getPlanetBaseCount } from "./data/siteCounts.js";
 
+// Exchange Prices
+export { getNearestCxPrice, getPriceAtExchange } from "./data/exchangePrices.js";
+
+// Governor Data
+export { getGovernor } from "./data/settledPlanets.js";
+
 // Search
 export { search, getSystemUuidByNaturalId } from "./data/searchIndex.js";
 
@@ -95,4 +101,7 @@ export type {
   ViewLevel,
   SelectedEntity,
   CxDistanceEntry,
+  ExchangePrice,
+  GovernorInfo,
+  InfrastructureData,
 } from "./types/index.js";

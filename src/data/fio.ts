@@ -1,4 +1,4 @@
-import type { FioSystem, FioPlanet, FioPlanetSummary, FioCxStation, FioMaterial } from "../types/index.js";
+import type { FioSystem, FioPlanet, FioPlanetSummary, FioCxStation, FioMaterial, FioExchangeAll, FioSettledPlanet, FioInfrastructurePlanet } from "../types/index.js";
 
 const FIO_BASE = "https://rest.fnar.net";
 
@@ -137,6 +137,28 @@ export async function fetchCxStations(): Promise<FioCxStation[]> {
 export interface FioPlanetSiteCount {
   PlanetNaturalId: string;
   SitesCount: number;
+}
+
+export async function fetchExchangeAll(): Promise<FioExchangeAll[]> {
+  const response = await fetch(`${FIO_BASE}/exchange/all`);
+  if (!response.ok) throw new Error(`FIO exchange/all: ${response.status}`);
+  const data: unknown = await response.json();
+  if (!Array.isArray(data)) throw new Error("FIO exchange/all returned invalid data");
+  return data as FioExchangeAll[];
+}
+
+export async function fetchSettledPlanets(): Promise<FioSettledPlanet[]> {
+  const response = await fetch(`${FIO_BASE}/planet/allplanets/settled`);
+  if (!response.ok) throw new Error(`FIO settled planets: ${response.status}`);
+  const data: unknown = await response.json();
+  if (!Array.isArray(data)) throw new Error("FIO settled planets returned invalid data");
+  return data as FioSettledPlanet[];
+}
+
+export async function fetchPlanetInfrastructure(planetNaturalId: string): Promise<FioInfrastructurePlanet> {
+  const response = await fetch(`${FIO_BASE}/infrastructure/${planetNaturalId}`);
+  if (!response.ok) throw new Error(`FIO infrastructure/${planetNaturalId}: ${response.status}`);
+  return response.json() as Promise<FioInfrastructurePlanet>;
 }
 
 export async function fetchPlanetSites(): Promise<FioPlanetSiteCount[]> {

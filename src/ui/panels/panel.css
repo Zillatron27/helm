@@ -309,6 +309,86 @@
   color: #9966cc;
 }
 
+/* Resource price annotation */
+.panel-resource-price {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  margin-left: auto;
+  padding-left: 8px;
+}
+
+/* Build requirements list */
+.panel-build-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.panel-build-item {
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: rgba(var(--bg-tertiary-rgb), 0.6);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+/* Population detail text */
+.panel-row-detail {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-left: 4px;
+}
+
+/* Collapsible sections */
+.panel-section-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+
+.panel-section-arrow {
+  float: right;
+  transition: transform 0.2s ease;
+}
+
+.panel-section-collapsible.panel-section-expanded .panel-section-arrow {
+  transform: rotate(90deg);
+}
+
+.panel-section-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.25s ease;
+}
+
+.panel-section-expanded .panel-section-content {
+  max-height: 400px;
+}
+
+/* External link button */
+.panel-button-external {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  margin-top: 12px;
+  background: rgba(var(--bg-tertiary-rgb), 0.8);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--accent);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.panel-button-external:hover {
+  background: rgba(var(--bg-tertiary-rgb), 0.9);
+  border-color: var(--accent);
+}
+
 /* Loading state */
 .panel-loading {
   color: var(--text-secondary);
