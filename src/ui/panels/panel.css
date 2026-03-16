@@ -135,6 +135,12 @@
   align-items: baseline;
   padding: 4px 0;
   font-size: 13px;
+  gap: 8px;
+}
+
+.panel-row > span:last-child {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .panel-row-label {
@@ -190,6 +196,18 @@
   height: 100%;
   background: var(--accent);
   border-radius: 2px;
+}
+
+/* Planet links in system panel */
+.panel-planet-link {
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.panel-planet-link:hover {
+  color: var(--accent);
 }
 
 /* Connected system links */

@@ -119,6 +119,17 @@ export class PanelManager {
 
       this.wireCxBadgeClicks();
 
+      // Wire planet links — zoom to system view and select the planet
+      this.panelEl.querySelectorAll("[data-planet-id]").forEach((el) => {
+        el.addEventListener("click", (e) => {
+          e.preventDefault();
+          const planetId = (el as HTMLElement).dataset["planetId"];
+          const planetSystemId = (el as HTMLElement).dataset["planetSystem"];
+          if (!planetId || !planetSystemId) return;
+          this.renderer?.panToPlanet(planetSystemId, planetId);
+        });
+      });
+
       // Wire connection links
       this.panelEl.querySelectorAll("[data-system-id]").forEach((el) => {
         el.addEventListener("click", (e) => {
@@ -193,7 +204,7 @@ export class PanelManager {
           const basesLabel = bases > 0 ? `<span class="panel-badge">${bases} bases</span>` : "";
           return `
           <div class="panel-row">
-            <span class="panel-row-label">${esc(p.name || p.naturalId)}</span>
+            <a class="panel-planet-link" data-planet-id="${esc(p.id)}" data-planet-system="${esc(p.systemId)}">${esc(p.name || p.naturalId)}</a>
             <span>
               <span class="panel-badge ${p.surface ? "panel-badge-rocky" : "panel-badge-gas"}">
                 ${p.surface ? "Rocky" : "Gas"}

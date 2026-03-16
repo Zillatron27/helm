@@ -70,26 +70,26 @@
   color: var(--text-primary);
 }
 
-/* Settled toggle — on state: warm amber */
+/* Settled toggle — on state: accent highlight */
 .toolbar-btn-settled-on {
-  border-color: #c4a35a;
-  color: #c4a35a;
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .toolbar-btn-settled-on:hover {
-  border-color: #c4a35a;
-  color: #c4a35a;
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* Settled toggle — off state: subdued */
 .toolbar-btn-settled-off {
   border-color: var(--border);
-  color: var(--text-primary);
+  color: var(--text-secondary);
 }
 
 .toolbar-btn-settled-off:hover {
-  border-color: var(--text-secondary);
-  color: var(--text-primary);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* Expandable panel — slides open leftward, absolutely positioned to avoid pushing rows */
