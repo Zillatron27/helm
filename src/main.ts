@@ -45,7 +45,11 @@ async function boot(): Promise<void> {
   try {
     const helm = await createMap(container);
     const { renderer, panelManager } = helm;
-    loading.remove();
+
+    // Cross-fade: loader fades out over the now-visible map
+    loading.style.transition = "opacity 0.6s ease";
+    loading.style.opacity = "0";
+    loading.addEventListener("transitionend", () => loading.remove(), { once: true });
 
     const searchBar = new SearchBar();
     searchBar.init(renderer);
