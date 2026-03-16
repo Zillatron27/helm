@@ -98,6 +98,13 @@ const GATEWAY_ARC_ALPHA = 0.6;
 const GATEWAY_ARC_HEIGHT_FACTOR = 0.3;
 const GATEWAY_ARC_HEIGHT_MAX = 200;
 
+// System selection halo — matches planet selection style
+const SYSTEM_HALO_RADIUS = 14;
+const SYSTEM_HALO_COLOUR = 0x3399ff;
+const SYSTEM_HALO_ALPHA = 0.7;
+const SYSTEM_HALO_STROKE = 2.0;
+const SYSTEM_HALO_ARC_SPAN = Math.PI * 0.7;
+
 let glowTexture: Texture | null = null;
 function getGlowTexture(): Texture {
   if (glowTexture) return glowTexture;
@@ -176,6 +183,9 @@ export class GalaxyLayer {
   // Double-click detection state
   private lastClickId: string | null = null;
   private lastClickTime = 0;
+
+  // System selection halo
+  private selectionHalo: Graphics;
 
   // Bridge API: click interceptor (set by MapRenderer)
   systemClickInterceptor: ((systemId: string, screenX: number, screenY: number) => boolean) | null = null;
@@ -393,8 +403,13 @@ export class GalaxyLayer {
     // Insert CX markers and gateway indicators above stars but below route overlay
     // Stars are already added; re-add route overlay on top
     this.container.removeChild(this.routeOverlay);
+    this.selectionHalo = new Graphics();
+    this.selectionHalo.eventMode = "none";
+    this.selectionHalo.visible = false;
+
     this.container.addChild(this.cxMarkers);
     this.container.addChild(this.gatewayIndicators);
+    this.container.addChild(this.selectionHalo);
     this.container.addChild(this.routeOverlay);
   }
 
@@ -498,7 +513,27 @@ export class GalaxyLayer {
 
   setSelectedSystem(systemId: string | null): void {
     this.selectedSystemId = systemId;
+    this.updateSelectionHalo();
     this.updateHighlight();
+  }
+
+  private updateSelectionHalo(): void {
+    this.selectionHalo.clear();
+    this.selectionHalo.visible = false;
+
+    const id = this.selectedSystemId;
+    if (!id) return;
+
+    const system = this.systemLookup.get(id);
+    if (!system) return;
+
+    this.selectionHalo.x = system.worldX;
+    this.selectionHalo.y = system.worldY;
+    this.selectionHalo.arc(0, 0, SYSTEM_HALO_RADIUS, -SYSTEM_HALO_ARC_SPAN / 2, SYSTEM_HALO_ARC_SPAN / 2);
+    this.selectionHalo.stroke({ width: SYSTEM_HALO_STROKE, color: SYSTEM_HALO_COLOUR, alpha: SYSTEM_HALO_ALPHA });
+    this.selectionHalo.arc(0, 0, SYSTEM_HALO_RADIUS, Math.PI - SYSTEM_HALO_ARC_SPAN / 2, Math.PI + SYSTEM_HALO_ARC_SPAN / 2);
+    this.selectionHalo.stroke({ width: SYSTEM_HALO_STROKE, color: SYSTEM_HALO_COLOUR, alpha: SYSTEM_HALO_ALPHA });
+    this.selectionHalo.visible = true;
   }
 
   private setHoveredSystem(systemId: string | null): void {
@@ -513,13 +548,12 @@ export class GalaxyLayer {
     this.highlightLayer.clear();
 
     const hovered = this.hoveredSystemId;
-    const selected = this.selectedSystemId;
-
     const hl = this.highlightedSystems;
 
-    // No highlight active — restore all stars, glows, and labels to default
+    // No hover active — restore all stars, glows, and labels to default
     // (respecting empire highlight filter when active)
-    if (!hovered && !selected) {
+    // Selection alone shows halo but doesn't dim/highlight connections
+    if (!hovered) {
       this.twinkleActive = !hl;
       for (const [id, star] of this.starGraphics) {
         const target = hl && !hl.has(id) ? DIM_HIGHLIGHT_ALPHA : 1;
@@ -541,18 +575,10 @@ export class GalaxyLayer {
     // Pause twinkle while highlight dimming is active
     this.twinkleActive = false;
 
-    // Collect all connected system IDs and draw highlighted connections
+    // Collect all connected system IDs — connection highlight only on hover
     const connectedIds = new Set<string>();
-
-    if (selected) {
-      connectedIds.add(selected);
-      this.drawSystemConnections(selected, connectedIds);
-    }
-
-    if (hovered && hovered !== selected) {
-      connectedIds.add(hovered);
-      this.drawSystemConnections(hovered, connectedIds);
-    }
+    connectedIds.add(hovered);
+    this.drawSystemConnections(hovered, connectedIds);
 
     this.highlightLayer.stroke({
       width: scaledWidth(HIGHLIGHT_BASE, HIGHLIGHT_MIN, HIGHLIGHT_MAX, this.currentViewportScale),
@@ -567,7 +593,7 @@ export class GalaxyLayer {
     // Tween non-connected stars/glows dim, connected ones bright
     // When empire highlight is active, "bright" for non-empire stars
     // is still DIM_HIGHLIGHT_ALPHA (they don't get boosted by selection)
-    const dur = hovered && !selected ? 0.2 : 0.25;
+    const dur = 0.2;
     for (const [id, star] of this.starGraphics) {
       let target: number;
       if (connectedIds.has(id)) {
@@ -620,6 +646,8 @@ export class GalaxyLayer {
     this.hoveredSystemId = null;
     this.selectedSystemId = null;
     this.highlightLayer.clear();
+    this.selectionHalo.clear();
+    this.selectionHalo.visible = false;
     this.starParticles.clear();
 
     const dur = tw ? 0.6 : 0;
