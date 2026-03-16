@@ -108,11 +108,11 @@ const SYSTEM_HALO_ARC_SPAN = Math.PI * 0.7;
 
 // Settled system ring indicators
 const SETTLED_COLOUR = 0xc4a35a;
-const SETTLED_RING_ALPHA = 0.3;
-const SETTLED_RING_STROKE = 1.2;
+const SETTLED_RING_ALPHA = 0.2;
+const SETTLED_RING_STROKE = 1.0;
 const SETTLED_RING_RADIUS_MULT = 3.2;
-const SETTLED_HIGHLIGHT_ALPHA = 0.7;
-const SETTLED_HIGHLIGHT_ARC_SPAN = Math.PI * 0.3;
+const SETTLED_GLOW_SIZE = 14;
+const SETTLED_GLOW_ALPHA = 0.5;
 const SETTLED_ROTATION_PERIOD = 5.0;
 
 let glowTexture: Texture | null = null;
@@ -197,7 +197,7 @@ export class GalaxyLayer {
   // Settled system indicators
   private settledRingsStatic: Container;
   private settledRingsAnimated: Container;
-  private settledEntries: Array<{ graphic: Graphics; phase: number; radius: number; x: number; y: number }> = [];
+  private settledEntries: Array<{ sprite: Sprite; phase: number; radius: number; cx: number; cy: number }> = [];
   private settledVisible = false;
 
   // System selection halo
@@ -680,7 +680,7 @@ export class GalaxyLayer {
       const sizeScale = connCount >= 5 ? 1.6 : connCount >= 3 ? 1.3 : 1;
       const ringRadius = STAR_RADIUS * sizeScale * SETTLED_RING_RADIUS_MULT;
 
-      // Static base ring
+      // Static base ring — subtle thin circle
       const ring = new Graphics();
       ring.circle(0, 0, ringRadius);
       ring.stroke({ width: SETTLED_RING_STROKE, color: SETTLED_COLOUR, alpha: SETTLED_RING_ALPHA });
@@ -688,11 +688,14 @@ export class GalaxyLayer {
       ring.y = system.worldY;
       this.settledRingsStatic.addChild(ring);
 
-      // Animated highlight arc entry
-      const highlight = new Graphics();
-      highlight.x = system.worldX;
-      highlight.y = system.worldY;
-      this.settledRingsAnimated.addChild(highlight);
+      // Orbiting glow sprite — reuses the star glow texture, tinted amber
+      const glow = new Sprite(getGlowTexture());
+      glow.anchor.set(0.5);
+      glow.width = SETTLED_GLOW_SIZE;
+      glow.height = SETTLED_GLOW_SIZE;
+      glow.tint = SETTLED_COLOUR;
+      glow.alpha = SETTLED_GLOW_ALPHA;
+      this.settledRingsAnimated.addChild(glow);
 
       // Phase offset from system ID hash for staggered rotation
       let hash = 0;
@@ -701,7 +704,7 @@ export class GalaxyLayer {
       }
       const phase = (Math.abs(hash) % 1000) / 1000 * Math.PI * 2;
 
-      this.settledEntries.push({ graphic: highlight, phase, radius: ringRadius, x: system.worldX, y: system.worldY });
+      this.settledEntries.push({ sprite: glow, phase, radius: ringRadius, cx: system.worldX, cy: system.worldY });
     }
   }
 
@@ -731,9 +734,8 @@ export class GalaxyLayer {
 
     for (const entry of this.settledEntries) {
       const angle = (elapsed / SETTLED_ROTATION_PERIOD) * Math.PI * 2 + entry.phase;
-      entry.graphic.clear();
-      entry.graphic.arc(0, 0, entry.radius, angle - SETTLED_HIGHLIGHT_ARC_SPAN / 2, angle + SETTLED_HIGHLIGHT_ARC_SPAN / 2);
-      entry.graphic.stroke({ width: SETTLED_RING_STROKE, color: SETTLED_COLOUR, alpha: SETTLED_HIGHLIGHT_ALPHA });
+      entry.sprite.x = entry.cx + Math.cos(angle) * entry.radius;
+      entry.sprite.y = entry.cy + Math.sin(angle) * entry.radius;
     }
   }
 

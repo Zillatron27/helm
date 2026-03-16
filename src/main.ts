@@ -70,6 +70,7 @@ async function boot(): Promise<void> {
     gatewayRow.className = "toolbar-row";
     const gatewayBtn = document.createElement("button");
     gatewayBtn.className = "toolbar-btn toolbar-btn-gateway-on";
+    gatewayBtn.title = "Toggle gateways (G)";
     gatewayBtn.innerHTML = GATEWAY_ICON_SVG;
     gatewayBtn.addEventListener("click", () => {
       setGatewaysVisible(!getGatewaysVisible());
