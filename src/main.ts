@@ -104,7 +104,7 @@ async function boot(): Promise<void> {
     document.body.appendChild(versionEl);
 
     // Sync toggle buttons with state (handles both button clicks and keyboard shortcuts)
-    onStateChange(() => {
+    function syncToggles(): void {
       const gwVisible = getGatewaysVisible();
       renderer.setGatewaysVisible(gwVisible);
       gatewayBtn.classList.toggle("toolbar-btn-gateway-on", gwVisible);
@@ -114,7 +114,10 @@ async function boot(): Promise<void> {
       renderer.setSettledVisible(stVisible);
       settledBtn.classList.toggle("toolbar-btn-settled-on", stVisible);
       settledBtn.classList.toggle("toolbar-btn-settled-off", !stVisible);
-    });
+    }
+    onStateChange(syncToggles);
+    // Apply persisted state on initial load
+    syncToggles();
 
     const viewport = renderer.getViewport();
     if (viewport) {

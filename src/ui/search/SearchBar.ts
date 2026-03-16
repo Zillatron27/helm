@@ -60,6 +60,7 @@ export class SearchBar {
     // Circular button (right)
     this.btnEl = document.createElement("button");
     this.btnEl.className = "toolbar-btn";
+    this.btnEl.title = "Search systems and planets (/)";
     this.btnEl.innerHTML = SEARCH_ICON_SVG;
     this.btnEl.addEventListener("click", () => this.toggleExpand());
 

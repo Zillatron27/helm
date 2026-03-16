@@ -7,7 +7,12 @@ let selectedEntity: SelectedEntity = null;
 let focusedSystemId: string | null = null;
 let activeRoute: Route | null = null;
 let searchFocused = false;
-let gatewaysVisible = true;
+let gatewaysVisible = (() => {
+  try {
+    const stored = localStorage.getItem("helm-gateways");
+    return stored !== null ? stored === "true" : true;
+  } catch { return true; }
+})();
 
 const listeners: Set<StateListener> = new Set();
 
@@ -83,10 +88,15 @@ export function getGatewaysVisible(): boolean {
 export function setGatewaysVisible(visible: boolean): void {
   if (visible === gatewaysVisible) return;
   gatewaysVisible = visible;
+  try { localStorage.setItem("helm-gateways", String(visible)); } catch { /* */ }
   notify();
 }
 
-let settledVisible = false;
+let settledVisible = (() => {
+  try {
+    return localStorage.getItem("helm-settled") === "true";
+  } catch { return false; }
+})();
 
 export function getSettledVisible(): boolean {
   return settledVisible;
@@ -95,6 +105,7 @@ export function getSettledVisible(): boolean {
 export function setSettledVisible(visible: boolean): void {
   if (visible === settledVisible) return;
   settledVisible = visible;
+  try { localStorage.setItem("helm-settled", String(visible)); } catch { /* */ }
   notify();
 }
 

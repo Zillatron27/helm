@@ -78,6 +78,7 @@ export class RoutePanel {
     // Circular button (right)
     this.btnEl = document.createElement("button");
     this.btnEl.className = "toolbar-btn";
+    this.btnEl.title = "Route planner";
     this.btnEl.innerHTML = ROUTE_ICON_SVG;
     this.btnEl.addEventListener("click", () => this.toggleExpand());
 
