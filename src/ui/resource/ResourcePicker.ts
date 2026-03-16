@@ -296,33 +296,21 @@ export class ResourcePicker {
     this.collapse();
     this.inputEl.blur();
 
-    // Show spinner while filter applies.
-    // Double-rAF ensures the spinner is painted before the heavy sync work.
-    // Restore icon in a separate rAF after the work completes so the spinner
-    // stays visible throughout the blocking computation.
-    this.showButtonSpinner();
+    // CSS pulsing glow on button while filter computes.
+    // CSS animations run on the compositor thread, so the pulse continues
+    // even while the main thread is blocked by heavy filter work.
+    this.btnEl.classList.add("toolbar-btn-resource-applying");
+
+    // Defer heavy work one frame so the animation class renders first
     requestAnimationFrame(() => {
+      setResourceFilter(material.MaterialId);
+      this.showBadge(material.Ticker);
+      // Wait for Pixi to render the filter, then restore button state
       requestAnimationFrame(() => {
-        setResourceFilter(material.MaterialId);
-        this.showBadge(material.Ticker);
-        // Defer icon restore — let the browser paint the filter result first
-        requestAnimationFrame(() => {
-          this.restoreButtonIcon();
-          this.btnEl.classList.add("toolbar-btn-resource-on");
-        });
+        this.btnEl.classList.remove("toolbar-btn-resource-applying");
+        this.btnEl.classList.add("toolbar-btn-resource-on");
       });
     });
-  }
-
-  private showButtonSpinner(): void {
-    this.btnEl.innerHTML = "";
-    const miniLoader = createMiniLoader(getTheme());
-    miniLoader.style.pointerEvents = "none";
-    this.btnEl.appendChild(miniLoader);
-  }
-
-  private restoreButtonIcon(): void {
-    this.btnEl.innerHTML = FILTER_ICON_SVG;
   }
 
   private showBadge(ticker: string): void {
