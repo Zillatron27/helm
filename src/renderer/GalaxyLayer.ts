@@ -177,6 +177,9 @@ export class GalaxyLayer {
   private lastClickId: string | null = null;
   private lastClickTime = 0;
 
+  // Bridge API: click interceptor (set by MapRenderer)
+  systemClickInterceptor: ((systemId: string, screenX: number, screenY: number) => boolean) | null = null;
+
   constructor(systems: StarSystem[], connections: JumpConnection[], tweens: TweenManager) {
     this.container = new Container();
     this.tweens = tweens;
@@ -292,7 +295,7 @@ export class GalaxyLayer {
       star.hitArea = new Circle(0, 0, hitRadius);
 
       // Click / double-click
-      star.on("pointertap", () => this.handleStarClick(system));
+      star.on("pointertap", (e) => this.handleStarClick(system, e.globalX, e.globalY));
 
       // Hover — start particles
       star.on("pointerover", () => {
@@ -395,22 +398,23 @@ export class GalaxyLayer {
     this.container.addChild(this.routeOverlay);
   }
 
-  private handleStarClick(system: StarSystem): void {
+  private handleStarClick(system: StarSystem, screenX: number, screenY: number): void {
     const now = performance.now();
     const isDoubleClick =
       this.lastClickId === system.id &&
       now - this.lastClickTime < DOUBLE_CLICK_MS;
 
     if (isDoubleClick) {
-      // Double-click: zoom into system view
+      // Double-click: zoom into system view (always proceeds, not gated by interceptor)
       this.lastClickId = null;
       this.lastClickTime = 0;
       setFocusedSystem(system.id);
       setViewLevel("system");
     } else {
-      // Single click: select system, show panel
+      // Single click: let interceptor suppress if it handles the click
       this.lastClickId = system.id;
       this.lastClickTime = now;
+      if (this.systemClickInterceptor?.(system.id, screenX, screenY)) return;
       setSelectedEntity({ type: "system", id: system.id });
     }
   }

@@ -1,6 +1,9 @@
 // Factory
 export { createMap } from "./factory.js";
-export type { HelmInstance } from "./factory.js";
+export type { HelmInstance, CameraState, CameraAnimationOptions } from "./factory.js";
+
+// Re-export Container type for consumers to type overlay layers without importing pixi.js
+export type { Container } from "pixi.js";
 
 // Data (read-only queries)
 export {

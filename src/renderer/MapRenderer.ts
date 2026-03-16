@@ -1,5 +1,6 @@
-import { Application } from "pixi.js";
+import { Application, Container } from "pixi.js";
 import { Viewport } from "pixi-viewport";
+import type { CameraState, CameraAnimationOptions } from "../factory.js";
 import { getTheme } from "../ui/theme.js";
 import { onThemeChange } from "../ui/theme.js";
 import type { StarSystem } from "../types/index.js";
@@ -56,6 +57,14 @@ export class MapRenderer {
   private elapsedTime = 0;
   private tweens = new TweenManager();
   private savedHighlightedSystems: Set<string> | null = null;
+
+  // Bridge API state
+  private overlayEntries: Array<{ name: string; zOrder: number; container: Container }> = [];
+  private tickCallbacks = new Set<(deltaMs: number) => void>();
+  private planetClickCallbacks = new Set<(naturalId: string, screenX: number, screenY: number) => boolean>();
+  private systemClickCallbacks = new Set<(systemId: string, screenX: number, screenY: number) => boolean>();
+  private systemViewEnterCallbacks = new Set<(systemId: string) => void>();
+  private systemViewExitCallbacks = new Set<(systemId: string) => void>();
 
   async init(container: HTMLElement): Promise<void> {
     const theme = getTheme();
@@ -114,6 +123,8 @@ export class MapRenderer {
     this.systemLayer = new SystemLayer();
     viewport.addChild(this.systemLayer.container);
 
+    this.wireClickInterceptors();
+
     // Centre on galaxy and fit to show the whole thing
     viewport.moveCenter(0, 0);
     viewport.fitWorld(true);
@@ -155,6 +166,9 @@ export class MapRenderer {
         this.galaxy?.updateTwinkle(this.elapsedTime);
       } else {
         this.systemLayer?.update(dt, this.elapsedTime);
+      }
+      for (const fn of this.tickCallbacks) {
+        fn(ticker.deltaMS);
       }
     });
 
@@ -237,6 +251,9 @@ export class MapRenderer {
 
     this.systemLayer = new SystemLayer();
     viewport.addChild(this.systemLayer.container);
+
+    this.wireClickInterceptors();
+    this.reinsertOverlays();
 
     // Restore camera position and zoom (no animation)
     viewport.moveCenter(savedCenter.x, savedCenter.y);
@@ -323,6 +340,10 @@ export class MapRenderer {
     const system = getSystemById(systemId);
     if (!system) return;
 
+    for (const fn of this.systemViewEnterCallbacks) {
+      fn(systemId);
+    }
+
     // Start dim tweens concurrent with camera animation
     this.galaxy?.dimExcept(systemId, this.tweens);
     if (this.hexGrid) {
@@ -346,6 +367,12 @@ export class MapRenderer {
   private zoomToNeighbourhood(): void {
     const viewport = this.viewport;
     if (!viewport) return;
+
+    if (this.lastFocusedSystemId) {
+      for (const fn of this.systemViewExitCallbacks) {
+        fn(this.lastFocusedSystemId);
+      }
+    }
 
     // Fade out system layer, then hide after fade completes
     if (this.systemLayer) {
@@ -405,6 +432,11 @@ export class MapRenderer {
 
     // Auto-dismiss system view when zooming out
     if (getViewLevel() === "system" && scale < SYSTEM_DISMISS_THRESHOLD) {
+      if (this.lastFocusedSystemId) {
+        for (const fn of this.systemViewExitCallbacks) {
+          fn(this.lastFocusedSystemId);
+        }
+      }
       // Fade out system layer, then hide after fade completes
       if (this.systemLayer) {
         this.tweens.to(this.systemLayer.container, "alpha", 0, 0.3);
@@ -572,7 +604,128 @@ export class MapRenderer {
     return this.fitScale;
   }
 
+  // --- Bridge API: Overlay Layers ---
+
+  createOverlayLayer(name: string, zOrder: number): Container {
+    const container = new Container();
+    this.overlayEntries.push({ name, zOrder, container });
+    this.overlayEntries.sort((a, b) => a.zOrder - b.zOrder);
+    this.reinsertOverlays();
+    return container;
+  }
+
+  removeOverlayLayer(name: string): void {
+    const idx = this.overlayEntries.findIndex((e) => e.name === name);
+    if (idx === -1) return;
+    const entry = this.overlayEntries[idx]!;
+    this.viewport?.removeChild(entry.container);
+    this.overlayEntries.splice(idx, 1);
+  }
+
+  private reinsertOverlays(): void {
+    const viewport = this.viewport;
+    if (!viewport) return;
+    for (const entry of this.overlayEntries) {
+      if (entry.container.parent === viewport) {
+        viewport.removeChild(entry.container);
+      }
+    }
+    // Helm's base layers are at indices 0-2 (hex, galaxy, system).
+    // All overlays go after them, sorted by zOrder.
+    for (const entry of this.overlayEntries) {
+      viewport.addChild(entry.container);
+    }
+  }
+
+  private wireClickInterceptors(): void {
+    if (this.galaxy) {
+      this.galaxy.systemClickInterceptor = (systemId, screenX, screenY) => {
+        for (const fn of this.systemClickCallbacks) {
+          if (fn(systemId, screenX, screenY)) return true;
+        }
+        return false;
+      };
+    }
+    if (this.systemLayer) {
+      this.systemLayer.planetClickInterceptor = (naturalId, screenX, screenY) => {
+        for (const fn of this.planetClickCallbacks) {
+          if (fn(naturalId, screenX, screenY)) return true;
+        }
+        return false;
+      };
+    }
+  }
+
+  // --- Bridge API: Camera ---
+
+  animateCamera(opts: CameraAnimationOptions): void {
+    const viewport = this.viewport;
+    if (!viewport) return;
+    viewport.animate({
+      position: { x: opts.x, y: opts.y },
+      scale: opts.scale,
+      time: opts.timeMs ?? 800,
+      ease: opts.ease ?? "easeInOutCubic",
+      callbackOnComplete: opts.onComplete,
+    });
+  }
+
+  getCameraState(): CameraState {
+    const viewport = this.viewport;
+    if (!viewport) return { x: 0, y: 0, scale: 1 };
+    return { x: viewport.center.x, y: viewport.center.y, scale: viewport.scaled };
+  }
+
+  worldToScreen(worldX: number, worldY: number): { x: number; y: number } {
+    const viewport = this.viewport;
+    if (!viewport) return { x: 0, y: 0 };
+    const pt = viewport.toScreen(worldX, worldY);
+    return { x: pt.x, y: pt.y };
+  }
+
+  // --- Bridge API: Tick ---
+
+  onTick(fn: (deltaMs: number) => void): () => void {
+    this.tickCallbacks.add(fn);
+    return () => { this.tickCallbacks.delete(fn); };
+  }
+
+  // --- Bridge API: Panel Interaction ---
+
+  onPlanetClick(fn: (naturalId: string, screenX: number, screenY: number) => boolean): () => void {
+    this.planetClickCallbacks.add(fn);
+    return () => { this.planetClickCallbacks.delete(fn); };
+  }
+
+  onSystemClick(fn: (systemId: string, screenX: number, screenY: number) => boolean): () => void {
+    this.systemClickCallbacks.add(fn);
+    return () => { this.systemClickCallbacks.delete(fn); };
+  }
+
+  // --- Bridge API: Lifecycle Events ---
+
+  onSystemViewEnter(fn: (systemId: string) => void): () => void {
+    this.systemViewEnterCallbacks.add(fn);
+    return () => { this.systemViewEnterCallbacks.delete(fn); };
+  }
+
+  onSystemViewExit(fn: (systemId: string) => void): () => void {
+    this.systemViewExitCallbacks.add(fn);
+    return () => { this.systemViewExitCallbacks.delete(fn); };
+  }
+
   destroy(): void {
+    // Remove overlay containers from viewport
+    for (const entry of this.overlayEntries) {
+      this.viewport?.removeChild(entry.container);
+    }
+    this.overlayEntries = [];
+    this.tickCallbacks.clear();
+    this.planetClickCallbacks.clear();
+    this.systemClickCallbacks.clear();
+    this.systemViewEnterCallbacks.clear();
+    this.systemViewExitCallbacks.clear();
+
     this.app?.destroy(true);
     this.app = null;
     this.viewport = null;

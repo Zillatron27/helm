@@ -107,6 +107,9 @@ export class SystemLayer {
   private selectionHalo: Graphics;
   private selectedPlanetId: string | null = null;
 
+  // Bridge API: click interceptor (set by MapRenderer)
+  planetClickInterceptor: ((naturalId: string, screenX: number, screenY: number) => boolean) | null = null;
+
   constructor() {
     this.container = new Container();
     this.container.visible = false;
@@ -256,8 +259,10 @@ export class SystemLayer {
       planetContainer.hitArea = new Circle(0, 0, Math.max(planet.displayRadius + 5, 15));
 
       const planetId = planet.id;
+      const planetNaturalId = planet.naturalId;
       planetContainer.on("pointertap", (e) => {
         e.stopPropagation();
+        if (this.planetClickInterceptor?.(planetNaturalId, e.globalX, e.globalY)) return;
         setSelectedEntity({ type: "planet", id: planetId });
       });
 
