@@ -4,7 +4,7 @@ import { SearchBar } from "./ui/search/SearchBar.js";
 import { RoutePanel } from "./ui/search/RoutePanel.js";
 import { SettingsPanel } from "./ui/SettingsPanel.js";
 import { setupControls } from "./ui/controls.js";
-import { onStateChange, getGatewaysVisible, setGatewaysVisible } from "./ui/state.js";
+import { onStateChange, getGatewaysVisible, setGatewaysVisible, getSettledVisible, setSettledVisible } from "./ui/state.js";
 import { initTheme, getTheme } from "./ui/theme.js";
 import "./ui/search/search.css";
 import "./ui/settings.css";
@@ -39,6 +39,15 @@ const GATEWAY_ICON_SVG = `<svg width="26" height="26" viewBox="0 0 26 22" fill="
   <path d="M4 13 C4 1 22 1 22 13"/>
 </svg>`;
 
+const SETTLED_ICON_SVG = `<svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="13" cy="8" r="4"/>
+  <path d="M5 24c0-4.4 3.6-8 8-8s8 3.6 8 8"/>
+  <circle cx="4" cy="12" r="3"/>
+  <path d="M0 22c0-2.8 1.8-5 4-5"/>
+  <circle cx="22" cy="12" r="3"/>
+  <path d="M26 22c0-2.8-1.8-5-4-5"/>
+</svg>`;
+
 async function boot(): Promise<void> {
   try {
     const helm = await createMap(container);
@@ -68,6 +77,19 @@ async function boot(): Promise<void> {
     gatewayRow.appendChild(gatewayBtn);
     toolbar.appendChild(gatewayRow);
 
+    // Settled toggle row
+    const settledRow = document.createElement("div");
+    settledRow.className = "toolbar-row";
+    const settledBtn = document.createElement("button");
+    settledBtn.className = "toolbar-btn toolbar-btn-settled-off";
+    settledBtn.title = "Toggle settled systems (S)";
+    settledBtn.innerHTML = SETTLED_ICON_SVG;
+    settledBtn.addEventListener("click", () => {
+      setSettledVisible(!getSettledVisible());
+    });
+    settledRow.appendChild(settledBtn);
+    toolbar.appendChild(settledRow);
+
     // Settings panel row
     const settingsPanel = new SettingsPanel();
     toolbar.appendChild(settingsPanel.getElement());
@@ -80,12 +102,17 @@ async function boot(): Promise<void> {
     versionEl.textContent = `v${VERSION}`;
     document.body.appendChild(versionEl);
 
-    // Sync gateway button with state (handles both button click and G key)
+    // Sync toggle buttons with state (handles both button clicks and keyboard shortcuts)
     onStateChange(() => {
-      const visible = getGatewaysVisible();
-      renderer.setGatewaysVisible(visible);
-      gatewayBtn.classList.toggle("toolbar-btn-gateway-on", visible);
-      gatewayBtn.classList.toggle("toolbar-btn-gateway-off", !visible);
+      const gwVisible = getGatewaysVisible();
+      renderer.setGatewaysVisible(gwVisible);
+      gatewayBtn.classList.toggle("toolbar-btn-gateway-on", gwVisible);
+      gatewayBtn.classList.toggle("toolbar-btn-gateway-off", !gwVisible);
+
+      const stVisible = getSettledVisible();
+      renderer.setSettledVisible(stVisible);
+      settledBtn.classList.toggle("toolbar-btn-settled-on", stVisible);
+      settledBtn.classList.toggle("toolbar-btn-settled-off", !stVisible);
     });
 
     const viewport = renderer.getViewport();

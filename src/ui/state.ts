@@ -86,6 +86,18 @@ export function setGatewaysVisible(visible: boolean): void {
   notify();
 }
 
+let settledVisible = false;
+
+export function getSettledVisible(): boolean {
+  return settledVisible;
+}
+
+export function setSettledVisible(visible: boolean): void {
+  if (visible === settledVisible) return;
+  settledVisible = visible;
+  notify();
+}
+
 export function offStateChange(listener: StateListener): void {
   listeners.delete(listener);
 }

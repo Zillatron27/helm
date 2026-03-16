@@ -30,6 +30,9 @@ export { findRoute } from "./data/pathfinding.js";
 // CX Distances
 export { getCxDistances } from "./data/cxDistances.js";
 
+// Site Counts
+export { getSystemBaseCount, getPlanetBaseCount } from "./data/siteCounts.js";
+
 // Search
 export { search, getSystemUuidByNaturalId } from "./data/searchIndex.js";
 
@@ -48,6 +51,8 @@ export {
   onStateChange,
   getGatewaysVisible,
   setGatewaysVisible,
+  getSettledVisible,
+  setSettledVisible,
   offStateChange,
 } from "./ui/state.js";
 

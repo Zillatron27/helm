@@ -134,6 +134,38 @@ export async function fetchCxStations(): Promise<FioCxStation[]> {
   return data as FioCxStation[];
 }
 
+export interface FioPlanetSiteCount {
+  PlanetNaturalId: string;
+  SitesCount: number;
+}
+
+export async function fetchPlanetSites(): Promise<FioPlanetSiteCount[]> {
+  const response = await fetch(`${FIO_BASE}/planet/sites/all`);
+
+  if (!response.ok) {
+    throw new Error(
+      `FIO planet sites API error: ${response.status} ${response.statusText}`
+    );
+  }
+
+  const data: unknown = await response.json();
+
+  if (!Array.isArray(data)) {
+    throw new Error("FIO planet sites API returned invalid data");
+  }
+
+  if (data.length === 0) return [];
+
+  const sample = data[0] as Record<string, unknown>;
+  if (!("PlanetNaturalId" in sample) || !("SitesCount" in sample)) {
+    throw new Error(
+      "FIO planet sites response missing required fields: PlanetNaturalId, SitesCount"
+    );
+  }
+
+  return data as FioPlanetSiteCount[];
+}
+
 export async function fetchMaterials(): Promise<FioMaterial[]> {
   const response = await fetch(`${FIO_BASE}/material/allmaterials`);
 

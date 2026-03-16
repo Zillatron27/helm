@@ -164,6 +164,7 @@ export class MapRenderer {
       if (getViewLevel() === "galaxy") {
         this.galaxy?.updateCxPulse(this.elapsedTime);
         this.galaxy?.updateTwinkle(this.elapsedTime);
+        this.galaxy?.updateSettledRings(this.elapsedTime);
       } else {
         this.systemLayer?.update(dt, this.elapsedTime);
       }
@@ -585,6 +586,10 @@ export class MapRenderer {
 
   setGatewaysVisible(visible: boolean): void {
     this.galaxy?.setGatewaysVisible(visible);
+  }
+
+  setSettledVisible(visible: boolean): void {
+    this.galaxy?.setSettledVisible(visible);
   }
 
   setGatewayIndicatorsVisible(visible: boolean): void {

@@ -7,6 +7,7 @@ import {
   setFocusedSystem,
 } from "../ui/state.js";
 import { getAllCxStations, getGalaxyGatewayConnections, isGatewaySystem } from "../data/cache.js";
+import { isSettledSystem } from "../data/siteCounts.js";
 import { StarParticles } from "./StarParticles.js";
 import { TweenManager } from "./Tween.js";
 
@@ -105,6 +106,15 @@ const SYSTEM_HALO_ALPHA = 0.7;
 const SYSTEM_HALO_STROKE = 2.0;
 const SYSTEM_HALO_ARC_SPAN = Math.PI * 0.7;
 
+// Settled system ring indicators
+const SETTLED_COLOUR = 0xc4a35a;
+const SETTLED_RING_ALPHA = 0.3;
+const SETTLED_RING_STROKE = 1.2;
+const SETTLED_RING_RADIUS_MULT = 3.2;
+const SETTLED_HIGHLIGHT_ALPHA = 0.7;
+const SETTLED_HIGHLIGHT_ARC_SPAN = Math.PI * 0.3;
+const SETTLED_ROTATION_PERIOD = 5.0;
+
 let glowTexture: Texture | null = null;
 function getGlowTexture(): Texture {
   if (glowTexture) return glowTexture;
@@ -184,6 +194,12 @@ export class GalaxyLayer {
   private lastClickId: string | null = null;
   private lastClickTime = 0;
 
+  // Settled system indicators
+  private settledRingsStatic: Container;
+  private settledRingsAnimated: Container;
+  private settledEntries: Array<{ graphic: Graphics; phase: number; radius: number; x: number; y: number }> = [];
+  private settledVisible = false;
+
   // System selection halo
   private selectionHalo: Graphics;
 
@@ -238,6 +254,20 @@ export class GalaxyLayer {
     this.glowContainer = new Container();
     this.glowContainer.eventMode = "none";
     this.container.addChild(this.glowContainer);
+
+    // Settled system ring indicators — above glows, below particles/stars
+    this.settledRingsStatic = new Container();
+    this.settledRingsStatic.eventMode = "none";
+    this.settledRingsStatic.visible = false;
+    this.container.addChild(this.settledRingsStatic);
+
+    this.settledRingsAnimated = new Container();
+    this.settledRingsAnimated.eventMode = "none";
+    this.settledRingsAnimated.visible = false;
+    this.container.addChild(this.settledRingsAnimated);
+
+    // Build settled indicators from site count data
+    this.buildSettledIndicators(systems);
 
     // Hover particles — above glows, below labels and stars
     this.starParticles = new StarParticles();
@@ -640,6 +670,73 @@ export class GalaxyLayer {
     }
   }
 
+  // --- Settled Indicators ---
+
+  private buildSettledIndicators(systems: StarSystem[]): void {
+    for (const system of systems) {
+      if (!isSettledSystem(system.id)) continue;
+
+      const connCount = system.connectionIds.length;
+      const sizeScale = connCount >= 5 ? 1.6 : connCount >= 3 ? 1.3 : 1;
+      const ringRadius = STAR_RADIUS * sizeScale * SETTLED_RING_RADIUS_MULT;
+
+      // Static base ring
+      const ring = new Graphics();
+      ring.circle(0, 0, ringRadius);
+      ring.stroke({ width: SETTLED_RING_STROKE, color: SETTLED_COLOUR, alpha: SETTLED_RING_ALPHA });
+      ring.x = system.worldX;
+      ring.y = system.worldY;
+      this.settledRingsStatic.addChild(ring);
+
+      // Animated highlight arc entry
+      const highlight = new Graphics();
+      highlight.x = system.worldX;
+      highlight.y = system.worldY;
+      this.settledRingsAnimated.addChild(highlight);
+
+      // Phase offset from system ID hash for staggered rotation
+      let hash = 0;
+      for (let i = 0; i < system.id.length; i++) {
+        hash = ((hash << 5) - hash + system.id.charCodeAt(i)) | 0;
+      }
+      const phase = (Math.abs(hash) % 1000) / 1000 * Math.PI * 2;
+
+      this.settledEntries.push({ graphic: highlight, phase, radius: ringRadius, x: system.worldX, y: system.worldY });
+    }
+  }
+
+  setSettledVisible(visible: boolean): void {
+    this.settledVisible = visible;
+    if (visible) {
+      this.settledRingsStatic.visible = true;
+      this.settledRingsAnimated.visible = true;
+      this.settledRingsStatic.alpha = 0;
+      this.settledRingsAnimated.alpha = 0;
+      this.tweens.to(this.settledRingsStatic, "alpha", 1, 0.4);
+      this.tweens.to(this.settledRingsAnimated, "alpha", 1, 0.4);
+    } else {
+      this.tweens.to(this.settledRingsStatic, "alpha", 0, 0.3);
+      this.tweens.to(this.settledRingsAnimated, "alpha", 0, 0.3);
+      setTimeout(() => {
+        if (!this.settledVisible) {
+          this.settledRingsStatic.visible = false;
+          this.settledRingsAnimated.visible = false;
+        }
+      }, 300);
+    }
+  }
+
+  updateSettledRings(elapsed: number): void {
+    if (!this.settledVisible) return;
+
+    for (const entry of this.settledEntries) {
+      const angle = (elapsed / SETTLED_ROTATION_PERIOD) * Math.PI * 2 + entry.phase;
+      entry.graphic.clear();
+      entry.graphic.arc(0, 0, entry.radius, angle - SETTLED_HIGHLIGHT_ARC_SPAN / 2, angle + SETTLED_HIGHLIGHT_ARC_SPAN / 2);
+      entry.graphic.stroke({ width: SETTLED_RING_STROKE, color: SETTLED_COLOUR, alpha: SETTLED_HIGHLIGHT_ALPHA });
+    }
+  }
+
   dimExcept(systemId: string, tw?: TweenManager): void {
     this.isDimmedForSystemView = true;
     this.twinkleActive = false;
@@ -658,6 +755,8 @@ export class GalaxyLayer {
       tw.to(this.glowContainer, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
       tw.to(this.gatewayArcs, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
       tw.to(this.gatewayIndicators, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
+      tw.to(this.settledRingsStatic, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
+      tw.to(this.settledRingsAnimated, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
       // Fade out ambient labels then hide
       tw.to(this.ambientLabels, "alpha", 0, 0.3);
     } else {
@@ -667,6 +766,8 @@ export class GalaxyLayer {
       this.glowContainer.alpha = SYSTEM_VIEW_LINES_ALPHA;
       this.gatewayArcs.alpha = SYSTEM_VIEW_LINES_ALPHA;
       this.gatewayIndicators.alpha = SYSTEM_VIEW_LINES_ALPHA;
+      this.settledRingsStatic.alpha = SYSTEM_VIEW_LINES_ALPHA;
+      this.settledRingsAnimated.alpha = SYSTEM_VIEW_LINES_ALPHA;
       this.ambientLabels.visible = false;
     }
 
@@ -700,6 +801,9 @@ export class GalaxyLayer {
       tw.to(this.gatewayIndicators, "alpha", containerAlpha, dur);
       // CX markers dim per-system when highlight is active
       tw.to(this.cxMarkers, "alpha", containerAlpha, dur);
+      const settledAlpha = this.settledVisible ? containerAlpha : 0;
+      tw.to(this.settledRingsStatic, "alpha", settledAlpha, dur);
+      tw.to(this.settledRingsAnimated, "alpha", settledAlpha, dur);
     } else {
       this.baseConnections.alpha = containerAlpha;
       this.routeOverlay.alpha = containerAlpha;
@@ -707,6 +811,8 @@ export class GalaxyLayer {
       this.gatewayArcs.alpha = containerAlpha;
       this.gatewayIndicators.alpha = containerAlpha;
       this.cxMarkers.alpha = containerAlpha;
+      this.settledRingsStatic.alpha = this.settledVisible ? containerAlpha : 0;
+      this.settledRingsAnimated.alpha = this.settledVisible ? containerAlpha : 0;
     }
 
     // Per-star alpha: respect highlight filter when active

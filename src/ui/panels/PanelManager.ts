@@ -19,6 +19,7 @@ import {
 } from "../../data/cache.js";
 import { getCxDistances } from "../../data/cxDistances.js";
 import { findRoute } from "../../data/pathfinding.js";
+import { getPlanetBaseCount } from "../../data/siteCounts.js";
 import type { MapRenderer } from "../../renderer/MapRenderer.js";
 
 export class PanelManager {
@@ -187,7 +188,10 @@ export class PanelManager {
 
     const rows = planets
       .map(
-        (p) => `
+        (p) => {
+          const bases = getPlanetBaseCount(p.naturalId);
+          const basesLabel = bases > 0 ? `<span class="panel-badge">${bases} bases</span>` : "";
+          return `
           <div class="panel-row">
             <span class="panel-row-label">${esc(p.name || p.naturalId)}</span>
             <span>
@@ -195,9 +199,11 @@ export class PanelManager {
                 ${p.surface ? "Rocky" : "Gas"}
               </span>
               <span class="panel-badge">T${p.tier}</span>
+              ${basesLabel}
             </span>
           </div>
-        `
+        `;
+        }
       )
       .join("");
 
@@ -251,6 +257,7 @@ export class PanelManager {
       </div>
       <div class="panel-body">
         ${renderCxDistanceSection(planet.systemId)}
+        ${renderBaseCountSection(planet.naturalId)}
         ${this.renderEnvironmentSection(planet)}
         ${this.renderResourcesSection(planet)}
         ${this.renderInfrastructureSection(planet)}
@@ -471,6 +478,22 @@ function tempClass(temp: number): string {
   if (temp < -25) return "panel-row-value-negative";
   if (temp > 75) return "panel-row-value-negative";
   return "panel-row-value-positive";
+}
+
+function renderBaseCountSection(planetNaturalId: string): string {
+  const count = getPlanetBaseCount(planetNaturalId);
+  const display = count > 0 ? `${count}` : "Unsettled";
+  const cls = count > 0 ? "" : "panel-row-value-neutral";
+
+  return `
+    <div class="panel-section">
+      <h3 class="panel-section-title">Population</h3>
+      <div class="panel-row">
+        <span class="panel-row-label">Bases</span>
+        <span class="panel-row-value ${cls}">${display}</span>
+      </div>
+    </div>
+  `;
 }
 
 function renderCxDistanceSection(systemId: string): string {

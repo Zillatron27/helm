@@ -6,6 +6,8 @@ import {
   setFocusedSystem,
   getGatewaysVisible,
   setGatewaysVisible,
+  getSettledVisible,
+  setSettledVisible,
 } from "./state.js";
 import type { PanelManager } from "./panels/PanelManager.js";
 import type { SearchBar } from "./search/SearchBar.js";
@@ -83,6 +85,10 @@ export function setupControls(
       case "g":
         e.preventDefault();
         setGatewaysVisible(!getGatewaysVisible());
+        break;
+      case "s":
+        e.preventDefault();
+        setSettledVisible(!getSettledVisible());
         break;
     }
   };

@@ -4,6 +4,7 @@ import { loadSystemData, loadCxStations, loadMaterials, getSystems } from "./dat
 import { fetchAllPlanetNames } from "./data/fio.js";
 import { buildSearchIndex } from "./data/searchIndex.js";
 import { computeCxDistances } from "./data/cxDistances.js";
+import { loadSiteCounts } from "./data/siteCounts.js";
 import { MapRenderer } from "./renderer/MapRenderer.js";
 import { PanelManager } from "./ui/panels/PanelManager.js";
 import { initTheme } from "./ui/theme.js";
@@ -78,6 +79,9 @@ export async function createMap(container: HTMLElement): Promise<HelmInstance> {
 
   buildSearchIndex(getSystems(), planetSummaries);
   computeCxDistances();
+  await loadSiteCounts().catch((err) => {
+    console.warn("Site count fetch failed, settled indicators unavailable:", err);
+  });
 
   const renderer = new MapRenderer();
   await renderer.init(container);
