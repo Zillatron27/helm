@@ -6,6 +6,8 @@ import {
   getExtractableResourceMaterialIds,
 } from "../../data/resourceIndex.js";
 import { getResourceFilter, setResourceFilter } from "../state.js";
+import { getTheme } from "../theme.js";
+import { createMiniLoader } from "../loader/LoaderAnimation.js";
 
 const DEBOUNCE_MS = 50;
 
@@ -56,11 +58,21 @@ export class ResourcePicker {
     this.expandEl.appendChild(bar);
     this.expandEl.appendChild(this.dropdownEl);
 
-    // Button
+    // Button — starts with mini loader, swaps to icon when index ready
     this.btnEl = document.createElement("button");
     this.btnEl.className = "toolbar-btn toolbar-btn-resource-disabled";
-    this.btnEl.title = "Resource filter (R)";
-    this.btnEl.innerHTML = FILTER_ICON_SVG;
+    this.btnEl.title = "Resource filter (R) — loading...";
+
+    // Show mini solar system spinner while index builds
+    if (!isResourceIndexReady()) {
+      const miniLoader = createMiniLoader(getTheme());
+      miniLoader.style.pointerEvents = "none";
+      this.btnEl.appendChild(miniLoader);
+    } else {
+      this.btnEl.innerHTML = FILTER_ICON_SVG;
+      this.btnEl.classList.remove("toolbar-btn-resource-disabled");
+    }
+
     this.btnEl.addEventListener("click", () => this.handleButtonClick());
 
     this.rowEl.appendChild(this.expandEl);
@@ -68,8 +80,10 @@ export class ResourcePicker {
 
     this.bindEvents();
 
-    // Enable button when resource index is ready
+    // Swap spinner for icon when resource index is ready
     onResourceIndexReady(() => {
+      this.btnEl.innerHTML = FILTER_ICON_SVG;
+      this.btnEl.title = "Resource filter (R)";
       this.btnEl.classList.remove("toolbar-btn-resource-disabled");
     });
   }

@@ -7,6 +7,7 @@ import { ResourcePicker } from "./ui/resource/ResourcePicker.js";
 import { setupControls } from "./ui/controls.js";
 import { onStateChange, getGatewaysVisible, setGatewaysVisible, getSettledVisible, setSettledVisible, getResourceFilter } from "./ui/state.js";
 import { initTheme, getTheme } from "./ui/theme.js";
+import { createLoader } from "./ui/loader/LoaderAnimation.js";
 import "./ui/search/search.css";
 import "./ui/settings.css";
 import "./ui/resource/resource.css";
@@ -20,19 +21,9 @@ const appEl = document.getElementById("app") as HTMLElement | null;
 if (!appEl) throw new Error("Missing #app element");
 const container: HTMLElement = appEl;
 
-// Loading indicator — uses theme colours
+// Themed loading animation
 const theme = getTheme();
-const loading = document.createElement("div");
-loading.style.cssText = `
-  position: fixed; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 16px;
-  color: #${theme.textSecondary.toString(16).padStart(6, "0")};
-  background: #${theme.bgPrimary.toString(16).padStart(6, "0")};
-  z-index: 100;
-`;
-loading.textContent = "Loading galaxy data...";
+const loading = createLoader(theme, VERSION);
 document.body.appendChild(loading);
 
 const GATEWAY_ICON_SVG = `<svg width="26" height="26" viewBox="0 0 26 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -134,9 +125,15 @@ async function boot(): Promise<void> {
       setupControls(viewport, panelManager, searchBar, renderer, resourcePicker);
     }
   } catch (err) {
-    loading.textContent = "";
-    loading.style.flexDirection = "column";
-    loading.style.gap = "12px";
+    loading.innerHTML = "";
+    loading.style.cssText = `
+      position:fixed;inset:0;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      gap:12px;
+      background:#${theme.bgPrimary.toString(16).padStart(6, "0")};
+      font-family:'IBM Plex Mono',monospace;
+      z-index:100;
+    `;
 
     const title = document.createElement("div");
     title.style.color = "#ff8c00";
@@ -147,7 +144,7 @@ async function boot(): Promise<void> {
 
     const detail = document.createElement("div");
     detail.style.color = "#666666";
-    detail.style.fontSize = "14px";
+    title.style.fontSize = "14px";
     detail.style.maxWidth = "600px";
     detail.style.textAlign = "center";
     detail.textContent = err instanceof Error ? err.message : String(err);
