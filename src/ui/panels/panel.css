@@ -247,13 +247,13 @@
 }
 
 .panel-cx-code {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-secondary);
   letter-spacing: 0.05em;
 }
 
 .panel-cx-jumps {
-  font-size: 14px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--text-primary);
 }
