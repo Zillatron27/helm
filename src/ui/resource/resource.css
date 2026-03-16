@@ -85,7 +85,7 @@
   white-space: nowrap;
 }
 
-/* Active filter badge — pill below the toolbar button */
+/* Active filter badge — pill left of the toolbar button */
 .resource-badge {
   display: flex;
   align-items: center;
@@ -99,8 +99,10 @@
   font-weight: 600;
   color: #00ccaa;
   cursor: default;
-  margin-top: 4px;
   white-space: nowrap;
+  margin-right: 8px;
+  height: 28px;
+  box-sizing: border-box;
 }
 
 .resource-badge-clear {

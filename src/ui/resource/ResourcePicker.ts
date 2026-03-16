@@ -22,17 +22,16 @@ export class ResourcePicker {
   private inputEl: HTMLInputElement;
   private dropdownEl: HTMLElement;
   private badgeEl: HTMLElement | null = null;
+  // filteredMaterials is rebuilt in grouped display order after every search
   private filteredMaterials: FioMaterial[] = [];
   private activeIndex = -1;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private expanded = false;
 
   constructor() {
-    // Toolbar row: [expand panel] [button]
+    // Toolbar row: [expand panel] [badge area] [button]
     this.rowEl = document.createElement("div");
     this.rowEl.className = "toolbar-row";
-    this.rowEl.style.flexWrap = "wrap";
-    this.rowEl.style.justifyContent = "flex-end";
 
     // Expandable panel (left of button)
     this.expandEl = document.createElement("div");
@@ -63,7 +62,6 @@ export class ResourcePicker {
     this.btnEl.className = "toolbar-btn toolbar-btn-resource-disabled";
     this.btnEl.title = "Resource filter (R) — loading...";
 
-    // Show mini solar system spinner while index builds
     if (!isResourceIndexReady()) {
       const miniLoader = createMiniLoader(getTheme());
       miniLoader.style.pointerEvents = "none";
@@ -103,7 +101,6 @@ export class ResourcePicker {
     if (this.expanded) {
       this.collapse();
     } else if (getResourceFilter() !== null) {
-      // Filter active but picker closed — clear the filter
       setResourceFilter(null);
       this.removeBadge();
     } else {
@@ -117,7 +114,6 @@ export class ResourcePicker {
     this.btnEl.classList.add("toolbar-btn-active");
     setTimeout(() => {
       this.inputEl.focus();
-      // Show all extractable resources initially
       this.showAllResources();
     }, 260);
   }
@@ -182,8 +178,8 @@ export class ResourcePicker {
   private showAllResources(): void {
     if (!isResourceIndexReady()) return;
     const extractable = getExtractableResourceMaterialIds();
-    this.filteredMaterials = getAllMaterials().filter((m) => extractable.has(m.MaterialId));
-    this.activeIndex = this.filteredMaterials.length > 0 ? 0 : -1;
+    const raw = getAllMaterials().filter((m) => extractable.has(m.MaterialId));
+    this.buildGroupedList(raw);
     this.renderDropdown();
   }
 
@@ -196,27 +192,21 @@ export class ResourcePicker {
 
     if (!isResourceIndexReady()) return;
     const extractable = getExtractableResourceMaterialIds();
-    this.filteredMaterials = getAllMaterials().filter((m) => {
+    const raw = getAllMaterials().filter((m) => {
       if (!extractable.has(m.MaterialId)) return false;
       return (
         m.Ticker.toLowerCase().includes(query) ||
         m.Name.toLowerCase().includes(query)
       );
     });
-    this.activeIndex = this.filteredMaterials.length > 0 ? 0 : -1;
+    this.buildGroupedList(raw);
     this.renderDropdown();
   }
 
-  private renderDropdown(): void {
-    if (this.filteredMaterials.length === 0) {
-      this.dropdownEl.innerHTML = "";
-      this.dropdownEl.classList.remove("resource-dropdown-open");
-      return;
-    }
-
-    // Group by category
+  /** Group materials by category and rebuild filteredMaterials in display order. */
+  private buildGroupedList(raw: FioMaterial[]): void {
     const grouped = new Map<string, FioMaterial[]>();
-    for (const m of this.filteredMaterials) {
+    for (const m of raw) {
       const cat = m.CategoryName || "Other";
       let list = grouped.get(cat);
       if (!list) {
@@ -226,17 +216,45 @@ export class ResourcePicker {
       list.push(m);
     }
 
-    let html = "";
-    let flatIndex = 0;
-    for (const [category, materials] of grouped) {
-      html += `<div class="resource-category">${esc(category)}</div>`;
+    // Rebuild filteredMaterials in grouped display order so indices match
+    this.filteredMaterials = [];
+    for (const materials of grouped.values()) {
       for (const m of materials) {
-        const activeClass = flatIndex === this.activeIndex ? " resource-item-active" : "";
-        html += `<div class="resource-item${activeClass}" data-index="${flatIndex}">
-          <span class="resource-item-ticker">${esc(m.Ticker)}</span>
-          <span class="resource-item-name">${esc(m.Name)}</span>
+        this.filteredMaterials.push(m);
+      }
+    }
+    this.activeIndex = this.filteredMaterials.length > 0 ? 0 : -1;
+  }
+
+  private renderDropdown(): void {
+    if (this.filteredMaterials.length === 0) {
+      this.dropdownEl.innerHTML = "";
+      this.dropdownEl.classList.remove("resource-dropdown-open");
+      return;
+    }
+
+    // Group by category (already in grouped order)
+    const grouped = new Map<string, Array<{ material: FioMaterial; index: number }>>();
+    for (let i = 0; i < this.filteredMaterials.length; i++) {
+      const m = this.filteredMaterials[i]!;
+      const cat = m.CategoryName || "Other";
+      let list = grouped.get(cat);
+      if (!list) {
+        list = [];
+        grouped.set(cat, list);
+      }
+      list.push({ material: m, index: i });
+    }
+
+    let html = "";
+    for (const [category, entries] of grouped) {
+      html += `<div class="resource-category">${esc(category)}</div>`;
+      for (const { material, index } of entries) {
+        const activeClass = index === this.activeIndex ? " resource-item-active" : "";
+        html += `<div class="resource-item${activeClass}" data-index="${index}">
+          <span class="resource-item-ticker">${esc(material.Ticker)}</span>
+          <span class="resource-item-name">${esc(material.Name)}</span>
         </div>`;
-        flatIndex++;
       }
     }
 
@@ -268,7 +286,6 @@ export class ResourcePicker {
     this.dropdownEl.querySelectorAll(".resource-item").forEach((el, i) => {
       el.classList.toggle("resource-item-active", i === this.activeIndex);
     });
-    // Scroll active item into view
     const activeEl = this.dropdownEl.querySelector(".resource-item-active");
     activeEl?.scrollIntoView({ block: "nearest" });
   }
@@ -279,9 +296,26 @@ export class ResourcePicker {
     this.collapse();
     this.inputEl.blur();
 
-    setResourceFilter(material.MaterialId);
-    this.showBadge(material.Ticker);
-    this.btnEl.classList.add("toolbar-btn-resource-on");
+    // Show spinner while filter applies, then restore icon
+    this.showButtonSpinner();
+    // Defer filter application to next frame so spinner renders first
+    requestAnimationFrame(() => {
+      setResourceFilter(material.MaterialId);
+      this.showBadge(material.Ticker);
+      this.restoreButtonIcon();
+      this.btnEl.classList.add("toolbar-btn-resource-on");
+    });
+  }
+
+  private showButtonSpinner(): void {
+    this.btnEl.innerHTML = "";
+    const miniLoader = createMiniLoader(getTheme());
+    miniLoader.style.pointerEvents = "none";
+    this.btnEl.appendChild(miniLoader);
+  }
+
+  private restoreButtonIcon(): void {
+    this.btnEl.innerHTML = FILTER_ICON_SVG;
   }
 
   private showBadge(ticker: string): void {
@@ -300,7 +334,8 @@ export class ResourcePicker {
     });
 
     badge.appendChild(clearBtn);
-    this.rowEl.appendChild(badge);
+    // Insert badge before the button (pops out to the left)
+    this.rowEl.insertBefore(badge, this.btnEl);
     this.badgeEl = badge;
   }
 

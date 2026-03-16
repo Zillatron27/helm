@@ -60,6 +60,11 @@ async function boot(): Promise<void> {
     const toolbar = document.createElement("div");
     toolbar.id = "helm-toolbar";
     toolbar.appendChild(searchBar.getElement());
+
+    // Resource filter picker row — right after search
+    const resourcePicker = new ResourcePicker();
+    toolbar.appendChild(resourcePicker.getElement());
+
     toolbar.appendChild(routePanel.getElement());
 
     // Gateway toggle row
@@ -87,10 +92,6 @@ async function boot(): Promise<void> {
     });
     settledRow.appendChild(settledBtn);
     toolbar.appendChild(settledRow);
-
-    // Resource filter picker row
-    const resourcePicker = new ResourcePicker();
-    toolbar.appendChild(resourcePicker.getElement());
 
     // Settings panel row
     const settingsPanel = new SettingsPanel();
