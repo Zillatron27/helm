@@ -201,17 +201,14 @@ export class PanelManager {
       .map(
         (p) => {
           const bases = getPlanetBaseCount(p.naturalId);
-          const basesLabel = bases > 0 ? `<span class="panel-badge">${bases} bases</span>` : "";
+          const basesText = bases > 0 ? `${bases}` : "";
           return `
-          <div class="panel-row">
+          <div class="panel-planet-row">
             <a class="panel-planet-link" data-planet-id="${esc(p.id)}" data-planet-system="${esc(p.systemId)}">${esc(p.name || p.naturalId)}</a>
-            <span>
-              <span class="panel-badge ${p.surface ? "panel-badge-rocky" : "panel-badge-gas"}">
-                ${p.surface ? "Rocky" : "Gas"}
-              </span>
-              <span class="panel-badge">T${p.tier}</span>
-              ${basesLabel}
+            <span class="panel-badge ${p.surface ? "panel-badge-rocky" : "panel-badge-gas"}">
+              ${p.surface ? "Rocky" : "Gas"}
             </span>
+            <span class="panel-planet-bases">${basesText}</span>
           </div>
         `;
         }
@@ -262,7 +259,6 @@ export class PanelManager {
         <div class="panel-subtitle">
           ${esc(planet.naturalId)}
           <span class="panel-badge ${typeBadge}">${typeLabel}</span>
-          <span class="panel-badge">Tier ${planet.tier}</span>
         </div>
         <button class="panel-close" aria-label="Close panel">&times;</button>
       </div>

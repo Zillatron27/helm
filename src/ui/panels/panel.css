@@ -198,16 +198,35 @@
   border-radius: 2px;
 }
 
-/* Planet links in system panel */
+/* Planet rows in system panel — columnar layout */
+.panel-planet-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
 .panel-planet-link {
   color: var(--text-secondary);
   cursor: pointer;
   text-decoration: none;
   transition: color 0.15s ease;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .panel-planet-link:hover {
   color: var(--accent);
+}
+
+.panel-planet-bases {
+  color: var(--text-secondary);
+  font-size: 11px;
+  text-align: right;
+  min-width: 48px;
 }
 
 /* Connected system links */
