@@ -457,7 +457,7 @@ function renderCxDistanceSection(systemId: string): string {
     if (i === 0) classes.push("panel-cx-nearest");
     if (entry.viaGateway) classes.push("panel-cx-gateway");
 
-    const codeText = entry.viaGateway ? `${esc(entry.code)} \u2B21` : esc(entry.code);
+    const codeText = entry.viaGateway ? `${esc(entry.label)} \u2B21` : esc(entry.label);
 
     return `
       <span class="${classes.join(" ")}">
