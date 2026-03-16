@@ -33,6 +33,8 @@ export class PanelManager {
   private panelEl: HTMLElement;
   private renderer: MapRenderer | null = null;
   private isOpen = false;
+  // Track last rendered panel to skip redundant re-renders (prevents flash)
+  private lastPanelKey: string | null = null;
 
   constructor() {
     this.containerEl = document.createElement("div");
@@ -63,8 +65,13 @@ export class PanelManager {
       if (system) {
         const resourceFilterId = getResourceFilter();
         if (resourceFilterId) {
+          // Skip re-render if same panel is already showing (prevents flash on view transitions)
+          const panelKey = `resource:${system.id}:${resourceFilterId}`;
+          if (this.lastPanelKey === panelKey && this.isOpen) return;
+          this.lastPanelKey = panelKey;
           this.showResourceFilterPanel(system, resourceFilterId);
         } else {
+          this.lastPanelKey = null;
           const planets = getPlanetsForSystem(system.naturalId);
           this.showSystemPanel(system, planets);
 
@@ -83,6 +90,7 @@ export class PanelManager {
         }
       }
     } else if (entity.type === "planet") {
+      this.lastPanelKey = null;
       const focusedId = getFocusedSystemId();
       if (!focusedId) return;
       const system = getSystemById(focusedId);
@@ -602,6 +610,7 @@ export class PanelManager {
     if (!this.isOpen) return;
     this.panelEl.classList.remove("panel-open");
     this.isOpen = false;
+    this.lastPanelKey = null;
     setActiveRoute(null);
   }
 

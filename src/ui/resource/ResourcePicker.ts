@@ -96,7 +96,7 @@ export class ResourcePicker {
     this.applyFilterAsync = fn;
   }
 
-  /** Toggle picker open/closed, or clear filter if active and picker closed. */
+  /** Toggle picker open/closed. */
   toggle(): void {
     this.handleButtonClick();
   }
@@ -106,9 +106,6 @@ export class ResourcePicker {
 
     if (this.expanded) {
       this.collapse();
-    } else if (getResourceFilter() !== null) {
-      setResourceFilter(null);
-      this.removeBadge();
     } else {
       this.expand();
     }
