@@ -7,6 +7,7 @@ import {
   setSelectedEntity,
   setViewLevel,
   setFocusedSystem,
+  setActiveRoute,
   onStateChange,
 } from "../state.js";
 import {
@@ -17,6 +18,7 @@ import {
   getMaterialTicker,
 } from "../../data/cache.js";
 import { getCxDistances } from "../../data/cxDistances.js";
+import { findRoute } from "../../data/pathfinding.js";
 import type { MapRenderer } from "../../renderer/MapRenderer.js";
 
 export class PanelManager {
@@ -113,6 +115,8 @@ export class PanelManager {
         setFocusedSystem(system.id);
         setViewLevel("system");
       });
+
+      this.wireCxBadgeClicks();
 
       // Wire connection links
       this.panelEl.querySelectorAll("[data-system-id]").forEach((el) => {
@@ -259,6 +263,8 @@ export class PanelManager {
       this.panelEl.querySelector(".panel-close")?.addEventListener("click", () => {
         setSelectedEntity(null);
       });
+
+      this.wireCxBadgeClicks();
     });
   }
 
@@ -371,6 +377,35 @@ export class PanelManager {
     `;
   }
 
+  private wireCxBadgeClicks(): void {
+    this.panelEl.querySelectorAll("[data-cx-system]").forEach((el) => {
+      el.addEventListener("click", () => {
+        const cxSystemId = (el as HTMLElement).dataset["cxSystem"];
+        const fromSystemId = (el as HTMLElement).dataset["fromSystem"];
+        if (!cxSystemId || !fromSystemId) return;
+
+        const route = findRoute(fromSystemId, cxSystemId);
+        if (!route) return;
+
+        setActiveRoute(route);
+        setSelectedEntity(null);
+
+        // Exit system view if active, then frame the route
+        if (getViewLevel() === "system") {
+          setFocusedSystem(null);
+          setViewLevel("galaxy");
+          setTimeout(() => {
+            this.renderer?.frameRoute(route.systemIds);
+          }, 850);
+        } else {
+          setTimeout(() => {
+            this.renderer?.frameRoute(route.systemIds);
+          }, 150);
+        }
+      });
+    });
+  }
+
   private navigateToSystem(targetId: string): void {
     const currentView = getViewLevel();
 
@@ -460,7 +495,7 @@ function renderCxDistanceSection(systemId: string): string {
     const codeText = entry.viaGateway ? `${esc(entry.label)} \u2B21` : esc(entry.label);
 
     return `
-      <span class="${classes.join(" ")}">
+      <span class="${classes.join(" ")}" data-cx-system="${esc(entry.systemId)}" data-from-system="${esc(systemId)}">
         <span class="panel-cx-code">${codeText}</span>
         <span class="panel-cx-jumps">${entry.jumps}</span>
       </span>

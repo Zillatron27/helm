@@ -202,6 +202,7 @@ export interface GatewayEndpoint {
 export interface CxDistanceEntry {
   code: string;        // ComexCode, e.g. "AI1"
   label: string;       // NaturalId, e.g. "ANT", "MOR"
+  systemId: string;    // CX system UUID for routing
   currency: string;    // CurrencyCode, e.g. "AIC"
   jumps: number;       // jump count, -1 if unreachable
   viaGateway: boolean; // true if shortest path crosses a gateway edge

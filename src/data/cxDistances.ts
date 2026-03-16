@@ -5,7 +5,7 @@ import { getAllCxStations, getNeighbours, getGalaxyGatewayConnections } from "./
 const bfsResults = new Map<string, { startId: string; distances: Map<string, number>; parents: Map<string, string> }>();
 
 // CX metadata for building entries
-const cxMeta = new Map<string, { code: string; label: string; currency: string }>();
+const cxMeta = new Map<string, { code: string; label: string; systemId: string; currency: string }>();
 
 // Gateway edge set for path checking (sorted pair keys "a:b")
 let gatewayEdges: Set<string> | null = null;
@@ -61,7 +61,7 @@ export function computeCxDistances(): void {
 
   // BFS from each CX station
   for (const cx of getAllCxStations()) {
-    cxMeta.set(cx.ComexCode, { code: cx.ComexCode, label: cx.NaturalId, currency: cx.CurrencyCode });
+    cxMeta.set(cx.ComexCode, { code: cx.ComexCode, label: cx.NaturalId, systemId: cx.SystemId, currency: cx.CurrencyCode });
     bfsResults.set(cx.ComexCode, bfsFromSystem(cx.SystemId));
   }
 }
@@ -74,7 +74,7 @@ export function getCxDistances(systemId: string): CxDistanceEntry[] {
     const jumps = result.distances.get(systemId) ?? -1;
     const viaGateway = jumps > 0 ? pathUsesGateway(result.startId, systemId, result.parents) : false;
 
-    entries.push({ code: meta.code, label: meta.label, currency: meta.currency, jumps, viaGateway });
+    entries.push({ code: meta.code, label: meta.label, systemId: meta.systemId, currency: meta.currency, jumps, viaGateway });
   }
 
   // Sort by jumps ascending (unreachable last)
