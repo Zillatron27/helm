@@ -296,14 +296,16 @@ export class ResourcePicker {
     this.collapse();
     this.inputEl.blur();
 
-    // Show spinner while filter applies, then restore icon
+    // Show spinner while filter applies, then restore icon.
+    // Double-rAF ensures the browser paints the spinner before heavy work runs.
     this.showButtonSpinner();
-    // Defer filter application to next frame so spinner renders first
     requestAnimationFrame(() => {
-      setResourceFilter(material.MaterialId);
-      this.showBadge(material.Ticker);
-      this.restoreButtonIcon();
-      this.btnEl.classList.add("toolbar-btn-resource-on");
+      requestAnimationFrame(() => {
+        setResourceFilter(material.MaterialId);
+        this.showBadge(material.Ticker);
+        this.restoreButtonIcon();
+        this.btnEl.classList.add("toolbar-btn-resource-on");
+      });
     });
   }
 
