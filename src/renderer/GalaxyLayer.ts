@@ -11,9 +11,10 @@ import { isSettledSystem } from "../data/siteCounts.js";
 import { StarParticles } from "./StarParticles.js";
 import { TweenManager } from "./Tween.js";
 
-/** Yield to the browser's event loop so it can paint a frame. */
+/** Yield to the browser so it can paint a frame. Uses rAF to guarantee
+ *  the yield aligns with the paint cycle (setTimeout doesn't guarantee paint). */
 function yieldToMain(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
 }
 
 const STAR_RADIUS = 7;
@@ -1243,6 +1244,9 @@ export class GalaxyLayer {
    * browser can paint frames (spinner stays animated during processing).
    */
   async setResourceFilterAsync(materialId: string | null, matches: Array<{ systemId: string; bestFactor: number }> | null): Promise<void> {
+    // Yield immediately so the spinner DOM has a chance to paint
+    await yieldToMain();
+
     // Clear previous indicators
     this.resourceIndicators.removeChildren();
 
@@ -1258,8 +1262,10 @@ export class GalaxyLayer {
       matchingIds.add(m.systemId);
     }
 
+    await yieldToMain();
+
     // Build concentration dots in batches
-    const DOT_BATCH = 40;
+    const DOT_BATCH = 30;
     for (let i = 0; i < matches.length; i++) {
       const m = matches[i]!;
       const system = this.systemLookup.get(m.systemId);
@@ -1282,7 +1288,7 @@ export class GalaxyLayer {
 
     await yieldToMain();
 
-    // Apply highlight filter with yields between star/glow/label passes
+    // Apply highlight filter with yields between passes
     this.highlightedSystems = matchingIds;
     if (this.isDimmedForSystemView) return;
 
@@ -1306,8 +1312,115 @@ export class GalaxyLayer {
 
     await yieldToMain();
 
-    // Redraw connections with per-line highlight alpha (single batch, can't easily chunk)
-    this.redrawWithHighlight();
+    // Redraw connections with per-line highlight — classify in batches, draw at end
+    await this.redrawWithHighlightAsync(matchingIds);
+  }
+
+  /** Chunked version of redrawWithHighlight that yields during classification. */
+  private async redrawWithHighlightAsync(hl: Set<string>): Promise<void> {
+    const theme = getTheme();
+    const scale = this.currentViewportScale;
+    const width = scaledWidth(LINE_BASE, LINE_MIN, LINE_MAX, scale);
+
+    const brightLines: Array<[number, number, number, number]> = [];
+    const dimLines: Array<[number, number, number, number]> = [];
+
+    // Classify connections in batches
+    const CONN_BATCH = 200;
+    for (let i = 0; i < this.connections.length; i++) {
+      const conn = this.connections[i]!;
+      const from = this.systemLookup.get(conn.fromId);
+      const to = this.systemLookup.get(conn.toId);
+      if (!from || !to) continue;
+
+      if (hl.has(conn.fromId) && hl.has(conn.toId)) {
+        brightLines.push([from.worldX, from.worldY, to.worldX, to.worldY]);
+      } else {
+        dimLines.push([from.worldX, from.worldY, to.worldX, to.worldY]);
+      }
+
+      if ((i + 1) % CONN_BATCH === 0) {
+        await yieldToMain();
+      }
+    }
+
+    await yieldToMain();
+
+    // Draw dim connections
+    this.baseConnections.clear();
+    if (dimLines.length > 0) {
+      for (const [x1, y1, x2, y2] of dimLines) {
+        this.baseConnections.moveTo(x1, y1);
+        this.baseConnections.lineTo(x2, y2);
+      }
+      this.baseConnections.stroke({
+        width,
+        color: theme.jumpLine,
+        alpha: theme.jumpLineAlpha * DIM_HIGHLIGHT_ALPHA,
+      });
+    }
+
+    await yieldToMain();
+
+    // Draw bright connections
+    if (brightLines.length > 0) {
+      for (const [x1, y1, x2, y2] of brightLines) {
+        this.baseConnections.moveTo(x1, y1);
+        this.baseConnections.lineTo(x2, y2);
+      }
+      this.baseConnections.stroke({ width, color: theme.jumpLine, alpha: theme.jumpLineAlpha });
+    }
+
+    this.lastConnectionScale = scale;
+
+    await yieldToMain();
+
+    // Gateway arcs — classify and draw
+    const gwConns = getGalaxyGatewayConnections();
+    const gwWidth = scaledWidth(GATEWAY_ARC_BASE, GATEWAY_ARC_MIN, GATEWAY_ARC_MAX, scale);
+
+    this.gatewayArcs.clear();
+    const brightArcs: Array<() => void> = [];
+    const dimArcs: Array<() => void> = [];
+
+    for (const gw of gwConns) {
+      const from = this.systemLookup.get(gw.fromSystemId);
+      const to = this.systemLookup.get(gw.toSystemId);
+      if (!from || !to) continue;
+
+      const midX = (from.worldX + to.worldX) / 2;
+      const midY = (from.worldY + to.worldY) / 2;
+      const dx = to.worldX - from.worldX;
+      const dy = to.worldY - from.worldY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const arcHeight = Math.min(dist * GATEWAY_ARC_HEIGHT_FACTOR, GATEWAY_ARC_HEIGHT_MAX);
+
+      const drawArc = () => {
+        this.gatewayArcs.moveTo(from.worldX, from.worldY);
+        this.gatewayArcs.quadraticCurveTo(midX, midY - arcHeight, to.worldX, to.worldY);
+      };
+
+      if (hl.has(gw.fromSystemId) && hl.has(gw.toSystemId)) {
+        brightArcs.push(drawArc);
+      } else {
+        dimArcs.push(drawArc);
+      }
+    }
+
+    if (dimArcs.length > 0) {
+      for (const draw of dimArcs) draw();
+      this.gatewayArcs.stroke({
+        width: gwWidth,
+        color: GATEWAY_COLOUR,
+        alpha: GATEWAY_ARC_ALPHA * DIM_HIGHLIGHT_ALPHA,
+      });
+    }
+    if (brightArcs.length > 0) {
+      for (const draw of brightArcs) draw();
+      this.gatewayArcs.stroke({ width: gwWidth, color: GATEWAY_COLOUR, alpha: GATEWAY_ARC_ALPHA });
+    }
+
+    this.lastGatewayArcScale = scale;
   }
 
   /** Pulse CX diamond markers like station beacons. */
