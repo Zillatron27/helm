@@ -1421,6 +1421,11 @@ export class GalaxyLayer {
     }
 
     this.lastGatewayArcScale = scale;
+
+    // Two yields: first lets Pixi's ticker render the changes,
+    // second ensures the browser has painted the result to screen
+    await yieldToMain();
+    await yieldToMain();
   }
 
   /** Pulse CX diamond markers like station beacons. */
