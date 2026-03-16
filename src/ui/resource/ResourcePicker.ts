@@ -296,15 +296,20 @@ export class ResourcePicker {
     this.collapse();
     this.inputEl.blur();
 
-    // Show spinner while filter applies, then restore icon.
-    // Double-rAF ensures the browser paints the spinner before heavy work runs.
+    // Show spinner while filter applies.
+    // Double-rAF ensures the spinner is painted before the heavy sync work.
+    // Restore icon in a separate rAF after the work completes so the spinner
+    // stays visible throughout the blocking computation.
     this.showButtonSpinner();
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         setResourceFilter(material.MaterialId);
         this.showBadge(material.Ticker);
-        this.restoreButtonIcon();
-        this.btnEl.classList.add("toolbar-btn-resource-on");
+        // Defer icon restore — let the browser paint the filter result first
+        requestAnimationFrame(() => {
+          this.restoreButtonIcon();
+          this.btnEl.classList.add("toolbar-btn-resource-on");
+        });
       });
     });
   }
