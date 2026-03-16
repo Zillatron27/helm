@@ -16,6 +16,7 @@ import {
   getCxForSystem,
   getMaterialTicker,
 } from "../../data/cache.js";
+import { getCxDistances } from "../../data/cxDistances.js";
 import type { MapRenderer } from "../../renderer/MapRenderer.js";
 
 export class PanelManager {
@@ -93,6 +94,7 @@ export class PanelManager {
       </div>
       <div class="panel-body">
         ${this.renderCxSection(system.id)}
+        ${renderCxDistanceSection(system.id)}
         ${this.renderPlanetsSection(planets)}
         ${this.renderConnectionsSection(system)}
         ${this.renderZoomButton(system)}
@@ -244,6 +246,7 @@ export class PanelManager {
         <button class="panel-close" aria-label="Close panel">&times;</button>
       </div>
       <div class="panel-body">
+        ${renderCxDistanceSection(planet.systemId)}
         ${this.renderEnvironmentSection(planet)}
         ${this.renderResourcesSection(planet)}
         ${this.renderInfrastructureSection(planet)}
@@ -442,4 +445,34 @@ function tempClass(temp: number): string {
   if (temp < -25) return "panel-row-value-negative";
   if (temp > 75) return "panel-row-value-negative";
   return "panel-row-value-positive";
+}
+
+function renderCxDistanceSection(systemId: string): string {
+  const entries = getCxDistances(systemId);
+  if (entries.length === 0) return "";
+
+  const badges = entries.map((entry, i) => {
+    if (entry.jumps === -1) return "";
+    const classes = ["panel-cx-badge"];
+    if (i === 0) classes.push("panel-cx-nearest");
+    if (entry.viaGateway) classes.push("panel-cx-gateway");
+
+    const codeText = entry.viaGateway ? `${esc(entry.code)} \u2B21` : esc(entry.code);
+
+    return `
+      <span class="${classes.join(" ")}">
+        <span class="panel-cx-code">${codeText}</span>
+        <span class="panel-cx-jumps">${entry.jumps}</span>
+      </span>
+    `;
+  }).filter(Boolean).join("");
+
+  if (!badges) return "";
+
+  return `
+    <div class="panel-section panel-cx-distances">
+      <h3 class="panel-section-title">CX Distance</h3>
+      <div class="panel-cx-row">${badges}</div>
+    </div>
+  `;
 }

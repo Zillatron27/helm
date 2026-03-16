@@ -27,6 +27,9 @@ export {
 // Pathfinding
 export { findRoute } from "./data/pathfinding.js";
 
+// CX Distances
+export { getCxDistances } from "./data/cxDistances.js";
+
 // Search
 export { search, getSystemUuidByNaturalId } from "./data/searchIndex.js";
 
@@ -86,4 +89,5 @@ export type {
   SpectralType,
   ViewLevel,
   SelectedEntity,
+  CxDistanceEntry,
 } from "./types/index.js";

@@ -198,6 +198,14 @@ export interface GatewayEndpoint {
   name: string;
 }
 
+// CX distance precomputed result
+export interface CxDistanceEntry {
+  code: string;        // ComexCode, e.g. "AI1"
+  currency: string;    // CurrencyCode, e.g. "AIC"
+  jumps: number;       // jump count, -1 if unreachable
+  viaGateway: boolean; // true if shortest path crosses a gateway edge
+}
+
 // UI state types
 
 export type ViewLevel = "galaxy" | "system";

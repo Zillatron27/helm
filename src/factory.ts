@@ -3,6 +3,7 @@ import type { Viewport } from "pixi-viewport";
 import { loadSystemData, loadCxStations, loadMaterials, getSystems } from "./data/cache.js";
 import { fetchAllPlanetNames } from "./data/fio.js";
 import { buildSearchIndex } from "./data/searchIndex.js";
+import { computeCxDistances } from "./data/cxDistances.js";
 import { MapRenderer } from "./renderer/MapRenderer.js";
 import { PanelManager } from "./ui/panels/PanelManager.js";
 import { initTheme } from "./ui/theme.js";
@@ -76,6 +77,7 @@ export async function createMap(container: HTMLElement): Promise<HelmInstance> {
   ]);
 
   buildSearchIndex(getSystems(), planetSummaries);
+  computeCxDistances();
 
   const renderer = new MapRenderer();
   await renderer.init(container);
