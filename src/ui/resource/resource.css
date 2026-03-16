@@ -138,6 +138,27 @@
   color: #00ccaa;
 }
 
+/* Resource filter panel — planet rows with factor bars */
+.panel-resource-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 12px;
+}
+
+.panel-resource-filter-row .panel-planet-link {
+  font-weight: 600;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+/* Resource badge in panel header */
+.panel-badge-resource {
+  background: rgba(0, 204, 170, 0.15);
+  color: #00ccaa;
+}
+
 /* Resource highlight in planet panel */
 .panel-resource-highlight {
   border-left: 3px solid #00ccaa;

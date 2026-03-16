@@ -17,7 +17,9 @@ import {
   loadPlanetsForSystem,
   getCxForSystem,
   getMaterialTicker,
+  getMaterialByTicker,
 } from "../../data/cache.js";
+import { getPlanetsWithResource } from "../../data/resourceIndex.js";
 import { getCxDistances } from "../../data/cxDistances.js";
 import { findRoute } from "../../data/pathfinding.js";
 import { getPlanetBaseCount } from "../../data/siteCounts.js";
@@ -59,21 +61,25 @@ export class PanelManager {
     if (entity.type === "system") {
       const system = getSystemById(entity.id);
       if (system) {
-        const planets = getPlanetsForSystem(system.naturalId);
-        this.showSystemPanel(system, planets);
+        const resourceFilterId = getResourceFilter();
+        if (resourceFilterId) {
+          this.showResourceFilterPanel(system, resourceFilterId);
+        } else {
+          const planets = getPlanetsForSystem(system.naturalId);
+          this.showSystemPanel(system, planets);
 
-        // If planets not cached yet, fetch and update
-        if (!planets) {
-          loadPlanetsForSystem(system.naturalId).then((loaded) => {
-            // Only update if still viewing this system
-            const current = getSelectedEntity();
-            if (
-              current?.type === "system" &&
-              current.id === entity.id
-            ) {
-              this.showSystemPanel(system, loaded);
-            }
-          });
+          // If planets not cached yet, fetch and update
+          if (!planets) {
+            loadPlanetsForSystem(system.naturalId).then((loaded) => {
+              const current = getSelectedEntity();
+              if (
+                current?.type === "system" &&
+                current.id === entity.id
+              ) {
+                this.showSystemPanel(system, loaded);
+              }
+            });
+          }
         }
       }
     } else if (entity.type === "planet") {
@@ -144,6 +150,95 @@ export class PanelManager {
         });
       });
     });
+  }
+
+  private showResourceFilterPanel(system: StarSystem, materialId: string): void {
+    const ticker = getMaterialTicker(materialId);
+    const material = getMaterialByTicker(ticker);
+    const materialName = material?.Name ?? ticker;
+
+    // Find matching planets in this system from the resource index
+    const allMatches = getPlanetsWithResource(materialId);
+    const systemMatches = allMatches
+      .filter((m) => m.systemId === system.id)
+      .sort((a, b) => b.factor - a.factor);
+
+    // Try to resolve planet names from cache
+    const cachedPlanets = getPlanetsForSystem(system.naturalId);
+
+    const planetRows = systemMatches.map((match) => {
+      const cached = cachedPlanets?.find((p) => p.naturalId === match.planetNaturalId);
+      const name = cached?.name || match.planetNaturalId;
+      const planetId = cached?.id || match.planetNaturalId;
+      const price = getNearestCxPrice(ticker, system.id);
+      const priceText = price && price.ask !== null
+        ? `<span class="panel-resource-price">${Math.round(price.ask)} ${esc(price.currency)}</span>`
+        : "";
+      return `
+        <div class="panel-resource-filter-row">
+          <a class="panel-planet-link" data-planet-id="${esc(planetId)}" data-planet-system="${esc(system.id)}">${esc(name)}</a>
+          <span class="panel-resource-type">${esc(formatResourceType(match.resourceType))}</span>
+          <div class="panel-resource-bar">
+            <div class="panel-resource-bar-fill" style="width: ${Math.round(match.factor * 100)}%"></div>
+          </div>
+          ${priceText}
+        </div>
+      `;
+    }).join("");
+
+    const noMatches = systemMatches.length === 0
+      ? `<div class="panel-loading">No ${esc(ticker)} in this system</div>`
+      : "";
+
+    const html = `
+      <div class="panel-header">
+        <h2 class="panel-title">${esc(system.name)}</h2>
+        <div class="panel-subtitle">
+          ${esc(system.naturalId)}
+          <span class="panel-badge panel-badge-resource">${esc(ticker)}</span>
+        </div>
+        <button class="panel-close" aria-label="Close panel">&times;</button>
+      </div>
+      <div class="panel-body">
+        <div class="panel-section">
+          <h3 class="panel-section-title">${esc(materialName)} (${systemMatches.length})</h3>
+          ${noMatches}
+          ${planetRows}
+        </div>
+        ${renderCxDistanceSection(system.id)}
+      </div>
+    `;
+
+    this.setContent(html, () => {
+      this.open();
+
+      this.panelEl.querySelector(".panel-close")?.addEventListener("click", () => {
+        setSelectedEntity(null);
+      });
+
+      this.wireCxBadgeClicks();
+
+      // Wire planet links — zoom to system view and select
+      this.panelEl.querySelectorAll("[data-planet-id]").forEach((el) => {
+        el.addEventListener("click", (e) => {
+          e.preventDefault();
+          const planetId = (el as HTMLElement).dataset["planetId"];
+          const planetSystemId = (el as HTMLElement).dataset["planetSystem"];
+          if (!planetId || !planetSystemId) return;
+          this.renderer?.panToPlanet(planetSystemId, planetId);
+        });
+      });
+    });
+
+    // If planets aren't cached, fetch and re-render to get proper names
+    if (!cachedPlanets) {
+      loadPlanetsForSystem(system.naturalId).then(() => {
+        const current = getSelectedEntity();
+        if (current?.type === "system" && current.id === system.id && getResourceFilter() === materialId) {
+          this.showResourceFilterPanel(system, materialId);
+        }
+      });
+    }
   }
 
   private renderCxSection(systemId: string): string {
