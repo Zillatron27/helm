@@ -444,6 +444,7 @@ export class PanelManager {
   hide(): void {
     this.panelEl.classList.remove("panel-open");
     this.isOpen = false;
+    setActiveRoute(null);
   }
 
   isVisible(): boolean {
