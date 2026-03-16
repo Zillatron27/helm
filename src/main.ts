@@ -63,6 +63,7 @@ async function boot(): Promise<void> {
 
     // Resource filter picker row — right after search
     const resourcePicker = new ResourcePicker();
+    resourcePicker.setFilterCallback((materialId) => renderer.setResourceFilterAsync(materialId));
     toolbar.appendChild(resourcePicker.getElement());
 
     toolbar.appendChild(routePanel.getElement());
@@ -117,8 +118,13 @@ async function boot(): Promise<void> {
       settledBtn.classList.toggle("toolbar-btn-settled-on", stVisible);
       settledBtn.classList.toggle("toolbar-btn-settled-off", !stVisible);
 
-      // Resource filter
-      renderer.setResourceFilter(getResourceFilter());
+      // Resource filter — sync path handles clearing only.
+      // Setting a filter goes through the async path (ResourcePicker.setFilterCallback)
+      // to yield between chunks so the spinner stays animated.
+      const filterMat = getResourceFilter();
+      if (!filterMat) {
+        renderer.setResourceFilter(null);
+      }
       resourcePicker.syncState();
     }
     onStateChange(syncToggles);

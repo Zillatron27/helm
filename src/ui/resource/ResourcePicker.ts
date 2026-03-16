@@ -27,6 +27,7 @@ export class ResourcePicker {
   private activeIndex = -1;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private expanded = false;
+  private applyFilterAsync: ((materialId: string | null) => Promise<void>) | null = null;
 
   constructor() {
     // Toolbar row: [expand panel] [badge area] [button]
@@ -88,6 +89,11 @@ export class ResourcePicker {
 
   getElement(): HTMLElement {
     return this.rowEl;
+  }
+
+  /** Wire the async filter callback (called from main.ts after renderer is available). */
+  setFilterCallback(fn: (materialId: string | null) => Promise<void>): void {
+    this.applyFilterAsync = fn;
   }
 
   /** Toggle picker open/closed, or clear filter if active and picker closed. */
@@ -296,21 +302,36 @@ export class ResourcePicker {
     this.collapse();
     this.inputEl.blur();
 
-    // CSS pulsing glow on button while filter computes.
-    // CSS animations run on the compositor thread, so the pulse continues
-    // even while the main thread is blocked by heavy filter work.
-    this.btnEl.classList.add("toolbar-btn-resource-applying");
+    // Show spinner — the async filter yields between chunks so the spinner
+    // stays animated throughout the multi-second computation.
+    this.showButtonSpinner();
 
-    // Defer heavy work one frame so the animation class renders first
-    requestAnimationFrame(() => {
-      setResourceFilter(material.MaterialId);
-      this.showBadge(material.Ticker);
-      // Wait for Pixi to render the filter, then restore button state
-      requestAnimationFrame(() => {
-        this.btnEl.classList.remove("toolbar-btn-resource-applying");
+    // Set state first (lightweight — triggers panel update, badge)
+    setResourceFilter(material.MaterialId);
+    this.showBadge(material.Ticker);
+
+    // Apply the heavy rendering work asynchronously (chunked with yields)
+    if (this.applyFilterAsync) {
+      this.applyFilterAsync(material.MaterialId).then(() => {
+        this.restoreButtonIcon();
         this.btnEl.classList.add("toolbar-btn-resource-on");
       });
-    });
+    } else {
+      // Fallback: no async callback wired, restore immediately
+      this.restoreButtonIcon();
+      this.btnEl.classList.add("toolbar-btn-resource-on");
+    }
+  }
+
+  private showButtonSpinner(): void {
+    this.btnEl.innerHTML = "";
+    const miniLoader = createMiniLoader(getTheme());
+    miniLoader.style.pointerEvents = "none";
+    this.btnEl.appendChild(miniLoader);
+  }
+
+  private restoreButtonIcon(): void {
+    this.btnEl.innerHTML = FILTER_ICON_SVG;
   }
 
   private showBadge(ticker: string): void {

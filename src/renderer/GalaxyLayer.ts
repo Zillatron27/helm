@@ -11,6 +11,11 @@ import { isSettledSystem } from "../data/siteCounts.js";
 import { StarParticles } from "./StarParticles.js";
 import { TweenManager } from "./Tween.js";
 
+/** Yield to the browser's event loop so it can paint a frame. */
+function yieldToMain(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 const STAR_RADIUS = 7;
 const HIT_RADIUS = 24;
 const DOUBLE_CLICK_MS = 300;
@@ -1231,6 +1236,78 @@ export class GalaxyLayer {
 
     this.resourceIndicators.visible = true;
     this.setHighlightedSystems(matchingIds);
+  }
+
+  /**
+   * Async version of setResourceFilter that yields between chunks so the
+   * browser can paint frames (spinner stays animated during processing).
+   */
+  async setResourceFilterAsync(materialId: string | null, matches: Array<{ systemId: string; bestFactor: number }> | null): Promise<void> {
+    // Clear previous indicators
+    this.resourceIndicators.removeChildren();
+
+    if (!materialId || !matches || matches.length === 0) {
+      this.resourceIndicators.visible = false;
+      this.setHighlightedSystems(null);
+      return;
+    }
+
+    // Build highlight set
+    const matchingIds = new Set<string>();
+    for (const m of matches) {
+      matchingIds.add(m.systemId);
+    }
+
+    // Build concentration dots in batches
+    const DOT_BATCH = 40;
+    for (let i = 0; i < matches.length; i++) {
+      const m = matches[i]!;
+      const system = this.systemLookup.get(m.systemId);
+      if (!system) continue;
+
+      const radius = RESOURCE_DOT_MIN_RADIUS + m.bestFactor * (RESOURCE_DOT_MAX_RADIUS - RESOURCE_DOT_MIN_RADIUS);
+      const dot = new Graphics();
+      dot.circle(0, 0, radius);
+      dot.fill({ color: RESOURCE_COLOUR, alpha: RESOURCE_DOT_ALPHA });
+      dot.x = system.worldX;
+      dot.y = system.worldY;
+      this.resourceIndicators.addChild(dot);
+
+      if ((i + 1) % DOT_BATCH === 0) {
+        await yieldToMain();
+      }
+    }
+
+    this.resourceIndicators.visible = true;
+
+    await yieldToMain();
+
+    // Apply highlight filter with yields between star/glow/label passes
+    this.highlightedSystems = matchingIds;
+    if (this.isDimmedForSystemView) return;
+
+    this.twinkleActive = false;
+
+    for (const [id, star] of this.starGraphics) {
+      star.alpha = matchingIds.has(id) ? 1 : DIM_HIGHLIGHT_ALPHA;
+    }
+
+    await yieldToMain();
+
+    for (const [id, glow] of this.glowGraphics) {
+      glow.alpha = matchingIds.has(id) ? GLOW_ALPHA : GLOW_ALPHA * DIM_HIGHLIGHT_ALPHA;
+    }
+
+    await yieldToMain();
+
+    for (const [id, label] of this.ambientLabelMap) {
+      label.alpha = matchingIds.has(id) ? 1 : DIM_HIGHLIGHT_ALPHA;
+    }
+
+    await yieldToMain();
+
+    // Redraw connections with per-line highlight alpha (single batch, can't easily chunk)
+    this.redrawWithHighlight();
   }
 
   /** Pulse CX diamond markers like station beacons. */

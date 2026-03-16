@@ -124,19 +124,6 @@
   opacity: 1;
 }
 
-/* Applying state — pulsing glow while filter computes (compositor-driven) */
-.toolbar-btn-resource-applying {
-  border-color: #00ccaa !important;
-  color: #00ccaa !important;
-  animation: helm-btn-pulse 0.8s ease-in-out infinite;
-  pointer-events: none;
-}
-
-@keyframes helm-btn-pulse {
-  0%, 100% { box-shadow: 0 0 0 2px rgba(0, 204, 170, 0.6); }
-  50% { box-shadow: 0 0 10px 3px rgba(0, 204, 170, 0.3); }
-}
-
 /* Disabled state for toolbar button */
 .toolbar-btn-resource-disabled {
   opacity: 0.3;

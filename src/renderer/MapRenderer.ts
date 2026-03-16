@@ -612,6 +612,12 @@ export class MapRenderer {
     this.systemLayer?.setResourceFilter(materialId);
   }
 
+  async setResourceFilterAsync(materialId: string | null): Promise<void> {
+    const matches = materialId ? getSystemsWithResource(materialId) : null;
+    await this.galaxy?.setResourceFilterAsync(materialId, matches);
+    this.systemLayer?.setResourceFilter(materialId);
+  }
+
   getViewport(): Viewport | null {
     return this.viewport;
   }
