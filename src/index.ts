@@ -17,6 +17,8 @@ export {
   getCxForSystem,
   getAllCxStations,
   getMaterialTicker,
+  getAllMaterials,
+  getMaterialByTicker,
   getNeighbours,
   getGalaxyGatewayConnections,
   getGatewaysForPlanet,
@@ -39,6 +41,15 @@ export { getNearestCxPrice, getPriceAtExchange } from "./data/exchangePrices.js"
 // Governor Data
 export { getGovernor } from "./data/settledPlanets.js";
 
+// Resource Index
+export {
+  isResourceIndexReady,
+  onResourceIndexReady,
+  getSystemsWithResource,
+  getPlanetsWithResource,
+  getExtractableResourceMaterialIds,
+} from "./data/resourceIndex.js";
+
 // Search
 export { search, getSystemUuidByNaturalId } from "./data/searchIndex.js";
 
@@ -60,6 +71,8 @@ export {
   getSettledVisible,
   setSettledVisible,
   offStateChange,
+  getResourceFilter,
+  setResourceFilter,
 } from "./ui/state.js";
 
 // Theme
@@ -104,4 +117,6 @@ export type {
   ExchangePrice,
   GovernorInfo,
   InfrastructureData,
+  ResourceMatch,
+  PlanetResourceMatch,
 } from "./types/index.js";

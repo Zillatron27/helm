@@ -3,11 +3,13 @@ import { createMap } from "./factory.js";
 import { SearchBar } from "./ui/search/SearchBar.js";
 import { RoutePanel } from "./ui/search/RoutePanel.js";
 import { SettingsPanel } from "./ui/SettingsPanel.js";
+import { ResourcePicker } from "./ui/resource/ResourcePicker.js";
 import { setupControls } from "./ui/controls.js";
-import { onStateChange, getGatewaysVisible, setGatewaysVisible, getSettledVisible, setSettledVisible } from "./ui/state.js";
+import { onStateChange, getGatewaysVisible, setGatewaysVisible, getSettledVisible, setSettledVisible, getResourceFilter } from "./ui/state.js";
 import { initTheme, getTheme } from "./ui/theme.js";
 import "./ui/search/search.css";
 import "./ui/settings.css";
+import "./ui/resource/resource.css";
 
 console.log(`Helm v${VERSION}`);
 
@@ -91,6 +93,10 @@ async function boot(): Promise<void> {
     settledRow.appendChild(settledBtn);
     toolbar.appendChild(settledRow);
 
+    // Resource filter picker row
+    const resourcePicker = new ResourcePicker();
+    toolbar.appendChild(resourcePicker.getElement());
+
     // Settings panel row
     const settingsPanel = new SettingsPanel();
     toolbar.appendChild(settingsPanel.getElement());
@@ -114,6 +120,10 @@ async function boot(): Promise<void> {
       renderer.setSettledVisible(stVisible);
       settledBtn.classList.toggle("toolbar-btn-settled-on", stVisible);
       settledBtn.classList.toggle("toolbar-btn-settled-off", !stVisible);
+
+      // Resource filter
+      renderer.setResourceFilter(getResourceFilter());
+      resourcePicker.syncState();
     }
     onStateChange(syncToggles);
     // Apply persisted state on initial load
@@ -121,7 +131,7 @@ async function boot(): Promise<void> {
 
     const viewport = renderer.getViewport();
     if (viewport) {
-      setupControls(viewport, panelManager, searchBar, renderer);
+      setupControls(viewport, panelManager, searchBar, renderer, resourcePicker);
     }
   } catch (err) {
     loading.textContent = "";

@@ -161,6 +161,14 @@ export async function fetchPlanetInfrastructure(planetNaturalId: string): Promis
   return response.json() as Promise<FioInfrastructurePlanet>;
 }
 
+export async function fetchAllPlanetsFull(): Promise<FioPlanet[]> {
+  const response = await fetch(`${FIO_BASE}/planet/allplanets/full`);
+  if (!response.ok) throw new Error(`FIO allplanets/full: ${response.status}`);
+  const data: unknown = await response.json();
+  if (!Array.isArray(data)) throw new Error("FIO allplanets/full returned invalid data");
+  return data as FioPlanet[];
+}
+
 export async function fetchPlanetSites(): Promise<FioPlanetSiteCount[]> {
   const response = await fetch(`${FIO_BASE}/planet/sites/all`);
 

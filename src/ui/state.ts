@@ -112,3 +112,16 @@ export function setSettledVisible(visible: boolean): void {
 export function offStateChange(listener: StateListener): void {
   listeners.delete(listener);
 }
+
+// Resource filter — persists until explicitly cleared
+let resourceFilter: string | null = null; // MaterialId
+
+export function getResourceFilter(): string | null {
+  return resourceFilter;
+}
+
+export function setResourceFilter(materialId: string | null): void {
+  if (materialId === resourceFilter) return;
+  resourceFilter = materialId;
+  notify();
+}

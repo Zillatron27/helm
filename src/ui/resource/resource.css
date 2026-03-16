@@ -1,0 +1,159 @@
+/* Resource filter expand panel */
+.toolbar-expand-resource.toolbar-expand-open {
+  padding: 0 12px;
+}
+
+/* Resource search input */
+.resource-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 14px;
+  padding: 10px 0;
+  min-width: 0;
+}
+
+.resource-input::placeholder {
+  color: var(--text-secondary);
+}
+
+/* Resource dropdown */
+.resource-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow-y: auto;
+  max-height: 320px;
+  display: none;
+  z-index: 62;
+}
+
+.resource-dropdown-open {
+  display: block;
+}
+
+/* Category group header */
+.resource-category {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  padding: 8px 12px 4px;
+}
+
+.resource-category:first-child {
+  padding-top: 6px;
+}
+
+/* Resource result item */
+.resource-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background 0.1s ease;
+  font-size: 13px;
+}
+
+.resource-item:hover,
+.resource-item-active {
+  background: var(--bg-tertiary);
+}
+
+.resource-item-ticker {
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 36px;
+}
+
+.resource-item-name {
+  color: var(--text-secondary);
+  flex: 1;
+  margin-left: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Active filter badge — pill below the toolbar button */
+.resource-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid #00ccaa;
+  border-radius: 12px;
+  padding: 2px 8px 2px 10px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: #00ccaa;
+  cursor: default;
+  margin-top: 4px;
+  white-space: nowrap;
+}
+
+.resource-badge-clear {
+  background: none;
+  border: none;
+  color: #00ccaa;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.15s ease;
+}
+
+.resource-badge-clear:hover {
+  opacity: 1;
+}
+
+/* Disabled state for toolbar button */
+.toolbar-btn-resource-disabled {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* Active state — resource filter colour */
+.toolbar-btn-resource-on {
+  border-color: #00ccaa;
+  color: #00ccaa;
+}
+
+.toolbar-btn-resource-on:hover {
+  border-color: #00ccaa;
+  color: #00ccaa;
+}
+
+/* Resource highlight in planet panel */
+.panel-resource-highlight {
+  border-left: 3px solid #00ccaa;
+  padding-left: 5px;
+  margin-left: -8px;
+  background: rgba(0, 204, 170, 0.05);
+}
+
+/* Scrollbar for resource dropdown */
+.resource-dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+.resource-dropdown::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+.resource-dropdown::-webkit-scrollbar-thumb {
+  background: var(--text-secondary);
+  border-radius: 3px;
+}

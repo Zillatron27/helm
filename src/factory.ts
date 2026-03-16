@@ -7,6 +7,7 @@ import { computeCxDistances } from "./data/cxDistances.js";
 import { loadSiteCounts } from "./data/siteCounts.js";
 import { loadExchangePrices } from "./data/exchangePrices.js";
 import { loadSettledPlanets } from "./data/settledPlanets.js";
+import { initResourceIndex } from "./data/resourceIndex.js";
 import { MapRenderer } from "./renderer/MapRenderer.js";
 import { PanelManager } from "./ui/panels/PanelManager.js";
 import { initTheme } from "./ui/theme.js";
@@ -100,6 +101,11 @@ export async function createMap(container: HTMLElement): Promise<HelmInstance> {
 
   const panelManager = new PanelManager();
   panelManager.init(renderer);
+
+  // Non-blocking: start background resource index build
+  initResourceIndex().catch((err) => {
+    console.warn("Resource index failed, resource filter will be unavailable:", err);
+  });
 
   return {
     renderer,

@@ -9,6 +9,7 @@ import {
   setFocusedSystem,
   setActiveRoute,
   onStateChange,
+  getResourceFilter,
 } from "../state.js";
 import {
   getSystemById,
@@ -359,6 +360,7 @@ export class PanelManager {
     }
 
     const sorted = [...planet.resources].sort((a, b) => b.Factor - a.Factor);
+    const activeFilter = getResourceFilter();
     const rows = sorted
       .map(
         (r) => {
@@ -367,8 +369,9 @@ export class PanelManager {
           const priceText = price && price.ask !== null
             ? `<span class="panel-resource-price">${Math.round(price.ask)} ${esc(price.currency)}</span>`
             : "";
+          const highlightClass = activeFilter === r.MaterialId ? " panel-resource-highlight" : "";
           return `
-          <div class="panel-resource">
+          <div class="panel-resource${highlightClass}">
             <span class="panel-resource-ticker">${esc(ticker)}</span>
             <span class="panel-resource-type">${esc(formatResourceType(r.ResourceType))}</span>
             <div class="panel-resource-bar">

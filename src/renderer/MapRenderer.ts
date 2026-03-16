@@ -14,6 +14,7 @@ import {
   getPlanetsForSystem,
   recolourCachedPlanets,
 } from "../data/cache.js";
+import { getSystemsWithResource } from "../data/resourceIndex.js";
 import { clearPlanetTextureCache } from "./PlanetTexture.js";
 import { BackgroundLayer } from "./BackgroundLayer.js";
 import { HexGridLayer } from "./HexGridLayer.js";
@@ -26,6 +27,7 @@ import {
   getSelectedEntity,
   getActiveRoute,
   getGatewaysVisible,
+  getResourceFilter,
   setSelectedEntity,
   setFocusedSystem,
   setViewLevel,
@@ -271,8 +273,11 @@ export class MapRenderer {
     // Re-apply gateway visibility
     this.galaxy.setGatewaysVisible(getGatewaysVisible());
 
-    // Re-apply empire highlight filter
-    if (this.savedHighlightedSystems) {
+    // Re-apply empire highlight filter or resource filter
+    const resourceFilterId = getResourceFilter();
+    if (resourceFilterId) {
+      this.setResourceFilter(resourceFilterId);
+    } else if (this.savedHighlightedSystems) {
       this.galaxy.setHighlightedSystems(this.savedHighlightedSystems);
     }
 
@@ -599,6 +604,12 @@ export class MapRenderer {
   setHighlightedSystems(ids: Set<string> | null): void {
     this.savedHighlightedSystems = ids;
     this.galaxy?.setHighlightedSystems(ids);
+  }
+
+  setResourceFilter(materialId: string | null): void {
+    const matches = materialId ? getSystemsWithResource(materialId) : null;
+    this.galaxy?.setResourceFilter(materialId, matches);
+    this.systemLayer?.setResourceFilter(materialId);
   }
 
   getViewport(): Viewport | null {

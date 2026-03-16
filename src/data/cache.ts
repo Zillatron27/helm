@@ -2,6 +2,7 @@ import type {
   FioSystem,
   FioPlanet,
   FioCxStation,
+  FioMaterial,
   StarSystem,
   JumpConnection,
   SpectralType,
@@ -54,6 +55,10 @@ const cxBySystem: Map<string, FioCxStation> = new Map();
 
 // Material ticker lookup: MaterialId → Ticker
 const materialTickers: Map<string, string> = new Map();
+
+// Full material list for resource picker
+let allMaterials: FioMaterial[] = [];
+const materialByTicker: Map<string, FioMaterial> = new Map();
 
 // Merged adjacency index (jump connections + gateway connections)
 const adjacency: Map<string, Set<string>> = new Map();
@@ -428,14 +433,24 @@ export function getAllCxStations(): FioCxStation[] {
 
 export async function loadMaterials(): Promise<void> {
   const materials = await fetchMaterials();
+  allMaterials = materials;
   for (const m of materials) {
     materialTickers.set(m.MaterialId, m.Ticker);
+    materialByTicker.set(m.Ticker, m);
   }
   console.log(`Loaded ${materials.length} material tickers`);
 }
 
 export function getMaterialTicker(materialId: string): string {
   return materialTickers.get(materialId) ?? materialId;
+}
+
+export function getAllMaterials(): FioMaterial[] {
+  return allMaterials;
+}
+
+export function getMaterialByTicker(ticker: string): FioMaterial | null {
+  return materialByTicker.get(ticker) ?? null;
 }
 
 export function getNeighbours(systemId: string): string[] {

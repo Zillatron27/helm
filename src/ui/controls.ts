@@ -12,6 +12,7 @@ import {
 import type { PanelManager } from "./panels/PanelManager.js";
 import type { SearchBar } from "./search/SearchBar.js";
 import type { MapRenderer } from "../renderer/MapRenderer.js";
+import type { ResourcePicker } from "./resource/ResourcePicker.js";
 
 const PAN_SPEED = 300; // pixels of visual movement per keypress
 const ZOOM_STEP = 0.15; // fraction per keypress
@@ -22,7 +23,8 @@ export function setupControls(
   viewport: Viewport,
   panelManager: PanelManager,
   searchBar: SearchBar,
-  renderer: MapRenderer
+  renderer: MapRenderer,
+  resourcePicker?: ResourcePicker
 ): void {
   handler = (e: KeyboardEvent) => {
     // Skip if user is typing in an input
@@ -89,6 +91,10 @@ export function setupControls(
       case "s":
         e.preventDefault();
         setSettledVisible(!getSettledVisible());
+        break;
+      case "r":
+        e.preventDefault();
+        resourcePicker?.toggle();
         break;
     }
   };

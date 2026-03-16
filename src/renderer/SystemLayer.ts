@@ -3,6 +3,7 @@ import type { StarSystem, Planet } from "../types/index.js";
 import { getTheme, getSpectralColour } from "../ui/theme.js";
 import { setSelectedEntity, getSelectedEntity, onStateChange } from "../ui/state.js";
 import { getGatewaysForPlanet, getSystemById } from "../data/cache.js";
+import { getPlanetsWithResource } from "../data/resourceIndex.js";
 import type { GatewayEndpoint } from "../types/index.js";
 import { generatePlanetTexture, generateStarTexture, getCloudTexture, getCloudTint } from "./PlanetTexture.js";
 
@@ -106,6 +107,10 @@ export class SystemLayer {
   private gatewayHoverLabel: Text | null = null;
   private selectionHalo: Graphics;
   private selectedPlanetId: string | null = null;
+
+  // Resource filter state
+  private resourceFilterMaterialId: string | null = null;
+  private planetContainers: Map<string, Container> = new Map(); // naturalId → planet container
 
   // Bridge API: click interceptor (set by MapRenderer)
   planetClickInterceptor: ((naturalId: string, screenX: number, screenY: number) => boolean) | null = null;
@@ -270,6 +275,7 @@ export class SystemLayer {
       this.planetPositions.set(planet.id, { x: px, y: py, radius: planet.displayRadius });
       // Also store by naturalId for search-based selection
       this.planetPositions.set(planet.naturalId, { x: px, y: py, radius: planet.displayRadius });
+      this.planetContainers.set(planet.naturalId, planetContainer);
       this.container.addChild(planetContainer);
 
       // Planet label
@@ -296,6 +302,9 @@ export class SystemLayer {
     // Selection halo — on top of everything
     this.container.addChild(this.selectionHalo);
     this.updateHalo();
+
+    // Apply resource filter dimming if active
+    this.applyResourceFilter();
 
     this.container.visible = true;
   }
@@ -464,10 +473,38 @@ export class SystemLayer {
     }
   }
 
+  setResourceFilter(materialId: string | null): void {
+    this.resourceFilterMaterialId = materialId;
+    this.applyResourceFilter();
+  }
+
+  private applyResourceFilter(): void {
+    const matId = this.resourceFilterMaterialId;
+    if (!matId) {
+      // Restore all planets to full alpha
+      for (const pc of this.planetContainers.values()) {
+        pc.alpha = 1;
+      }
+      return;
+    }
+
+    // Build set of planet naturalIds that have this resource
+    const matches = getPlanetsWithResource(matId);
+    const matchingPlanets = new Set<string>();
+    for (const m of matches) {
+      matchingPlanets.add(m.planetNaturalId);
+    }
+
+    for (const [naturalId, pc] of this.planetContainers) {
+      pc.alpha = matchingPlanets.has(naturalId) ? 1 : 0.2;
+    }
+  }
+
   private clear(): void {
     this.container.removeChildren();
     this.planetSprites.clear();
     this.planetPositions.clear();
+    this.planetContainers.clear();
     this.planetClouds = [];
     this.ambientParticles = [];
     this.particleGfx.clear();

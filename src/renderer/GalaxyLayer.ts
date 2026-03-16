@@ -106,6 +106,12 @@ const SYSTEM_HALO_ALPHA = 0.7;
 const SYSTEM_HALO_STROKE = 2.0;
 const SYSTEM_HALO_ARC_SPAN = Math.PI * 0.7;
 
+// Resource filter concentration indicators
+const RESOURCE_COLOUR = 0x00ccaa;
+const RESOURCE_DOT_MAX_RADIUS = 20;
+const RESOURCE_DOT_MIN_RADIUS = 4;
+const RESOURCE_DOT_ALPHA = 0.7;
+
 // Settled system ring indicators
 const SETTLED_COLOUR = 0xc4a35a;
 const SETTLED_RING_ALPHA = 0.2;
@@ -200,6 +206,9 @@ export class GalaxyLayer {
   private settledEntries: Array<{ sprite: Sprite; phase: number; radius: number; cx: number; cy: number }> = [];
   private settledVisible = false;
 
+  // Resource filter concentration indicators
+  private resourceIndicators: Container;
+
   // System selection halo
   private selectionHalo: Graphics;
 
@@ -268,6 +277,12 @@ export class GalaxyLayer {
 
     // Build settled indicators from site count data
     this.buildSettledIndicators(systems);
+
+    // Resource filter concentration indicators — above settled rings, below particles
+    this.resourceIndicators = new Container();
+    this.resourceIndicators.eventMode = "none";
+    this.resourceIndicators.visible = false;
+    this.container.addChild(this.resourceIndicators);
 
     // Hover particles — above glows, below labels and stars
     this.starParticles = new StarParticles();
@@ -759,6 +774,7 @@ export class GalaxyLayer {
       tw.to(this.gatewayIndicators, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
       tw.to(this.settledRingsStatic, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
       tw.to(this.settledRingsAnimated, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
+      tw.to(this.resourceIndicators, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
       // Fade out ambient labels then hide
       tw.to(this.ambientLabels, "alpha", 0, 0.3);
     } else {
@@ -770,6 +786,7 @@ export class GalaxyLayer {
       this.gatewayIndicators.alpha = SYSTEM_VIEW_LINES_ALPHA;
       this.settledRingsStatic.alpha = SYSTEM_VIEW_LINES_ALPHA;
       this.settledRingsAnimated.alpha = SYSTEM_VIEW_LINES_ALPHA;
+      this.resourceIndicators.alpha = SYSTEM_VIEW_LINES_ALPHA;
       this.ambientLabels.visible = false;
     }
 
@@ -795,6 +812,7 @@ export class GalaxyLayer {
 
     // Container-level elements restore to full unless highlight is active
     const containerAlpha = 1;
+    const resourceAlpha = this.resourceIndicators.visible ? containerAlpha : 0;
     if (tw) {
       tw.to(this.baseConnections, "alpha", containerAlpha, dur);
       tw.to(this.routeOverlay, "alpha", containerAlpha, dur);
@@ -806,6 +824,7 @@ export class GalaxyLayer {
       const settledAlpha = this.settledVisible ? containerAlpha : 0;
       tw.to(this.settledRingsStatic, "alpha", settledAlpha, dur);
       tw.to(this.settledRingsAnimated, "alpha", settledAlpha, dur);
+      tw.to(this.resourceIndicators, "alpha", resourceAlpha, dur);
     } else {
       this.baseConnections.alpha = containerAlpha;
       this.routeOverlay.alpha = containerAlpha;
@@ -815,6 +834,7 @@ export class GalaxyLayer {
       this.cxMarkers.alpha = containerAlpha;
       this.settledRingsStatic.alpha = this.settledVisible ? containerAlpha : 0;
       this.settledRingsAnimated.alpha = this.settledVisible ? containerAlpha : 0;
+      this.resourceIndicators.alpha = resourceAlpha;
     }
 
     // Per-star alpha: respect highlight filter when active
@@ -1173,6 +1193,44 @@ export class GalaxyLayer {
     }
 
     this.lastGatewayArcScale = scale;
+  }
+
+  /**
+   * Apply a resource filter — highlight matching systems, show concentration dots.
+   * Pass null to clear the filter.
+   */
+  setResourceFilter(materialId: string | null, matches: Array<{ systemId: string; bestFactor: number }> | null): void {
+    // Clear previous indicators
+    this.resourceIndicators.removeChildren();
+
+    if (!materialId || !matches || matches.length === 0) {
+      this.resourceIndicators.visible = false;
+      this.setHighlightedSystems(null);
+      return;
+    }
+
+    // Build highlight set from matching systems
+    const matchingIds = new Set<string>();
+    for (const m of matches) {
+      matchingIds.add(m.systemId);
+    }
+
+    // Build concentration dots
+    for (const m of matches) {
+      const system = this.systemLookup.get(m.systemId);
+      if (!system) continue;
+
+      const radius = RESOURCE_DOT_MIN_RADIUS + m.bestFactor * (RESOURCE_DOT_MAX_RADIUS - RESOURCE_DOT_MIN_RADIUS);
+      const dot = new Graphics();
+      dot.circle(0, 0, radius);
+      dot.fill({ color: RESOURCE_COLOUR, alpha: RESOURCE_DOT_ALPHA });
+      dot.x = system.worldX;
+      dot.y = system.worldY;
+      this.resourceIndicators.addChild(dot);
+    }
+
+    this.resourceIndicators.visible = true;
+    this.setHighlightedSystems(matchingIds);
   }
 
   /** Pulse CX diamond markers like station beacons. */

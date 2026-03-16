@@ -298,6 +298,21 @@ export interface InfrastructureData {
   projects: { ticker: string; name: string; level: number }[];
 }
 
+// Resource filter types
+
+export interface ResourceMatch {
+  systemId: string;
+  bestFactor: number;
+  planetCount: number;
+}
+
+export interface PlanetResourceMatch {
+  planetNaturalId: string;
+  systemId: string;
+  factor: number;
+  resourceType: string;
+}
+
 // UI state types
 
 export type ViewLevel = "galaxy" | "system";
