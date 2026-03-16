@@ -154,6 +154,7 @@ export class SearchBar {
         e.preventDefault();
         this.moveSelection(-1);
         break;
+      case "Tab":
       case "Enter":
         e.preventDefault();
         if (this.activeIndex >= 0 && this.activeIndex < this.results.length) {
