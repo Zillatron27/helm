@@ -68,9 +68,16 @@ async function fetchAndProcess(planetNaturalId: string): Promise<InfrastructureD
       unemployment: unemployFields[i] ?? 0,
     })).filter((t) => t.count > 0);
 
-    const projects = (raw.InfrastructureProjects ?? [])
-      .filter((p) => p.Level > 0)
-      .map((p) => ({ ticker: p.Ticker, name: p.Name, level: p.Level }));
+    // Deduplicate projects by ticker — keep highest level per ticker
+    const projectMap = new Map<string, { ticker: string; name: string; level: number }>();
+    for (const p of raw.InfrastructureProjects ?? []) {
+      if (p.Level <= 0) continue;
+      const existing = projectMap.get(p.Ticker);
+      if (!existing || p.Level > existing.level) {
+        projectMap.set(p.Ticker, { ticker: p.Ticker, name: p.Name, level: p.Level });
+      }
+    }
+    const projects = Array.from(projectMap.values());
 
     const data: InfrastructureData = { population, projects };
     cache.set(planetNaturalId, data);

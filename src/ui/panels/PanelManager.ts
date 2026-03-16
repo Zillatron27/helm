@@ -588,7 +588,7 @@ function renderBuildRequirementsSection(planet: Planet): string {
   return `
     <div class="panel-section panel-section-collapsible">
       <h3 class="panel-section-title panel-section-toggle" data-section="build">
-        Build Requirements
+        Core Module Requirements
         <span class="panel-section-arrow">\u25b8</span>
       </h3>
       <div class="panel-section-content" data-section-content="build">
