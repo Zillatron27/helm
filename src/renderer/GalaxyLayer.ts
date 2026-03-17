@@ -120,11 +120,11 @@ const RESOURCE_DOT_ALPHA = 0.7;
 
 // Settled system ring indicators
 const SETTLED_COLOUR = 0xc4a35a;
-const SETTLED_RING_ALPHA = 0.3;
+const SETTLED_RING_ALPHA = 0.345;
 const SETTLED_RING_STROKE = 1.0;
 const SETTLED_RING_RADIUS_MULT = 3.2;
 const SETTLED_GLOW_SIZE = 14;
-const SETTLED_GLOW_ALPHA = 0.75;
+const SETTLED_GLOW_ALPHA = 0.86;
 const SETTLED_ROTATION_PERIOD = 5.0;
 
 let glowTexture: Texture | null = null;

@@ -2,14 +2,14 @@ import { Container, Graphics, Text, TextStyle } from "pixi.js";
 import type { SectorHex } from "../types/index.js";
 import { getTheme } from "../ui/theme.js";
 
-const HEX_STROKE_ALPHA = 0.45;
+const HEX_STROKE_ALPHA = 0.38;
 
 // Base stroke width and clamp range for zoom-responsive scaling
 const HEX_BASE = 1.5;
 const HEX_MIN = 0.5;
 const HEX_MAX = 5.0;
 
-const LABEL_ALPHA = 0.09;
+const LABEL_ALPHA = 0.077;
 const LABEL_FONT_SIZE = 48;
 
 // Redraw threshold — skip if scale changed less than 20%
