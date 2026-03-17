@@ -225,6 +225,11 @@
   color: #c4a26b;
 }
 
+.search-result-type-cogc {
+  background: #1a1a2a;
+  color: #7799ff;
+}
+
 /* Route panel content */
 .route-panel-content {
   min-width: 0;

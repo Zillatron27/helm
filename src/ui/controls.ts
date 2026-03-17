@@ -8,6 +8,10 @@ import {
   setGatewaysVisible,
   getSettledVisible,
   setSettledVisible,
+  getResourceFilter,
+  setResourceFilter,
+  getCogcFilter,
+  setCogcFilter,
 } from "./state.js";
 import type { PanelManager } from "./panels/PanelManager.js";
 import type { SearchBar } from "./search/SearchBar.js";
@@ -47,15 +51,16 @@ export function setupControls(
         break;
       case "Escape":
         e.preventDefault();
-        if (panelManager.isVisible()) {
-          // Close panel first
+        if (getResourceFilter() || getCogcFilter()) {
+          // Clear any active filter first
+          setResourceFilter(null);
+          setCogcFilter(null);
+        } else if (panelManager.isVisible()) {
           setSelectedEntity(null);
         } else if (getViewLevel() === "system") {
-          // First escape: exit system view to neighbourhood
           setFocusedSystem(null);
           setViewLevel("galaxy");
         } else {
-          // Second escape: zoom to full galaxy fit
           renderer.zoomToGalaxyFit();
         }
         break;

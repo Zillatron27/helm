@@ -5,7 +5,11 @@ import {
   setFocusedSystem,
   setViewLevel,
   getViewLevel,
+  setCogcFilter,
+  getCogcFilter,
+  setResourceFilter,
 } from "../state.js";
+import { getSystemsWithCogcProgram } from "../../data/resourceIndex.js";
 import type { SearchEntry } from "../../types/index.js";
 import type { MapRenderer } from "../../renderer/MapRenderer.js";
 
@@ -16,12 +20,33 @@ const SEARCH_ICON_SVG = `<svg width="24" height="24" viewBox="0 0 24 24" fill="n
   <line x1="15.5" y1="15.5" x2="21" y2="21"/>
 </svg>`;
 
+const COGC_NAMES: Record<string, string> = {
+  ADVERTISING_AGRICULTURE: "Agriculture",
+  ADVERTISING_CHEMISTRY: "Chemistry",
+  ADVERTISING_CONSTRUCTION: "Construction",
+  ADVERTISING_ELECTRONICS: "Electronics",
+  ADVERTISING_FOOD_INDUSTRIES: "Food Industries",
+  ADVERTISING_FUEL_REFINING: "Fuel Refining",
+  ADVERTISING_MANUFACTURING: "Manufacturing",
+  ADVERTISING_METALLURGY: "Metallurgy",
+  ADVERTISING_RESOURCE_EXTRACTION: "Resource Extraction",
+  EDUCATION: "Education",
+  FAMILY_SUPPORT: "Family Support",
+  FESTIVITIES: "Festivities",
+  IMMIGRATION_PIONEER: "Immigration: Pioneer",
+  IMMIGRATION_SETTLER: "Immigration: Settler",
+  IMMIGRATION_TECHNICIAN: "Immigration: Technician",
+  IMMIGRATION_ENGINEER: "Immigration: Engineer",
+  IMMIGRATION_SCIENTIST: "Immigration: Scientist",
+};
+
 export class SearchBar {
   private rowEl: HTMLElement;
   private expandEl: HTMLElement;
   private btnEl: HTMLButtonElement;
   private inputEl: HTMLInputElement;
   private dropdownEl: HTMLElement;
+  private cogcBadgeEl: HTMLElement | null = null;
   private renderer: MapRenderer | null = null;
   private results: SearchEntry[] = [];
   private activeIndex = -1;
@@ -195,6 +220,8 @@ export class SearchBar {
         const typeClass =
           r.type === "system"
             ? "search-result-type-system"
+            : r.type === "cogc"
+            ? "search-result-type-cogc"
             : "search-result-type-planet";
         return `<div class="search-result${activeClass}" data-index="${i}">
           <span class="search-result-name">${esc(r.name || r.naturalId)}</span>
@@ -252,15 +279,61 @@ export class SearchBar {
       setViewLevel("galaxy");
     }
 
-    if (entry.type === "planet") {
-      // Wait for system view exit, then zoom into target system + planet
+    if (entry.type === "cogc") {
+      // COGC filter — highlight matching systems on galaxy view
+      const matchingSystems = getSystemsWithCogcProgram(entry.id);
+      setResourceFilter(null);
+      setCogcFilter(entry.id);
+      this.renderer?.setHighlightedSystems(matchingSystems.size > 0 ? matchingSystems : null);
+      const label = COGC_NAMES[entry.id] ?? entry.id.replace(/_/g, " ");
+      this.showCogcBadge(label);
+    } else if (entry.type === "planet") {
       setTimeout(() => {
         this.renderer?.panToPlanet(entry.systemId, entry.id);
       }, 100);
     } else {
-      // Navigate camera to system and select it
       setSelectedEntity({ type: "system", id: entry.systemId });
       this.renderer?.panToSystem(entry.systemId);
+    }
+  }
+
+  private showCogcBadge(label: string): void {
+    this.removeCogcBadge();
+
+    const badge = document.createElement("div");
+    badge.className = "resource-badge";
+    badge.textContent = `COGC: ${label}`;
+
+    const clearBtn = document.createElement("button");
+    clearBtn.className = "resource-badge-clear";
+    clearBtn.textContent = "\u00d7";
+    clearBtn.addEventListener("click", () => {
+      setCogcFilter(null);
+      this.removeCogcBadge();
+    });
+
+    badge.appendChild(clearBtn);
+    this.rowEl.insertBefore(badge, this.btnEl);
+    this.cogcBadgeEl = badge;
+  }
+
+  private removeCogcBadge(): void {
+    if (this.cogcBadgeEl) {
+      this.cogcBadgeEl.remove();
+      this.cogcBadgeEl = null;
+    }
+  }
+
+  /** Sync badge state with external filter changes. */
+  syncCogcState(): void {
+    const cogcCategory = getCogcFilter();
+    if (cogcCategory) {
+      if (!this.cogcBadgeEl) {
+        const label = COGC_NAMES[cogcCategory] ?? cogcCategory.replace(/_/g, " ");
+        this.showCogcBadge(label);
+      }
+    } else {
+      this.removeCogcBadge();
     }
   }
 }

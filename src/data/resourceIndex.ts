@@ -1,4 +1,4 @@
-import type { ResourceMatch, PlanetResourceMatch } from "../types/index.js";
+import type { ResourceMatch, PlanetResourceMatch, CogcMatch } from "../types/index.js";
 import { fetchAllPlanetsFull } from "./fio.js";
 
 // Precomputed index: MaterialId → systems containing that resource
@@ -9,6 +9,9 @@ const planetIndex: Map<string, PlanetResourceMatch[]> = new Map();
 
 // All material IDs that appear as extractable resources on planets
 const extractableMaterialIds: Set<string> = new Set();
+
+// COGC index: category → planets with that active program
+const cogcIndex: Map<string, CogcMatch[]> = new Map();
 
 let ready = false;
 const readyCallbacks: Array<() => void> = [];
@@ -70,6 +73,27 @@ export async function initResourceIndex(): Promise<void> {
     }
   }
 
+  // Build COGC index from COGCPrograms on each planet
+  const now = Date.now();
+  for (const planet of planets) {
+    const programs = planet.COGCPrograms;
+    if (!programs) continue;
+    for (const prog of programs) {
+      if (now >= prog.StartEpochMs && now <= prog.EndEpochMs) {
+        let list = cogcIndex.get(prog.ProgramType);
+        if (!list) {
+          list = [];
+          cogcIndex.set(prog.ProgramType, list);
+        }
+        list.push({
+          planetNaturalId: planet.PlanetNaturalId,
+          systemId: planet.SystemId,
+          endsAt: prog.EndEpochMs,
+        });
+      }
+    }
+  }
+
   // Flatten system accumulator into sorted arrays
   for (const [matId, sysMap] of systemAccum) {
     const matches: ResourceMatch[] = [];
@@ -99,4 +123,18 @@ export function getPlanetsWithResource(materialId: string): PlanetResourceMatch[
 
 export function getExtractableResourceMaterialIds(): Set<string> {
   return extractableMaterialIds;
+}
+
+export function getCogcProgramPlanets(category: string): CogcMatch[] {
+  return cogcIndex.get(category) ?? [];
+}
+
+export function getActiveCogcCategories(): string[] {
+  return Array.from(cogcIndex.keys());
+}
+
+export function getSystemsWithCogcProgram(category: string): Set<string> {
+  const matches = cogcIndex.get(category);
+  if (!matches) return new Set();
+  return new Set(matches.map((m) => m.systemId));
 }

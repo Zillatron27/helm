@@ -5,7 +5,7 @@ import { RoutePanel } from "./ui/search/RoutePanel.js";
 import { SettingsPanel } from "./ui/SettingsPanel.js";
 import { ResourcePicker } from "./ui/resource/ResourcePicker.js";
 import { setupControls } from "./ui/controls.js";
-import { onStateChange, getGatewaysVisible, setGatewaysVisible, getSettledVisible, setSettledVisible, getResourceFilter } from "./ui/state.js";
+import { onStateChange, getGatewaysVisible, setGatewaysVisible, getSettledVisible, setSettledVisible, getResourceFilter, getCogcFilter } from "./ui/state.js";
 import { initTheme, getTheme } from "./ui/theme.js";
 import { createLoader } from "./ui/loader/LoaderAnimation.js";
 import "./ui/search/search.css";
@@ -126,6 +126,16 @@ async function boot(): Promise<void> {
         renderer.setResourceFilter(null);
       }
       resourcePicker.syncState();
+
+      // COGC filter — sync badge and clear highlights when needed
+      const cogcCat = getCogcFilter();
+      if (!cogcCat) {
+        // Only clear highlights if no resource filter is active either
+        if (!filterMat) {
+          renderer.setHighlightedSystems(null);
+        }
+      }
+      searchBar.syncCogcState();
     }
     onStateChange(syncToggles);
     // Apply persisted state on initial load

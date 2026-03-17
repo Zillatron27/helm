@@ -79,6 +79,10 @@ export function search(query: string, limit = 10): SearchEntry[] {
   return [...exact, ...namePrefix, ...idPrefix, ...substring].slice(0, limit);
 }
 
+export function addSearchEntries(newEntries: SearchEntry[]): void {
+  entries.push(...newEntries);
+}
+
 export function getSystemUuidByNaturalId(naturalId: string): string | undefined {
   return naturalIdToUuid.get(naturalId);
 }

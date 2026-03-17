@@ -48,6 +48,9 @@ export {
   getSystemsWithResource,
   getPlanetsWithResource,
   getExtractableResourceMaterialIds,
+  getCogcProgramPlanets,
+  getActiveCogcCategories,
+  getSystemsWithCogcProgram,
 } from "./data/resourceIndex.js";
 
 // Search
@@ -73,6 +76,8 @@ export {
   offStateChange,
   getResourceFilter,
   setResourceFilter,
+  getCogcFilter,
+  setCogcFilter,
 } from "./ui/state.js";
 
 // Theme
@@ -119,4 +124,5 @@ export type {
   InfrastructureData,
   ResourceMatch,
   PlanetResourceMatch,
+  CogcMatch,
 } from "./types/index.js";

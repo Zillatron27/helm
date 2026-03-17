@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.10.0 — 2026-03-18
+
+COGC program display, planet panel reorder, and COGC search filter.
+
+### Added
+
+- **COGC program display** — planet panel Population & Economy section now shows the active COGC program name and time remaining. Shows "No active program" for planets with a COGC but no current program.
+- **COGC search** — typing COGC program types (e.g. "agriculture", "family support") in the search bar returns COGC results. Selecting one highlights matching systems on the galaxy view using the same lens pattern as the resource filter. Clicking a highlighted system shows a contextual panel listing planets with that active program.
+- **COGC filter badge** — active COGC filter shows a dismissible badge next to the search button. Clears on badge ×, Escape, or selecting a different search result.
+- **COGC/resource filter mutual exclusion** — selecting a COGC filter clears any active resource filter and vice versa.
+
+### Changed
+
+- **Planet panel section reorder** — new order: CX Distance → Resources → Environment → Population & Economy → Infrastructure → Core Module Requirements → Faction → Actions. Population & Economy moves up (was below Infrastructure), Core Modules moves down.
+- **Base count merged into Population & Economy** — base count is now the first row inside the collapsible Population & Economy section, rendered immediately. The standalone "Population" section is removed.
+- **Escape key** — now clears active COGC or resource filter before dismissing panels or exiting system view.
+
 ## 0.9.0 — 2026-03-17
 
 Server-side analytics via Cloudflare Worker.

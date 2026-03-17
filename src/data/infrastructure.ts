@@ -79,7 +79,17 @@ async function fetchAndProcess(planetNaturalId: string): Promise<InfrastructureD
     }
     const projects = Array.from(projectMap.values());
 
-    const data: InfrastructureData = { population, projects };
+    // Extract active COGC program
+    const now = Date.now();
+    const programs = raw.InfrastructurePrograms ?? [];
+    const activeProgram = programs.find(
+      (p) => now >= p.StartTimestampEpochMs && now <= p.EndTimestampEpochMs
+    );
+    const cogcProgram = activeProgram
+      ? { category: activeProgram.Category, endsAt: activeProgram.EndTimestampEpochMs }
+      : null;
+
+    const data: InfrastructureData = { population, projects, cogcProgram };
     cache.set(planetNaturalId, data);
     return data;
   } catch (err) {

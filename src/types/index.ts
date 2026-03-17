@@ -57,6 +57,7 @@ export interface FioPlanet {
   CurrencyCode: string | null;
   PlanetTier: number;
   COGCProgramStatus: string | null;
+  COGCPrograms?: Array<{ ProgramType: string; StartEpochMs: number; EndEpochMs: number }>;
   // Orbital fields (undocumented in FIO reference, verified from live API)
   OrbitIndex: number;
   OrbitSemiMajorAxis: number;
@@ -162,11 +163,11 @@ export interface FioPlanetSummary {
 
 // Unified search result
 export interface SearchEntry {
-  type: "system" | "planet";
-  id: string; // UUID for systems, PlanetNaturalId for planets
+  type: "system" | "planet" | "cogc";
+  id: string; // UUID for systems, PlanetNaturalId for planets, category key for COGC
   name: string; // Display name
   naturalId: string;
-  systemId: string; // Parent system UUID (same as id for systems)
+  systemId: string; // Parent system UUID (same as id for systems, "" for COGC)
 }
 
 // Pathfinding result
@@ -287,15 +288,25 @@ export interface FioInfrastructureProject {
   UpgradeStatus: string | null;
 }
 
+export interface FioInfrastructureProgram {
+  Number: number;
+  StartTimestampEpochMs: number;
+  EndTimestampEpochMs: number;
+  Category: string;
+  Program: string;
+}
+
 export interface FioInfrastructurePlanet {
   InfrastructureProjects: FioInfrastructureProject[];
   InfrastructureReports: FioInfrastructureReport[];
+  InfrastructurePrograms: FioInfrastructureProgram[];
 }
 
 // Processed infrastructure data
 export interface InfrastructureData {
   population: { tier: string; count: number; happiness: number; unemployment: number }[];
   projects: { ticker: string; name: string; level: number }[];
+  cogcProgram: { category: string; endsAt: number } | null;
 }
 
 // Resource filter types
@@ -311,6 +322,14 @@ export interface PlanetResourceMatch {
   systemId: string;
   factor: number;
   resourceType: string;
+}
+
+// COGC filter types
+
+export interface CogcMatch {
+  planetNaturalId: string;
+  systemId: string;
+  endsAt: number;
 }
 
 // UI state types

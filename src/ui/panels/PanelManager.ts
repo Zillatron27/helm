@@ -10,6 +10,7 @@ import {
   setActiveRoute,
   onStateChange,
   getResourceFilter,
+  getCogcFilter,
 } from "../state.js";
 import {
   getSystemById,
@@ -19,7 +20,7 @@ import {
   getMaterialTicker,
   getMaterialByTicker,
 } from "../../data/cache.js";
-import { getPlanetsWithResource } from "../../data/resourceIndex.js";
+import { getPlanetsWithResource, getCogcProgramPlanets } from "../../data/resourceIndex.js";
 import { getCxDistances } from "../../data/cxDistances.js";
 import { findRoute } from "../../data/pathfinding.js";
 import { getPlanetBaseCount } from "../../data/siteCounts.js";
@@ -64,18 +65,22 @@ export class PanelManager {
       const system = getSystemById(entity.id);
       if (system) {
         const resourceFilterId = getResourceFilter();
+        const cogcFilterId = getCogcFilter();
         if (resourceFilterId) {
-          // Skip re-render if same panel is already showing (prevents flash on view transitions)
           const panelKey = `resource:${system.id}:${resourceFilterId}`;
           if (this.lastPanelKey === panelKey && this.isOpen) return;
           this.lastPanelKey = panelKey;
           this.showResourceFilterPanel(system, resourceFilterId);
+        } else if (cogcFilterId) {
+          const panelKey = `cogc:${system.id}:${cogcFilterId}`;
+          if (this.lastPanelKey === panelKey && this.isOpen) return;
+          this.lastPanelKey = panelKey;
+          this.showCogcFilterPanel(system, cogcFilterId);
         } else {
           this.lastPanelKey = null;
           const planets = getPlanetsForSystem(system.naturalId);
           this.showSystemPanel(system, planets);
 
-          // If planets not cached yet, fetch and update
           if (!planets) {
             loadPlanetsForSystem(system.naturalId).then((loaded) => {
               const current = getSelectedEntity();
@@ -249,6 +254,83 @@ export class PanelManager {
     }
   }
 
+  private showCogcFilterPanel(system: StarSystem, category: string): void {
+    const programName = formatCogcCategory(category);
+    const allMatches = getCogcProgramPlanets(category);
+    const systemMatches = allMatches
+      .filter((m) => m.systemId === system.id)
+      .sort((a, b) => a.endsAt - b.endsAt);
+
+    const cachedPlanets = getPlanetsForSystem(system.naturalId);
+
+    const planetRows = systemMatches.map((match) => {
+      const cached = cachedPlanets?.find((p) => p.naturalId === match.planetNaturalId);
+      const name = cached?.name || match.planetNaturalId;
+      const planetId = cached?.id || match.planetNaturalId;
+      const bases = getPlanetBaseCount(match.planetNaturalId);
+      const basesText = bases > 0 ? `${bases} bases` : "";
+      return `
+        <div class="panel-resource-filter-row">
+          <a class="panel-planet-link" data-planet-id="${esc(planetId)}" data-planet-system="${esc(system.id)}">${esc(name)}</a>
+          <span class="panel-resource-type">${esc(formatTimeRemaining(match.endsAt))}</span>
+          <span class="panel-planet-bases">${basesText}</span>
+        </div>
+      `;
+    }).join("");
+
+    const noMatches = systemMatches.length === 0
+      ? `<div class="panel-loading">No active ${esc(programName)} programs</div>`
+      : "";
+
+    const html = `
+      <div class="panel-header">
+        <h2 class="panel-title">${esc(system.name)}</h2>
+        <div class="panel-subtitle">
+          ${esc(system.naturalId)}
+          <span class="panel-badge panel-badge-resource">COGC</span>
+        </div>
+        <button class="panel-close" aria-label="Close panel">&times;</button>
+      </div>
+      <div class="panel-body">
+        <div class="panel-section">
+          <h3 class="panel-section-title">${esc(programName)} (${systemMatches.length})</h3>
+          ${noMatches}
+          ${planetRows}
+        </div>
+        ${renderCxDistanceSection(system.id)}
+      </div>
+    `;
+
+    this.setContent(html, () => {
+      this.open();
+
+      this.panelEl.querySelector(".panel-close")?.addEventListener("click", () => {
+        setSelectedEntity(null);
+      });
+
+      this.wireCxBadgeClicks();
+
+      this.panelEl.querySelectorAll("[data-planet-id]").forEach((el) => {
+        el.addEventListener("click", (e) => {
+          e.preventDefault();
+          const planetId = (el as HTMLElement).dataset["planetId"];
+          const planetSystemId = (el as HTMLElement).dataset["planetSystem"];
+          if (!planetId || !planetSystemId) return;
+          this.renderer?.panToPlanet(planetSystemId, planetId);
+        });
+      });
+    });
+
+    if (!cachedPlanets) {
+      loadPlanetsForSystem(system.naturalId).then(() => {
+        const current = getSelectedEntity();
+        if (current?.type === "system" && current.id === system.id && getCogcFilter() === category) {
+          this.showCogcFilterPanel(system, category);
+        }
+      });
+    }
+  }
+
   private renderCxSection(systemId: string): string {
     const cx = getCxForSystem(systemId);
     if (!cx) return "";
@@ -371,12 +453,11 @@ export class PanelManager {
       </div>
       <div class="panel-body">
         ${renderCxDistanceSection(planet.systemId)}
-        ${renderBaseCountSection(planet.naturalId)}
         ${this.renderResourcesSection(planet)}
         ${this.renderEnvironmentSection(planet)}
+        ${renderPopulationSection(planet.naturalId, planet.hasChamberOfCommerce)}
         ${this.renderInfrastructureSection(planet)}
         ${renderBuildRequirementsSection(planet)}
-        ${renderPopulationSection(planet.naturalId)}
         ${this.renderFactionSection(planet)}
         ${renderPlanBaseLink(planet.naturalId)}
       </div>
@@ -395,16 +476,16 @@ export class PanelManager {
       const infraEl = this.panelEl.querySelector("[data-infra-planet]") as HTMLElement | null;
       if (infraEl) {
         const pNid = infraEl.dataset["infraPlanet"]!;
+        const hasCogc = infraEl.dataset["hasCogc"] === "1";
         const cached = getPlanetInfrastructure(pNid);
         if (cached) {
-          infraEl.innerHTML = renderPopulationContent(cached);
+          infraEl.innerHTML = renderPopulationContent(cached, hasCogc);
         } else {
           loadPlanetInfrastructure(pNid).then((data) => {
-            // Only update if still viewing this planet
             const current = getSelectedEntity();
             if (current?.type !== "planet") return;
             if (data) {
-              infraEl.innerHTML = renderPopulationContent(data);
+              infraEl.innerHTML = renderPopulationContent(data, hasCogc);
             } else {
               infraEl.innerHTML = `<span class="panel-loading">No data available</span>`;
             }
@@ -639,22 +720,6 @@ function tempClass(temp: number): string {
   return "panel-row-value-positive";
 }
 
-function renderBaseCountSection(planetNaturalId: string): string {
-  const count = getPlanetBaseCount(planetNaturalId);
-  const display = count > 0 ? `${count}` : "Unsettled";
-  const cls = count > 0 ? "" : "panel-row-value-neutral";
-
-  return `
-    <div class="panel-section">
-      <h3 class="panel-section-title">Population</h3>
-      <div class="panel-row">
-        <span class="panel-row-label">Bases</span>
-        <span class="panel-row-value ${cls}">${display}</span>
-      </div>
-    </div>
-  `;
-}
-
 function renderCxDistanceSection(systemId: string): string {
   const entries = getCxDistances(systemId);
   if (entries.length === 0) return "";
@@ -705,22 +770,32 @@ function renderBuildRequirementsSection(planet: Planet): string {
   `;
 }
 
-function renderPopulationSection(planetNaturalId: string): string {
+function renderPopulationSection(planetNaturalId: string, hasCogc: boolean): string {
+  const count = getPlanetBaseCount(planetNaturalId);
+  const baseDisplay = count > 0 ? `${count}` : "Unsettled";
+  const baseCls = count > 0 ? "" : "panel-row-value-neutral";
+
   return `
     <div class="panel-section panel-section-collapsible">
       <h3 class="panel-section-title panel-section-toggle" data-section="population">
         Population &amp; Economy
         <span class="panel-section-arrow">\u25b8</span>
       </h3>
-      <div class="panel-section-content" data-section-content="population" data-infra-planet="${esc(planetNaturalId)}">
-        <span class="panel-loading">Loading...</span>
+      <div class="panel-section-content" data-section-content="population">
+        <div class="panel-row">
+          <span class="panel-row-label">Bases</span>
+          <span class="panel-row-value ${baseCls}">${baseDisplay}</span>
+        </div>
+        <div data-infra-planet="${esc(planetNaturalId)}" data-has-cogc="${hasCogc ? "1" : "0"}">
+          <span class="panel-loading">Loading...</span>
+        </div>
       </div>
     </div>
   `;
 }
 
-function renderPopulationContent(data: import("../../types/index.js").InfrastructureData): string {
-  if (data.population.length === 0 && data.projects.length === 0) {
+function renderPopulationContent(data: import("../../types/index.js").InfrastructureData, hasCogc: boolean): string {
+  if (data.population.length === 0 && data.projects.length === 0 && !data.cogcProgram) {
     return `<span class="panel-loading">No infrastructure data</span>`;
   }
 
@@ -733,6 +808,26 @@ function renderPopulationContent(data: import("../../types/index.js").Infrastruc
         <span class="panel-row-value">${t.count.toLocaleString()} <span class="panel-row-detail">${Math.round(t.happiness * 100)}% happy</span></span>
       </div>
     `).join("");
+  }
+
+  if (data.cogcProgram) {
+    html += `
+      <div class="panel-row">
+        <span class="panel-row-label">COGC</span>
+        <span class="panel-row-value">${esc(formatCogcCategory(data.cogcProgram.category))}</span>
+      </div>
+      <div class="panel-row">
+        <span class="panel-row-label">Ends</span>
+        <span class="panel-row-value">${esc(formatTimeRemaining(data.cogcProgram.endsAt))}</span>
+      </div>
+    `;
+  } else if (hasCogc) {
+    html += `
+      <div class="panel-row">
+        <span class="panel-row-label">COGC</span>
+        <span class="panel-row-value panel-row-value-neutral">No active program</span>
+      </div>
+    `;
   }
 
   if (data.projects.length > 0) {
@@ -749,6 +844,48 @@ function renderPopulationContent(data: import("../../types/index.js").Infrastruc
 function renderPlanBaseLink(planetNaturalId: string): string {
   const url = `https://prunplanner.org/plan/${encodeURIComponent(planetNaturalId)}`;
   return `<a class="panel-button panel-button-external" href="${url}" target="_blank" rel="noopener">Plan Base in PrUNplanner \u2197</a>`;
+}
+
+const COGC_NAMES: Record<string, string> = {
+  ADVERTISING_AGRICULTURE: "Advertising: Agriculture",
+  ADVERTISING_CHEMISTRY: "Advertising: Chemistry",
+  ADVERTISING_CONSTRUCTION: "Advertising: Construction",
+  ADVERTISING_ELECTRONICS: "Advertising: Electronics",
+  ADVERTISING_FOOD_INDUSTRIES: "Advertising: Food Industries",
+  ADVERTISING_FUEL_REFINING: "Advertising: Fuel Refining",
+  ADVERTISING_MANUFACTURING: "Advertising: Manufacturing",
+  ADVERTISING_METALLURGY: "Advertising: Metallurgy",
+  ADVERTISING_RESOURCE_EXTRACTION: "Advertising: Resource Extraction",
+  EDUCATION: "Education",
+  FAMILY_SUPPORT: "Family Support",
+  FESTIVITIES: "Festivities",
+  IMMIGRATION_PIONEER: "Immigration: Pioneer",
+  IMMIGRATION_SETTLER: "Immigration: Settler",
+  IMMIGRATION_TECHNICIAN: "Immigration: Technician",
+  IMMIGRATION_ENGINEER: "Immigration: Engineer",
+  IMMIGRATION_SCIENTIST: "Immigration: Scientist",
+};
+
+function formatCogcCategory(category: string): string {
+  // Strip trailing _N level suffix before lookup
+  const stripped = category.replace(/_\d+$/, "");
+  if (COGC_NAMES[stripped]) return COGC_NAMES[stripped];
+  // Fallback: replace underscores with spaces and title-case
+  return stripped
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function formatTimeRemaining(epochMs: number): string {
+  const diff = epochMs - Date.now();
+  if (diff <= 0) return "Expired";
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  if (days > 0) return `in ${days}d ${hours % 24}h`;
+  if (hours > 0) return `in ${hours}h ${minutes % 60}m`;
+  return `in ${minutes}m`;
 }
 
 function wireCollapsibleSections(panelEl: HTMLElement): void {

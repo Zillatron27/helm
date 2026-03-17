@@ -123,5 +123,26 @@ export function getResourceFilter(): string | null {
 export function setResourceFilter(materialId: string | null): void {
   if (materialId === resourceFilter) return;
   resourceFilter = materialId;
+  // Mutually exclusive with COGC filter
+  if (materialId !== null && cogcFilter !== null) {
+    cogcFilter = null;
+  }
+  notify();
+}
+
+// COGC filter — persists until explicitly cleared, mutually exclusive with resource filter
+let cogcFilter: string | null = null; // COGC category key
+
+export function getCogcFilter(): string | null {
+  return cogcFilter;
+}
+
+export function setCogcFilter(category: string | null): void {
+  if (category === cogcFilter) return;
+  cogcFilter = category;
+  // Mutually exclusive with resource filter
+  if (category !== null && resourceFilter !== null) {
+    resourceFilter = null;
+  }
   notify();
 }

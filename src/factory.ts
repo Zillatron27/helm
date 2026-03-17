@@ -7,7 +7,8 @@ import { computeCxDistances } from "./data/cxDistances.js";
 import { loadSiteCounts } from "./data/siteCounts.js";
 import { loadExchangePrices } from "./data/exchangePrices.js";
 import { loadSettledPlanets } from "./data/settledPlanets.js";
-import { initResourceIndex } from "./data/resourceIndex.js";
+import { initResourceIndex, getActiveCogcCategories } from "./data/resourceIndex.js";
+import { addSearchEntries } from "./data/searchIndex.js";
 import { MapRenderer } from "./renderer/MapRenderer.js";
 import { PanelManager } from "./ui/panels/PanelManager.js";
 import { initTheme } from "./ui/theme.js";
@@ -102,8 +103,40 @@ export async function createMap(container: HTMLElement): Promise<HelmInstance> {
   const panelManager = new PanelManager();
   panelManager.init(renderer);
 
-  // Non-blocking: start background resource index build
-  initResourceIndex().catch((err) => {
+  // Non-blocking: start background resource index build + COGC search entries
+  initResourceIndex().then(() => {
+    const cogcNames: Record<string, string> = {
+      ADVERTISING_AGRICULTURE: "COGC: Agriculture",
+      ADVERTISING_CHEMISTRY: "COGC: Chemistry",
+      ADVERTISING_CONSTRUCTION: "COGC: Construction",
+      ADVERTISING_ELECTRONICS: "COGC: Electronics",
+      ADVERTISING_FOOD_INDUSTRIES: "COGC: Food Industries",
+      ADVERTISING_FUEL_REFINING: "COGC: Fuel Refining",
+      ADVERTISING_MANUFACTURING: "COGC: Manufacturing",
+      ADVERTISING_METALLURGY: "COGC: Metallurgy",
+      ADVERTISING_RESOURCE_EXTRACTION: "COGC: Resource Extraction",
+      EDUCATION: "COGC: Education",
+      FAMILY_SUPPORT: "COGC: Family Support",
+      FESTIVITIES: "COGC: Festivities",
+      IMMIGRATION_PIONEER: "COGC: Immigration Pioneer",
+      IMMIGRATION_SETTLER: "COGC: Immigration Settler",
+      IMMIGRATION_TECHNICIAN: "COGC: Immigration Technician",
+      IMMIGRATION_ENGINEER: "COGC: Immigration Engineer",
+      IMMIGRATION_SCIENTIST: "COGC: Immigration Scientist",
+    };
+    const categories = getActiveCogcCategories();
+    const entries = categories.map((cat) => ({
+      type: "cogc" as const,
+      id: cat,
+      name: cogcNames[cat] ?? `COGC: ${cat.replace(/_/g, " ")}`,
+      naturalId: cat,
+      systemId: "",
+    }));
+    if (entries.length > 0) {
+      addSearchEntries(entries);
+      console.log(`COGC search: ${entries.length} active program types indexed`);
+    }
+  }).catch((err) => {
     console.warn("Resource index failed, resource filter will be unavailable:", err);
   });
 
