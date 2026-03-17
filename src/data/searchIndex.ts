@@ -59,6 +59,7 @@ export function search(query: string, limit = 10): SearchEntry[] {
   const exact: SearchEntry[] = [];
   const namePrefix: SearchEntry[] = [];
   const idPrefix: SearchEntry[] = [];
+  const cogcMatches: SearchEntry[] = [];
   const substring: SearchEntry[] = [];
 
   for (const entry of entries) {
@@ -72,11 +73,17 @@ export function search(query: string, limit = 10): SearchEntry[] {
     } else if (idLower.startsWith(q)) {
       idPrefix.push(entry);
     } else if (nameLower.includes(q) || idLower.includes(q)) {
-      substring.push(entry);
+      // COGC entries rank above generic substring matches so they
+      // aren't buried under hundreds of system/planet results
+      if (entry.type === "cogc") {
+        cogcMatches.push(entry);
+      } else {
+        substring.push(entry);
+      }
     }
   }
 
-  return [...exact, ...namePrefix, ...idPrefix, ...substring].slice(0, limit);
+  return [...exact, ...namePrefix, ...idPrefix, ...cogcMatches, ...substring].slice(0, limit);
 }
 
 export function addSearchEntries(newEntries: SearchEntry[]): void {
