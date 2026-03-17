@@ -69,7 +69,7 @@ export class SearchBar {
     this.inputEl = document.createElement("input");
     this.inputEl.type = "text";
     this.inputEl.className = "search-input";
-    this.inputEl.placeholder = "Search systems or planets...";
+    this.inputEl.placeholder = "Search systems, planets or COGC...";
     this.inputEl.autocomplete = "off";
     this.inputEl.spellcheck = false;
 
@@ -85,7 +85,7 @@ export class SearchBar {
     // Circular button (right)
     this.btnEl = document.createElement("button");
     this.btnEl.className = "toolbar-btn";
-    this.btnEl.title = "Search systems and planets (/)";
+    this.btnEl.title = "Search systems, planets and COGC (/)";
     this.btnEl.innerHTML = SEARCH_ICON_SVG;
     this.btnEl.addEventListener("click", () => this.toggleExpand());
 
