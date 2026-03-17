@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.0 — 2026-03-17
+
+Server-side analytics via Cloudflare Worker.
+
+### Added
+
+- **Cloudflare Worker** (`worker.ts`) — wraps static asset serving, sends fire-and-forget analytics events to Umami on each page view. No client-side JavaScript, no cookies, no tracking pixels.
+- **`run_worker_first`** — Worker executes on every request, delegates to `env.ASSETS.fetch()` for static assets, ensuring analytics fire even on cached content.
+- **`typecheck:worker`** script — separate TypeScript config for the Worker runtime (no DOM, Cloudflare Workers types).
+
 ## 0.6.0 — 2026-03-10
 
 Bridge API: independent gateway indicator control.
