@@ -2,16 +2,30 @@
 
 ## 0.10.1 — 2026-03-18
 
-COGC search timing fix, correct program names, and search button loading state.
+Filter state refactor, highlight rendering fix, COGC data source fix, and UI polish.
 
 ### Fixed
 
 - **COGC search timing** — COGC results were injected into the search array asynchronously after the 35MB planet fetch. Searching before fetch completed returned no COGC results. COGC entries are now built on-the-fly during `search()` when the resource index is ready.
-- **Wrong COGC program names** — replaced fake program types (Education, Family Support, Festivities, Immigration) with the 14 real in-game COGC programs (Manufacturing, Pioneers, Settlers, Technicians, Engineers, Scientists, Agriculture, Chemistry, Construction, Electronics, Food Industries, Fuel Refining, Metallurgy, Resource Extraction).
+- **Wrong COGC program names** — replaced fake program types (Education, Family Support, Festivities, Immigration) with the 9 real COGC advertising programs. WORKFORCE_* entries removed (not COGC programs).
+- **Highlight tween race condition** — async `setResourceFilterAsync` set star alphas directly, but stale hover/unhover tweens running on the Pixi ticker overwrote them during `yieldToMain()` yields, preventing dimming from appearing. Fix: clear all tweens before applying highlight alphas.
+- **COGC wrong data source** — planet panel was reading COGC programs from the `/infrastructure` endpoint (`InfrastructurePrograms`), which only contains population programs (IMMIGRATION, EDUCATION, FESTIVITIES). Actual COGC programs come from `COGCPrograms` on the full planet endpoint.
+- **COGC filter cleared by syncToggles** — `syncToggles` god function ran every sync path on every state change, causing resource filter clearing to wipe COGC highlights.
+- **Expand panel z-index** — filter badges no longer render on top of the search input when the search bar is open.
+
+### Changed
+
+- **Per-topic state subscriptions** — split `syncToggles` into dedicated `onResourceFilterChange` and `onCogcFilterChange` handlers. `syncToggles` now only handles gateways and settled visibility. Each filter handler owns its full lifecycle with symmetric highlight teardown guards.
+- **SearchBar simplified** — no longer applies highlights or manages badge text directly. Public `showCogcBadge`/`removeCogcBadge`/`showButtonSpinner`/`restoreButtonIcon` methods for the handler in main.ts.
+- **COGC filtered to ADVERTISING_* only** — COGC index, search, and display all filter to `ADVERTISING_*` program types. Migration and workforce programs excluded.
+- **Resource panel polish** — camelCase FIO material names formatted with spaces ("aluminiumOre" → "Aluminium Ore"). Resource type label (Mineral/Gas/Liquid) removed from filter panel rows. Concentration percentage shown next to resource bars.
+- **COGC search results** — redundant `ADVERTISING_*` subtext removed from search dropdown.
 
 ### Added
 
-- **Search button loading state** — search button shows a mini orbital spinner while `allplanets/full` is loading, with a "Loading COGC data..." tooltip. Swaps to the search icon when the resource index is ready. Same pattern as the resource filter button.
+- **Search button loading spinner** — search button shows a mini orbital spinner during COGC highlight computation and while `allplanets/full` loads. Same pattern as the resource filter button.
+- **Shared `yieldToMain` utility** — extracted from GalaxyLayer to `src/util/yieldToMain.ts` for reuse.
+- **`clearResourceIndicators`** — new method on GalaxyLayer and MapRenderer to decouple indicator cleanup from highlight clearing.
 
 ## 0.10.0 — 2026-03-18
 
