@@ -82,7 +82,7 @@ export function search(query: string, limit = 10): SearchEntry[] {
   const substring: SearchEntry[] = [];
 
   for (const entry of entries) {
-    const nameLower = entry.name.toLowerCase();
+    const nameLower = (entry.name ?? "").toLowerCase();
     const idLower = entry.naturalId.toLowerCase();
 
     if (nameLower === q || idLower === q) {

@@ -79,6 +79,7 @@ export async function initResourceIndex(): Promise<void> {
     const programs = planet.COGCPrograms;
     if (!programs) continue;
     for (const prog of programs) {
+      if (!prog.ProgramType) continue;
       if (now >= prog.StartEpochMs && now <= prog.EndEpochMs) {
         let list = cogcIndex.get(prog.ProgramType);
         if (!list) {
