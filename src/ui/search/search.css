@@ -116,6 +116,7 @@
   overflow: visible;
   pointer-events: auto;
   border: 1px solid var(--border);
+  z-index: 1;
 }
 
 /* Search expand panel */

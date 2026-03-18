@@ -113,6 +113,38 @@ export function offStateChange(listener: StateListener): void {
   listeners.delete(listener);
 }
 
+// --- Per-topic filter subscriptions ---
+// These fire only when the specific filter changes, unlike onStateChange which
+// fires on every state mutation. This prevents cross-contamination between
+// independent filter handlers (e.g. gateway toggle triggering resource filter logic).
+
+const resourceFilterListeners: Set<StateListener> = new Set();
+const cogcFilterListeners: Set<StateListener> = new Set();
+
+function notifyResourceFilterListeners(): void {
+  for (const fn of resourceFilterListeners) fn();
+}
+
+function notifyCogcFilterListeners(): void {
+  for (const fn of cogcFilterListeners) fn();
+}
+
+export function onResourceFilterChange(listener: StateListener): void {
+  resourceFilterListeners.add(listener);
+}
+
+export function offResourceFilterChange(listener: StateListener): void {
+  resourceFilterListeners.delete(listener);
+}
+
+export function onCogcFilterChange(listener: StateListener): void {
+  cogcFilterListeners.add(listener);
+}
+
+export function offCogcFilterChange(listener: StateListener): void {
+  cogcFilterListeners.delete(listener);
+}
+
 // Resource filter — persists until explicitly cleared
 let resourceFilter: string | null = null; // MaterialId
 
@@ -123,10 +155,12 @@ export function getResourceFilter(): string | null {
 export function setResourceFilter(materialId: string | null): void {
   if (materialId === resourceFilter) return;
   resourceFilter = materialId;
-  // Mutually exclusive with COGC filter
+  // Mutually exclusive: setting resource clears COGC
   if (materialId !== null && cogcFilter !== null) {
     cogcFilter = null;
+    notifyCogcFilterListeners();
   }
+  notifyResourceFilterListeners();
   notify();
 }
 
@@ -140,9 +174,11 @@ export function getCogcFilter(): string | null {
 export function setCogcFilter(category: string | null): void {
   if (category === cogcFilter) return;
   cogcFilter = category;
-  // Mutually exclusive with resource filter
+  // Mutually exclusive: setting COGC clears resource
   if (category !== null && resourceFilter !== null) {
     resourceFilter = null;
+    notifyResourceFilterListeners();
   }
+  notifyCogcFilterListeners();
   notify();
 }

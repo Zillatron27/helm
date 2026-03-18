@@ -5,7 +5,9 @@ import { RoutePanel } from "./ui/search/RoutePanel.js";
 import { SettingsPanel } from "./ui/SettingsPanel.js";
 import { ResourcePicker } from "./ui/resource/ResourcePicker.js";
 import { setupControls } from "./ui/controls.js";
-import { onStateChange, getGatewaysVisible, setGatewaysVisible, getSettledVisible, setSettledVisible, getResourceFilter, getCogcFilter } from "./ui/state.js";
+import { onStateChange, getGatewaysVisible, setGatewaysVisible, getSettledVisible, setSettledVisible, getResourceFilter, getCogcFilter, onResourceFilterChange, onCogcFilterChange } from "./ui/state.js";
+import { isResourceIndexReady, onResourceIndexReady, getSystemsWithCogcProgram } from "./data/resourceIndex.js";
+import { yieldToMain } from "./util/yieldToMain.js";
 import { initTheme, getTheme } from "./ui/theme.js";
 import { createLoader } from "./ui/loader/LoaderAnimation.js";
 import "./ui/search/search.css";
@@ -106,7 +108,27 @@ async function boot(): Promise<void> {
     versionEl.textContent = `v${VERSION}`;
     document.body.appendChild(versionEl);
 
-    // Sync toggle buttons with state (handles both button clicks and keyboard shortcuts)
+    // --- Display labels for COGC program categories ---
+    const COGC_NAMES: Record<string, string> = {
+      ADVERTISING_MANUFACTURING: "Manufacturing",
+      WORKFORCE_PIONEERS: "Pioneers",
+      WORKFORCE_SETTLERS: "Settlers",
+      WORKFORCE_TECHNICIANS: "Technicians",
+      WORKFORCE_ENGINEERS: "Engineers",
+      WORKFORCE_SCIENTISTS: "Scientists",
+      ADVERTISING_AGRICULTURE: "Agriculture",
+      ADVERTISING_CHEMISTRY: "Chemistry",
+      ADVERTISING_CONSTRUCTION: "Construction",
+      ADVERTISING_ELECTRONICS: "Electronics",
+      ADVERTISING_FOOD_INDUSTRIES: "Food Industries",
+      ADVERTISING_FUEL_REFINING: "Fuel Refining",
+      ADVERTISING_METALLURGY: "Metallurgy",
+      ADVERTISING_RESOURCE_EXTRACTION: "Resource Extraction",
+    };
+
+    // --- Global toggle sync (gateways, settled visibility) ---
+    // Only handles genuinely global visual state that doesn't interfere
+    // with filter-specific logic.
     function syncToggles(): void {
       const gwVisible = getGatewaysVisible();
       renderer.setGatewaysVisible(gwVisible);
@@ -117,28 +139,67 @@ async function boot(): Promise<void> {
       renderer.setSettledVisible(stVisible);
       settledBtn.classList.toggle("toolbar-btn-settled-on", stVisible);
       settledBtn.classList.toggle("toolbar-btn-settled-off", !stVisible);
+    }
+    onStateChange(syncToggles);
+    syncToggles();
 
-      // Resource filter — sync path handles clearing only.
-      // Setting a filter goes through the async path (ResourcePicker.setFilterCallback)
-      // to yield between chunks so the spinner stays animated.
-      const cogcCat = getCogcFilter();
+    // --- Resource filter handler ---
+    // Owns the full lifecycle of resource filter teardown.
+    // Setting a filter goes through the async path (ResourcePicker.setFilterCallback).
+    function handleResourceFilterChange(): void {
       const filterMat = getResourceFilter();
-      if (!filterMat && !cogcCat) {
-        renderer.setResourceFilter(null);
-      }
-      resourcePicker.syncState();
-
-      // COGC filter — clear highlights only when neither filter is active
-      if (!cogcCat) {
-        if (!filterMat) {
+      if (!filterMat) {
+        renderer.clearResourceIndicators();
+        // Only clear highlights if COGC isn't taking over
+        if (!getCogcFilter()) {
           renderer.setHighlightedSystems(null);
         }
       }
-      searchBar.syncCogcState();
+      resourcePicker.syncState();
     }
-    onStateChange(syncToggles);
-    // Apply persisted state on initial load
-    syncToggles();
+    onResourceFilterChange(handleResourceFilterChange);
+
+    // --- COGC filter handler ---
+    // Owns the full lifecycle: spinner → highlight application → badge.
+    // Same pattern as resource filter: button spinner while working.
+    async function handleCogcFilterChange(): Promise<void> {
+      const cogcCat = getCogcFilter();
+      if (!cogcCat) {
+        searchBar.removeCogcBadge();
+        searchBar.restoreButtonIcon();
+        // Only clear highlights if resource filter isn't taking over
+        if (!getResourceFilter()) {
+          renderer.setHighlightedSystems(null);
+        }
+        return;
+      }
+
+      const label = COGC_NAMES[cogcCat] ?? cogcCat.replace(/_/g, " ");
+
+      // Show spinner on search button while working
+      searchBar.showButtonSpinner();
+
+      if (!isResourceIndexReady()) {
+        onResourceIndexReady(() => handleCogcFilterChange());
+        return;
+      }
+
+      // Yield so the spinner paints before highlight work
+      await yieldToMain();
+      await yieldToMain();
+
+      // Guard: filter may have changed during the yield
+      if (getCogcFilter() !== cogcCat) {
+        searchBar.restoreButtonIcon();
+        return;
+      }
+
+      const matchingSystems = getSystemsWithCogcProgram(cogcCat);
+      renderer.setHighlightedSystems(matchingSystems.size > 0 ? matchingSystems : null);
+      searchBar.restoreButtonIcon();
+      searchBar.showCogcBadge(label);
+    }
+    onCogcFilterChange(handleCogcFilterChange);
 
     const viewport = renderer.getViewport();
     if (viewport) {

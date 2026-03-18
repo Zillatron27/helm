@@ -10,12 +10,7 @@ import { getAllCxStations, getGalaxyGatewayConnections, isGatewaySystem } from "
 import { isSettledSystem } from "../data/siteCounts.js";
 import { StarParticles } from "./StarParticles.js";
 import { TweenManager } from "./Tween.js";
-
-/** Yield to the browser so it can paint a frame. Uses rAF to guarantee
- *  the yield aligns with the paint cycle (setTimeout doesn't guarantee paint). */
-function yieldToMain(): Promise<void> {
-  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
-}
+import { yieldToMain } from "../util/yieldToMain.js";
 
 const STAR_RADIUS = 7;
 const HIT_RADIUS = 24;
@@ -1060,6 +1055,11 @@ export class GalaxyLayer {
   private applyHighlightFilter(): void {
     const hl = this.highlightedSystems;
 
+    // Kill any in-flight tweens (e.g. from hover highlight) before
+    // overwriting all star/glow/label alphas — stale tweens would
+    // overwrite the values we're about to set.
+    this.tweens.clear();
+
     if (!hl) {
       // Clear filter — restore all to full alpha
       this.twinkleActive = true;
@@ -1201,6 +1201,12 @@ export class GalaxyLayer {
     this.lastGatewayArcScale = scale;
   }
 
+  /** Remove resource concentration dots without touching highlight state. */
+  clearResourceIndicators(): void {
+    this.resourceIndicators.removeChildren();
+    this.resourceIndicators.visible = false;
+  }
+
   /**
    * Apply a resource filter — highlight matching systems, show concentration dots.
    * Pass null to clear the filter.
@@ -1292,6 +1298,10 @@ export class GalaxyLayer {
     this.highlightedSystems = matchingIds;
     if (this.isDimmedForSystemView) return;
 
+    // Kill any in-flight tweens (e.g. from hover highlight) before
+    // overwriting all star/glow/label alphas — stale tweens would
+    // overwrite the values we set during the yields.
+    this.tweens.clear();
     this.twinkleActive = false;
 
     for (const [id, star] of this.starGraphics) {
@@ -1314,6 +1324,7 @@ export class GalaxyLayer {
 
     // Redraw connections with per-line highlight — classify in batches, draw at end
     await this.redrawWithHighlightAsync(matchingIds);
+
   }
 
   /** Chunked version of redrawWithHighlight that yields during classification. */

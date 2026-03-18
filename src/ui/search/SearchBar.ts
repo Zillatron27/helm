@@ -6,12 +6,11 @@ import {
   setViewLevel,
   getViewLevel,
   setCogcFilter,
-  getCogcFilter,
-  setResourceFilter,
 } from "../state.js";
-import { isResourceIndexReady, onResourceIndexReady, getSystemsWithCogcProgram } from "../../data/resourceIndex.js";
 import type { SearchEntry } from "../../types/index.js";
 import type { MapRenderer } from "../../renderer/MapRenderer.js";
+import { createMiniLoader } from "../loader/LoaderAnimation.js";
+import { getTheme } from "../theme.js";
 
 const DEBOUNCE_MS = 50;
 
@@ -19,23 +18,6 @@ const SEARCH_ICON_SVG = `<svg width="24" height="24" viewBox="0 0 24 24" fill="n
   <circle cx="10" cy="10" r="7"/>
   <line x1="15.5" y1="15.5" x2="21" y2="21"/>
 </svg>`;
-
-const COGC_NAMES: Record<string, string> = {
-  ADVERTISING_MANUFACTURING: "Manufacturing",
-  WORKFORCE_PIONEERS: "Pioneers",
-  WORKFORCE_SETTLERS: "Settlers",
-  WORKFORCE_TECHNICIANS: "Technicians",
-  WORKFORCE_ENGINEERS: "Engineers",
-  WORKFORCE_SCIENTISTS: "Scientists",
-  ADVERTISING_AGRICULTURE: "Agriculture",
-  ADVERTISING_CHEMISTRY: "Chemistry",
-  ADVERTISING_CONSTRUCTION: "Construction",
-  ADVERTISING_ELECTRONICS: "Electronics",
-  ADVERTISING_FOOD_INDUSTRIES: "Food Industries",
-  ADVERTISING_FUEL_REFINING: "Fuel Refining",
-  ADVERTISING_METALLURGY: "Metallurgy",
-  ADVERTISING_RESOURCE_EXTRACTION: "Resource Extraction",
-};
 
 export class SearchBar {
   private rowEl: HTMLElement;
@@ -277,27 +259,8 @@ export class SearchBar {
     }
 
     if (entry.type === "cogc") {
-      const label = COGC_NAMES[entry.id] ?? entry.id.replace(/_/g, " ");
-      setResourceFilter(null);
+      // Handler in main.ts owns the full lifecycle: badge, loading, highlights
       setCogcFilter(entry.id);
-
-      const applyCogcFilter = (): void => {
-        // Show loading state, then defer highlight work by one frame
-        // so the badge text renders before the expensive setHighlightedSystems call
-        this.showCogcBadge(`${label} \u2014 Loading\u2026`);
-        requestAnimationFrame(() => {
-          const matchingSystems = getSystemsWithCogcProgram(entry.id);
-          this.renderer?.setHighlightedSystems(matchingSystems.size > 0 ? matchingSystems : null);
-          this.showCogcBadge(label);
-        });
-      };
-
-      if (isResourceIndexReady()) {
-        applyCogcFilter();
-      } else {
-        this.showCogcBadge(`${label} \u2014 Loading\u2026`);
-        onResourceIndexReady(applyCogcFilter);
-      }
     } else if (entry.type === "planet") {
       setTimeout(() => {
         this.renderer?.panToPlanet(entry.systemId, entry.id);
@@ -308,7 +271,7 @@ export class SearchBar {
     }
   }
 
-  private showCogcBadge(label: string): void {
+  showCogcBadge(label: string): void {
     this.removeCogcBadge();
 
     const badge = document.createElement("div");
@@ -320,7 +283,6 @@ export class SearchBar {
     clearBtn.textContent = "\u00d7";
     clearBtn.addEventListener("click", () => {
       setCogcFilter(null);
-      this.removeCogcBadge();
     });
 
     badge.appendChild(clearBtn);
@@ -328,24 +290,22 @@ export class SearchBar {
     this.cogcBadgeEl = badge;
   }
 
-  private removeCogcBadge(): void {
+  removeCogcBadge(): void {
     if (this.cogcBadgeEl) {
       this.cogcBadgeEl.remove();
       this.cogcBadgeEl = null;
     }
   }
 
-  /** Sync badge state with external filter changes. */
-  syncCogcState(): void {
-    const cogcCategory = getCogcFilter();
-    if (cogcCategory) {
-      if (!this.cogcBadgeEl) {
-        const label = COGC_NAMES[cogcCategory] ?? cogcCategory.replace(/_/g, " ");
-        this.showCogcBadge(label);
-      }
-    } else {
-      this.removeCogcBadge();
-    }
+  showButtonSpinner(): void {
+    this.btnEl.innerHTML = "";
+    const miniLoader = createMiniLoader(getTheme());
+    miniLoader.style.pointerEvents = "none";
+    this.btnEl.appendChild(miniLoader);
+  }
+
+  restoreButtonIcon(): void {
+    this.btnEl.innerHTML = SEARCH_ICON_SVG;
   }
 }
 

@@ -606,6 +606,12 @@ export class MapRenderer {
     this.galaxy?.setHighlightedSystems(ids);
   }
 
+  /** Remove resource indicator dots without touching highlight state. */
+  clearResourceIndicators(): void {
+    this.galaxy?.clearResourceIndicators();
+    this.systemLayer?.setResourceFilter(null);
+  }
+
   setResourceFilter(materialId: string | null): void {
     const matches = materialId ? getSystemsWithResource(materialId) : null;
     this.galaxy?.setResourceFilter(materialId, matches);
