@@ -83,7 +83,7 @@ export class SearchBar {
 
     // Circular button (right) — starts with mini loader if COGC data not ready
     this.btnEl = document.createElement("button");
-    this.btnEl.className = "toolbar-btn";
+    this.btnEl.className = "toolbar-btn toolbar-btn-resource-disabled";
     this.btnEl.addEventListener("click", () => this.toggleExpand());
 
     if (!isResourceIndexReady()) {
@@ -92,8 +92,9 @@ export class SearchBar {
       miniLoader.style.pointerEvents = "none";
       this.btnEl.appendChild(miniLoader);
     } else {
-      this.btnEl.title = "Search systems, planets and COGC (/)";
       this.btnEl.innerHTML = SEARCH_ICON_SVG;
+      this.btnEl.title = "Search systems, planets and COGC (/)";
+      this.btnEl.classList.remove("toolbar-btn-resource-disabled");
     }
 
     this.rowEl.appendChild(this.expandEl);
@@ -105,6 +106,7 @@ export class SearchBar {
     onResourceIndexReady(() => {
       this.btnEl.innerHTML = SEARCH_ICON_SVG;
       this.btnEl.title = "Search systems, planets and COGC (/)";
+      this.btnEl.classList.remove("toolbar-btn-resource-disabled");
     });
   }
 
@@ -117,6 +119,7 @@ export class SearchBar {
   }
 
   focus(): void {
+    if (!isResourceIndexReady()) return;
     if (!this.expanded) {
       this.expand();
     }
@@ -124,6 +127,7 @@ export class SearchBar {
   }
 
   private toggleExpand(): void {
+    if (!isResourceIndexReady()) return;
     if (this.expanded) {
       this.collapse();
     } else {
