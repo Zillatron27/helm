@@ -1,7 +1,26 @@
 import type { StarSystem, FioPlanetSummary, SearchEntry } from "../types/index.js";
+import { isResourceIndexReady, getActiveCogcCategories } from "./resourceIndex.js";
 
 let entries: SearchEntry[] = [];
 const naturalIdToUuid: Map<string, string> = new Map();
+
+// FIO ProgramType → in-game display name (all 14 real COGC programs)
+const COGC_DISPLAY_NAMES: Record<string, string> = {
+  ADVERTISING_MANUFACTURING: "Manufacturing",
+  WORKFORCE_PIONEERS: "Pioneers",
+  WORKFORCE_SETTLERS: "Settlers",
+  WORKFORCE_TECHNICIANS: "Technicians",
+  WORKFORCE_ENGINEERS: "Engineers",
+  WORKFORCE_SCIENTISTS: "Scientists",
+  ADVERTISING_AGRICULTURE: "Agriculture",
+  ADVERTISING_CHEMISTRY: "Chemistry",
+  ADVERTISING_CONSTRUCTION: "Construction",
+  ADVERTISING_ELECTRONICS: "Electronics",
+  ADVERTISING_FOOD_INDUSTRIES: "Food Industries",
+  ADVERTISING_FUEL_REFINING: "Fuel Refining",
+  ADVERTISING_METALLURGY: "Metallurgy",
+  ADVERTISING_RESOURCE_EXTRACTION: "Resource Extraction",
+};
 
 // Strip trailing lowercase letter from planet natural ID to get system natural ID.
 // Planet IDs follow XX-NNNx format (e.g. UV-351a), system IDs are XX-NNN (e.g. UV-351).
@@ -73,21 +92,28 @@ export function search(query: string, limit = 10): SearchEntry[] {
     } else if (idLower.startsWith(q)) {
       idPrefix.push(entry);
     } else if (nameLower.includes(q) || idLower.includes(q)) {
-      // COGC entries rank above generic substring matches so they
-      // aren't buried under hundreds of system/planet results
-      if (entry.type === "cogc") {
-        cogcMatches.push(entry);
-      } else {
-        substring.push(entry);
+      substring.push(entry);
+    }
+  }
+
+  // Query COGC programs at search time (available once resource index loads)
+  if (isResourceIndexReady()) {
+    for (const category of getActiveCogcCategories()) {
+      const displayName = COGC_DISPLAY_NAMES[category] ?? category.replace(/_/g, " ");
+      const cogcLabel = `COGC: ${displayName}`;
+      const cogcLower = cogcLabel.toLowerCase();
+
+      if (cogcLower === q) {
+        exact.push({ type: "cogc", id: category, name: cogcLabel, naturalId: category, systemId: "" });
+      } else if (cogcLower.startsWith(q) || displayName.toLowerCase().startsWith(q)) {
+        cogcMatches.push({ type: "cogc", id: category, name: cogcLabel, naturalId: category, systemId: "" });
+      } else if (cogcLower.includes(q)) {
+        cogcMatches.push({ type: "cogc", id: category, name: cogcLabel, naturalId: category, systemId: "" });
       }
     }
   }
 
   return [...exact, ...namePrefix, ...idPrefix, ...cogcMatches, ...substring].slice(0, limit);
-}
-
-export function addSearchEntries(newEntries: SearchEntry[]): void {
-  entries.push(...newEntries);
 }
 
 export function getSystemUuidByNaturalId(naturalId: string): string | undefined {

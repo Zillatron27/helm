@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.10.1 — 2026-03-18
+
+COGC search timing fix, correct program names, and search button loading state.
+
+### Fixed
+
+- **COGC search timing** — COGC results were injected into the search array asynchronously after the 35MB planet fetch. Searching before fetch completed returned no COGC results. COGC entries are now built on-the-fly during `search()` when the resource index is ready.
+- **Wrong COGC program names** — replaced fake program types (Education, Family Support, Festivities, Immigration) with the 14 real in-game COGC programs (Manufacturing, Pioneers, Settlers, Technicians, Engineers, Scientists, Agriculture, Chemistry, Construction, Electronics, Food Industries, Fuel Refining, Metallurgy, Resource Extraction).
+
+### Added
+
+- **Search button loading state** — search button shows a mini orbital spinner while `allplanets/full` is loading, with a "Loading COGC data..." tooltip. Swaps to the search icon when the resource index is ready. Same pattern as the resource filter button.
+
 ## 0.10.0 — 2026-03-18
 
 COGC program display, planet panel reorder, and COGC search filter.

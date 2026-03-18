@@ -9,7 +9,9 @@ import {
   getCogcFilter,
   setResourceFilter,
 } from "../state.js";
-import { getSystemsWithCogcProgram } from "../../data/resourceIndex.js";
+import { isResourceIndexReady, onResourceIndexReady, getSystemsWithCogcProgram } from "../../data/resourceIndex.js";
+import { createMiniLoader } from "../loader/LoaderAnimation.js";
+import { getTheme } from "../theme.js";
 import type { SearchEntry } from "../../types/index.js";
 import type { MapRenderer } from "../../renderer/MapRenderer.js";
 
@@ -21,23 +23,20 @@ const SEARCH_ICON_SVG = `<svg width="24" height="24" viewBox="0 0 24 24" fill="n
 </svg>`;
 
 const COGC_NAMES: Record<string, string> = {
+  ADVERTISING_MANUFACTURING: "Manufacturing",
+  WORKFORCE_PIONEERS: "Pioneers",
+  WORKFORCE_SETTLERS: "Settlers",
+  WORKFORCE_TECHNICIANS: "Technicians",
+  WORKFORCE_ENGINEERS: "Engineers",
+  WORKFORCE_SCIENTISTS: "Scientists",
   ADVERTISING_AGRICULTURE: "Agriculture",
   ADVERTISING_CHEMISTRY: "Chemistry",
   ADVERTISING_CONSTRUCTION: "Construction",
   ADVERTISING_ELECTRONICS: "Electronics",
   ADVERTISING_FOOD_INDUSTRIES: "Food Industries",
   ADVERTISING_FUEL_REFINING: "Fuel Refining",
-  ADVERTISING_MANUFACTURING: "Manufacturing",
   ADVERTISING_METALLURGY: "Metallurgy",
   ADVERTISING_RESOURCE_EXTRACTION: "Resource Extraction",
-  EDUCATION: "Education",
-  FAMILY_SUPPORT: "Family Support",
-  FESTIVITIES: "Festivities",
-  IMMIGRATION_PIONEER: "Immigration: Pioneer",
-  IMMIGRATION_SETTLER: "Immigration: Settler",
-  IMMIGRATION_TECHNICIAN: "Immigration: Technician",
-  IMMIGRATION_ENGINEER: "Immigration: Engineer",
-  IMMIGRATION_SCIENTIST: "Immigration: Scientist",
 };
 
 export class SearchBar {
@@ -82,17 +81,31 @@ export class SearchBar {
     this.expandEl.appendChild(bar);
     this.expandEl.appendChild(this.dropdownEl);
 
-    // Circular button (right)
+    // Circular button (right) — starts with mini loader if COGC data not ready
     this.btnEl = document.createElement("button");
     this.btnEl.className = "toolbar-btn";
-    this.btnEl.title = "Search systems, planets and COGC (/)";
-    this.btnEl.innerHTML = SEARCH_ICON_SVG;
     this.btnEl.addEventListener("click", () => this.toggleExpand());
+
+    if (!isResourceIndexReady()) {
+      this.btnEl.title = "Loading COGC data...";
+      const miniLoader = createMiniLoader(getTheme());
+      miniLoader.style.pointerEvents = "none";
+      this.btnEl.appendChild(miniLoader);
+    } else {
+      this.btnEl.title = "Search systems, planets and COGC (/)";
+      this.btnEl.innerHTML = SEARCH_ICON_SVG;
+    }
 
     this.rowEl.appendChild(this.expandEl);
     this.rowEl.appendChild(this.btnEl);
 
     this.bindEvents();
+
+    // Swap spinner for search icon when resource index is ready
+    onResourceIndexReady(() => {
+      this.btnEl.innerHTML = SEARCH_ICON_SVG;
+      this.btnEl.title = "Search systems, planets and COGC (/)";
+    });
   }
 
   getElement(): HTMLElement {

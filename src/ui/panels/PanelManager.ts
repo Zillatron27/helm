@@ -847,23 +847,20 @@ function renderPlanBaseLink(planetNaturalId: string): string {
 }
 
 const COGC_NAMES: Record<string, string> = {
-  ADVERTISING_AGRICULTURE: "Advertising: Agriculture",
-  ADVERTISING_CHEMISTRY: "Advertising: Chemistry",
-  ADVERTISING_CONSTRUCTION: "Advertising: Construction",
-  ADVERTISING_ELECTRONICS: "Advertising: Electronics",
-  ADVERTISING_FOOD_INDUSTRIES: "Advertising: Food Industries",
-  ADVERTISING_FUEL_REFINING: "Advertising: Fuel Refining",
-  ADVERTISING_MANUFACTURING: "Advertising: Manufacturing",
-  ADVERTISING_METALLURGY: "Advertising: Metallurgy",
-  ADVERTISING_RESOURCE_EXTRACTION: "Advertising: Resource Extraction",
-  EDUCATION: "Education",
-  FAMILY_SUPPORT: "Family Support",
-  FESTIVITIES: "Festivities",
-  IMMIGRATION_PIONEER: "Immigration: Pioneer",
-  IMMIGRATION_SETTLER: "Immigration: Settler",
-  IMMIGRATION_TECHNICIAN: "Immigration: Technician",
-  IMMIGRATION_ENGINEER: "Immigration: Engineer",
-  IMMIGRATION_SCIENTIST: "Immigration: Scientist",
+  ADVERTISING_MANUFACTURING: "Manufacturing",
+  WORKFORCE_PIONEERS: "Pioneers",
+  WORKFORCE_SETTLERS: "Settlers",
+  WORKFORCE_TECHNICIANS: "Technicians",
+  WORKFORCE_ENGINEERS: "Engineers",
+  WORKFORCE_SCIENTISTS: "Scientists",
+  ADVERTISING_AGRICULTURE: "Agriculture",
+  ADVERTISING_CHEMISTRY: "Chemistry",
+  ADVERTISING_CONSTRUCTION: "Construction",
+  ADVERTISING_ELECTRONICS: "Electronics",
+  ADVERTISING_FOOD_INDUSTRIES: "Food Industries",
+  ADVERTISING_FUEL_REFINING: "Fuel Refining",
+  ADVERTISING_METALLURGY: "Metallurgy",
+  ADVERTISING_RESOURCE_EXTRACTION: "Resource Extraction",
 };
 
 function formatCogcCategory(category: string): string {
