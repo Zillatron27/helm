@@ -81,33 +81,17 @@ export class SearchBar {
     this.expandEl.appendChild(bar);
     this.expandEl.appendChild(this.dropdownEl);
 
-    // Circular button (right) — starts with mini loader if COGC data not ready
+    // Circular button (right)
     this.btnEl = document.createElement("button");
-    this.btnEl.className = "toolbar-btn toolbar-btn-resource-disabled";
+    this.btnEl.className = "toolbar-btn";
+    this.btnEl.title = "Search systems, planets and COGC (/)";
+    this.btnEl.innerHTML = SEARCH_ICON_SVG;
     this.btnEl.addEventListener("click", () => this.toggleExpand());
-
-    if (!isResourceIndexReady()) {
-      this.btnEl.title = "Loading COGC data...";
-      const miniLoader = createMiniLoader(getTheme());
-      miniLoader.style.pointerEvents = "none";
-      this.btnEl.appendChild(miniLoader);
-    } else {
-      this.btnEl.innerHTML = SEARCH_ICON_SVG;
-      this.btnEl.title = "Search systems, planets and COGC (/)";
-      this.btnEl.classList.remove("toolbar-btn-resource-disabled");
-    }
 
     this.rowEl.appendChild(this.expandEl);
     this.rowEl.appendChild(this.btnEl);
 
     this.bindEvents();
-
-    // Swap spinner for search icon when resource index is ready
-    onResourceIndexReady(() => {
-      this.btnEl.innerHTML = SEARCH_ICON_SVG;
-      this.btnEl.title = "Search systems, planets and COGC (/)";
-      this.btnEl.classList.remove("toolbar-btn-resource-disabled");
-    });
   }
 
   getElement(): HTMLElement {
@@ -119,7 +103,6 @@ export class SearchBar {
   }
 
   focus(): void {
-    if (!isResourceIndexReady()) return;
     if (!this.expanded) {
       this.expand();
     }
@@ -127,7 +110,6 @@ export class SearchBar {
   }
 
   private toggleExpand(): void {
-    if (!isResourceIndexReady()) return;
     if (this.expanded) {
       this.collapse();
     } else {
@@ -297,13 +279,24 @@ export class SearchBar {
     }
 
     if (entry.type === "cogc") {
-      // COGC filter — highlight matching systems on galaxy view
-      const matchingSystems = getSystemsWithCogcProgram(entry.id);
-      setResourceFilter(null);
-      setCogcFilter(entry.id);
-      this.renderer?.setHighlightedSystems(matchingSystems.size > 0 ? matchingSystems : null);
       const label = COGC_NAMES[entry.id] ?? entry.id.replace(/_/g, " ");
       this.showCogcBadge(label);
+      setResourceFilter(null);
+      setCogcFilter(entry.id);
+
+      // Show spinner while COGC data loads, then apply filter
+      this.showButtonSpinner();
+      const applyCogcFilter = (): void => {
+        const matchingSystems = getSystemsWithCogcProgram(entry.id);
+        this.renderer?.setHighlightedSystems(matchingSystems.size > 0 ? matchingSystems : null);
+        this.restoreButtonIcon();
+      };
+
+      if (isResourceIndexReady()) {
+        applyCogcFilter();
+      } else {
+        onResourceIndexReady(applyCogcFilter);
+      }
     } else if (entry.type === "planet") {
       setTimeout(() => {
         this.renderer?.panToPlanet(entry.systemId, entry.id);
@@ -312,6 +305,17 @@ export class SearchBar {
       setSelectedEntity({ type: "system", id: entry.systemId });
       this.renderer?.panToSystem(entry.systemId);
     }
+  }
+
+  private showButtonSpinner(): void {
+    this.btnEl.innerHTML = "";
+    const miniLoader = createMiniLoader(getTheme());
+    miniLoader.style.pointerEvents = "none";
+    this.btnEl.appendChild(miniLoader);
+  }
+
+  private restoreButtonIcon(): void {
+    this.btnEl.innerHTML = SEARCH_ICON_SVG;
   }
 
   private showCogcBadge(label: string): void {
