@@ -282,13 +282,17 @@ export class SearchBar {
       setCogcFilter(entry.id);
 
       const applyCogcFilter = (): void => {
-        const matchingSystems = getSystemsWithCogcProgram(entry.id);
-        this.renderer?.setHighlightedSystems(matchingSystems.size > 0 ? matchingSystems : null);
-        this.showCogcBadge(label);
+        // Show loading state, then defer highlight work by one frame
+        // so the badge text renders before the expensive setHighlightedSystems call
+        this.showCogcBadge(`${label} \u2014 Loading\u2026`);
+        requestAnimationFrame(() => {
+          const matchingSystems = getSystemsWithCogcProgram(entry.id);
+          this.renderer?.setHighlightedSystems(matchingSystems.size > 0 ? matchingSystems : null);
+          this.showCogcBadge(label);
+        });
       };
 
       if (isResourceIndexReady()) {
-        this.showCogcBadge(label);
         applyCogcFilter();
       } else {
         this.showCogcBadge(`${label} \u2014 Loading\u2026`);

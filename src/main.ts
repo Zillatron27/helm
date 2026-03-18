@@ -121,16 +121,15 @@ async function boot(): Promise<void> {
       // Resource filter — sync path handles clearing only.
       // Setting a filter goes through the async path (ResourcePicker.setFilterCallback)
       // to yield between chunks so the spinner stays animated.
+      const cogcCat = getCogcFilter();
       const filterMat = getResourceFilter();
-      if (!filterMat) {
+      if (!filterMat && !cogcCat) {
         renderer.setResourceFilter(null);
       }
       resourcePicker.syncState();
 
-      // COGC filter — sync badge and clear highlights when needed
-      const cogcCat = getCogcFilter();
+      // COGC filter — clear highlights only when neither filter is active
       if (!cogcCat) {
-        // Only clear highlights if no resource filter is active either
         if (!filterMat) {
           renderer.setHighlightedSystems(null);
         }
