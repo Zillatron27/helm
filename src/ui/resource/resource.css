@@ -156,6 +156,15 @@
   flex-shrink: 1;
 }
 
+/* Concentration percentage next to bar */
+.panel-resource-pct {
+  color: var(--text-secondary);
+  font-size: 11px;
+  min-width: 28px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
 /* Resource badge in panel header */
 .panel-badge-resource {
   background: rgba(0, 204, 170, 0.15);

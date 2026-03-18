@@ -202,12 +202,12 @@ export class SearchBar {
             : r.type === "cogc"
             ? "search-result-type-cogc"
             : "search-result-type-planet";
+        const meta = r.type === "cogc"
+          ? `<span class="search-result-meta"><span class="search-result-type ${typeClass}">${r.type}</span></span>`
+          : `<span class="search-result-meta"><span class="search-result-id">${esc(r.naturalId)}</span><span class="search-result-type ${typeClass}">${r.type}</span></span>`;
         return `<div class="search-result${activeClass}" data-index="${i}">
           <span class="search-result-name">${esc(r.name || r.naturalId)}</span>
-          <span class="search-result-meta">
-            <span class="search-result-id">${esc(r.naturalId)}</span>
-            <span class="search-result-type ${typeClass}">${r.type}</span>
-          </span>
+          ${meta}
         </div>`;
       })
       .join("");

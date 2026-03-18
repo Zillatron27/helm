@@ -168,7 +168,7 @@ export class PanelManager {
   private showResourceFilterPanel(system: StarSystem, materialId: string): void {
     const ticker = getMaterialTicker(materialId);
     const material = getMaterialByTicker(ticker);
-    const materialName = material?.Name ?? ticker;
+    const materialName = formatCamelCase(material?.Name ?? ticker);
 
     // Find matching planets in this system from the resource index
     const allMatches = getPlanetsWithResource(materialId);
@@ -187,13 +187,14 @@ export class PanelManager {
       const priceText = price && price.ask !== null
         ? `<span class="panel-resource-price">${Math.round(price.ask)} ${esc(price.currency)}</span>`
         : "";
+      const pct = Math.round(match.factor * 100);
       return `
         <div class="panel-resource-filter-row">
           <a class="panel-planet-link" data-planet-id="${esc(planetId)}" data-planet-system="${esc(system.id)}">${esc(name)}</a>
-          <span class="panel-resource-type">${esc(formatResourceType(match.resourceType))}</span>
           <div class="panel-resource-bar">
-            <div class="panel-resource-bar-fill" style="width: ${Math.round(match.factor * 100)}%"></div>
+            <div class="panel-resource-bar-fill" style="width: ${pct}%"></div>
           </div>
+          <span class="panel-resource-pct">${pct}%</span>
           ${priceText}
         </div>
       `;
@@ -712,6 +713,13 @@ function formatResourceType(type: string): string {
   // Convert "GASEOUS" → "Gas", "LIQUID" → "Liquid", "MINERAL" → "Mineral"
   if (!type) return "";
   return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+}
+
+/** Split camelCase FIO names into words: "aluminiumOre" → "Aluminium Ore" */
+function formatCamelCase(name: string): string {
+  return name
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/^./, (c) => c.toUpperCase());
 }
 
 function tempClass(temp: number): string {

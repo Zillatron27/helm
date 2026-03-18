@@ -251,12 +251,12 @@ export class ResourcePicker {
 
     let html = "";
     for (const [category, entries] of grouped) {
-      html += `<div class="resource-category">${esc(category)}</div>`;
+      html += `<div class="resource-category">${esc(formatCamelCase(category))}</div>`;
       for (const { material, index } of entries) {
         const activeClass = index === this.activeIndex ? " resource-item-active" : "";
         html += `<div class="resource-item${activeClass}" data-index="${index}">
           <span class="resource-item-ticker">${esc(material.Ticker)}</span>
-          <span class="resource-item-name">${esc(material.Name)}</span>
+          <span class="resource-item-name">${esc(formatCamelCase(material.Name))}</span>
         </div>`;
       }
     }
@@ -378,4 +378,11 @@ function esc(text: string): string {
   const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
+}
+
+/** Split camelCase FIO names into words: "aluminiumOre" → "Aluminium Ore" */
+function formatCamelCase(name: string): string {
+  return name
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/^./, (c) => c.toUpperCase());
 }
