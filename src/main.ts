@@ -111,11 +111,6 @@ async function boot(): Promise<void> {
     // --- Display labels for COGC program categories ---
     const COGC_NAMES: Record<string, string> = {
       ADVERTISING_MANUFACTURING: "Manufacturing",
-      WORKFORCE_PIONEERS: "Pioneers",
-      WORKFORCE_SETTLERS: "Settlers",
-      WORKFORCE_TECHNICIANS: "Technicians",
-      WORKFORCE_ENGINEERS: "Engineers",
-      WORKFORCE_SCIENTISTS: "Scientists",
       ADVERTISING_AGRICULTURE: "Agriculture",
       ADVERTISING_CHEMISTRY: "Chemistry",
       ADVERTISING_CONSTRUCTION: "Construction",

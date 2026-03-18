@@ -4,14 +4,9 @@ import { isResourceIndexReady, getActiveCogcCategories } from "./resourceIndex.j
 let entries: SearchEntry[] = [];
 const naturalIdToUuid: Map<string, string> = new Map();
 
-// FIO ProgramType → in-game display name (all 14 real COGC programs)
+// FIO ProgramType → in-game display name (ADVERTISING_* COGC programs only)
 const COGC_DISPLAY_NAMES: Record<string, string> = {
   ADVERTISING_MANUFACTURING: "Manufacturing",
-  WORKFORCE_PIONEERS: "Pioneers",
-  WORKFORCE_SETTLERS: "Settlers",
-  WORKFORCE_TECHNICIANS: "Technicians",
-  WORKFORCE_ENGINEERS: "Engineers",
-  WORKFORCE_SCIENTISTS: "Scientists",
   ADVERTISING_AGRICULTURE: "Agriculture",
   ADVERTISING_CHEMISTRY: "Chemistry",
   ADVERTISING_CONSTRUCTION: "Construction",

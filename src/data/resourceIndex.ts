@@ -13,6 +13,9 @@ const extractableMaterialIds: Set<string> = new Set();
 // COGC index: category → planets with that active program
 const cogcIndex: Map<string, CogcMatch[]> = new Map();
 
+// Reverse lookup: planetNaturalId → active COGC program
+const planetCogcLookup: Map<string, { category: string; endsAt: number }> = new Map();
+
 let ready = false;
 const readyCallbacks: Array<() => void> = [];
 
@@ -80,6 +83,8 @@ export async function initResourceIndex(): Promise<void> {
     if (!programs) continue;
     for (const prog of programs) {
       if (!prog.ProgramType) continue;
+      // Only index actual COGC programs — excludes migration/education programs
+      if (!prog.ProgramType.startsWith("ADVERTISING_")) continue;
       if (now >= prog.StartEpochMs && now <= prog.EndEpochMs) {
         let list = cogcIndex.get(prog.ProgramType);
         if (!list) {
@@ -89,6 +94,10 @@ export async function initResourceIndex(): Promise<void> {
         list.push({
           planetNaturalId: planet.PlanetNaturalId,
           systemId: planet.SystemId,
+          endsAt: prog.EndEpochMs,
+        });
+        planetCogcLookup.set(planet.PlanetNaturalId, {
+          category: prog.ProgramType,
           endsAt: prog.EndEpochMs,
         });
       }
@@ -132,6 +141,11 @@ export function getCogcProgramPlanets(category: string): CogcMatch[] {
 
 export function getActiveCogcCategories(): string[] {
   return Array.from(cogcIndex.keys());
+}
+
+/** Get the active COGC program for a specific planet, if any. */
+export function getPlanetCogcProgram(planetNaturalId: string): { category: string; endsAt: number } | null {
+  return planetCogcLookup.get(planetNaturalId) ?? null;
 }
 
 export function getSystemsWithCogcProgram(category: string): Set<string> {

@@ -1,5 +1,6 @@
 import type { InfrastructureData } from "../types/index.js";
 import { fetchPlanetInfrastructure } from "./fio.js";
+import { getPlanetCogcProgram } from "./resourceIndex.js";
 
 const cache = new Map<string, InfrastructureData>();
 const pending = new Map<string, Promise<InfrastructureData | null>>();
@@ -79,15 +80,9 @@ async function fetchAndProcess(planetNaturalId: string): Promise<InfrastructureD
     }
     const projects = Array.from(projectMap.values());
 
-    // Extract active COGC program
-    const now = Date.now();
-    const programs = raw.InfrastructurePrograms ?? [];
-    const activeProgram = programs.find(
-      (p) => now >= p.StartTimestampEpochMs && now <= p.EndTimestampEpochMs
-    );
-    const cogcProgram = activeProgram
-      ? { category: activeProgram.Category, endsAt: activeProgram.EndTimestampEpochMs }
-      : null;
+    // COGC program comes from the full planet data (COGCPrograms), not
+    // InfrastructurePrograms which only contains population programs.
+    const cogcProgram = getPlanetCogcProgram(planetNaturalId);
 
     const data: InfrastructureData = { population, projects, cogcProgram };
     cache.set(planetNaturalId, data);
