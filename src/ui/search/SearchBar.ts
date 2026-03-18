@@ -10,8 +10,6 @@ import {
   setResourceFilter,
 } from "../state.js";
 import { isResourceIndexReady, onResourceIndexReady, getSystemsWithCogcProgram } from "../../data/resourceIndex.js";
-import { createMiniLoader } from "../loader/LoaderAnimation.js";
-import { getTheme } from "../theme.js";
 import type { SearchEntry } from "../../types/index.js";
 import type { MapRenderer } from "../../renderer/MapRenderer.js";
 
@@ -280,21 +278,20 @@ export class SearchBar {
 
     if (entry.type === "cogc") {
       const label = COGC_NAMES[entry.id] ?? entry.id.replace(/_/g, " ");
-      this.showCogcBadge(label);
       setResourceFilter(null);
       setCogcFilter(entry.id);
 
-      // Show spinner while COGC data loads, then apply filter
-      this.showButtonSpinner();
       const applyCogcFilter = (): void => {
         const matchingSystems = getSystemsWithCogcProgram(entry.id);
         this.renderer?.setHighlightedSystems(matchingSystems.size > 0 ? matchingSystems : null);
-        this.restoreButtonIcon();
+        this.showCogcBadge(label);
       };
 
       if (isResourceIndexReady()) {
+        this.showCogcBadge(label);
         applyCogcFilter();
       } else {
+        this.showCogcBadge(`${label} \u2014 Loading\u2026`);
         onResourceIndexReady(applyCogcFilter);
       }
     } else if (entry.type === "planet") {
@@ -305,17 +302,6 @@ export class SearchBar {
       setSelectedEntity({ type: "system", id: entry.systemId });
       this.renderer?.panToSystem(entry.systemId);
     }
-  }
-
-  private showButtonSpinner(): void {
-    this.btnEl.innerHTML = "";
-    const miniLoader = createMiniLoader(getTheme());
-    miniLoader.style.pointerEvents = "none";
-    this.btnEl.appendChild(miniLoader);
-  }
-
-  private restoreButtonIcon(): void {
-    this.btnEl.innerHTML = SEARCH_ICON_SVG;
   }
 
   private showCogcBadge(label: string): void {
