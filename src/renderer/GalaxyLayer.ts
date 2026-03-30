@@ -12,7 +12,7 @@ import { StarParticles } from "./StarParticles.js";
 import { TweenManager } from "./Tween.js";
 import { yieldToMain } from "../util/yieldToMain.js";
 
-const STAR_RADIUS = 7;
+const STAR_RADIUS = 12;
 const HIT_RADIUS = 24;
 const DOUBLE_CLICK_MS = 300;
 const HOVER_SCALE = 1.4;

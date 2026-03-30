@@ -2,7 +2,7 @@ import { Container, Graphics, Text, TextStyle } from "pixi.js";
 import type { SectorHex } from "../types/index.js";
 import { getTheme } from "../ui/theme.js";
 
-const HEX_STROKE_ALPHA = 0.38;
+const HEX_STROKE_ALPHA = 0.19;
 
 // Base stroke width and clamp range for zoom-responsive scaling
 const HEX_BASE = 1.5;
