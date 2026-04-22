@@ -1,4 +1,5 @@
 import type { ViewLevel, SelectedEntity, Route } from "../types/index.js";
+import type { BridgeSnapshot } from "../data/bridge-types.js";
 
 type StateListener = () => void;
 
@@ -143,6 +144,34 @@ export function onCogcFilterChange(listener: StateListener): void {
 
 export function offCogcFilterChange(listener: StateListener): void {
   cogcFilterListeners.delete(listener);
+}
+
+// --- Bridge snapshot (Helm Extension data) ---
+// Same listener-set pattern as the filter subscriptions above. Phase 3 wires
+// snapshot reception via src/data/bridge.ts; Phase 4+ panels subscribe here.
+
+let bridgeSnapshot: BridgeSnapshot | null = null;
+const bridgeSnapshotListeners: Set<StateListener> = new Set();
+
+function notifyBridgeSnapshotListeners(): void {
+  for (const fn of bridgeSnapshotListeners) fn();
+}
+
+export function getBridgeSnapshot(): BridgeSnapshot | null {
+  return bridgeSnapshot;
+}
+
+export function setBridgeSnapshot(snapshot: BridgeSnapshot | null): void {
+  bridgeSnapshot = snapshot;
+  notifyBridgeSnapshotListeners();
+}
+
+export function onBridgeSnapshotChange(listener: StateListener): void {
+  bridgeSnapshotListeners.add(listener);
+}
+
+export function offBridgeSnapshotChange(listener: StateListener): void {
+  bridgeSnapshotListeners.delete(listener);
 }
 
 // Resource filter — persists until explicitly cleared

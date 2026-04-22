@@ -10,6 +10,7 @@ import { isResourceIndexReady, onResourceIndexReady, getSystemsWithCogcProgram }
 import { yieldToMain } from "./util/yieldToMain.js";
 import { initTheme, getTheme } from "./ui/theme.js";
 import { createLoader } from "./ui/loader/LoaderAnimation.js";
+import { initBridge } from "./data/bridge.js";
 import "./ui/search/search.css";
 import "./ui/settings.css";
 import "./ui/resource/resource.css";
@@ -44,6 +45,13 @@ const SETTLED_ICON_SVG = `<svg width="26" height="26" viewBox="0 0 26 26" fill="
 </svg>`;
 
 async function boot(): Promise<void> {
+  // Attach the Helm Extension message listener before any await — the
+  // extension's content script runs at document_start and the SW notifies
+  // APEX as soon as both tabs register, so hello can arrive before
+  // createMap() resolves on a slow connection. There's no retry on the
+  // extension side per protocol §3.3.
+  initBridge();
+
   try {
     const helm = await createMap(container);
     const { renderer, panelManager } = helm;
@@ -99,6 +107,12 @@ async function boot(): Promise<void> {
     // Settings panel row
     const settingsPanel = new SettingsPanel();
     toolbar.appendChild(settingsPanel.getElement());
+
+    // HUD toolbar slot — Phase 4+ overview panels (burn/fleet/warehouse)
+    // append their toggle buttons here. Empty in Phase 3.
+    const hudToolbarSlot = document.createElement("div");
+    hudToolbarSlot.id = "hud-toolbar-slot";
+    toolbar.appendChild(hudToolbarSlot);
 
     document.body.appendChild(toolbar);
 
