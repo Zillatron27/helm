@@ -15,6 +15,32 @@
   </head>
   <body>
     <div id="app"></div>
+    <script>
+      // Bridge bootstrap — synchronous, runs before the module bundle loads.
+      // Extension content script (document_start) can post helm-extension-hello
+      // before initBridge() attaches its listener; without this buffer, the
+      // hello is dropped and handshake never completes. See src/data/bridge.ts.
+      // Inbound type list is duplicated from bridge.ts INBOUND_TYPES — keep in sync.
+      (function () {
+        var INBOUND = { "helm-extension-hello": 1, "helm-init": 1, "helm-update": 1 };
+        var queue = [];
+        function capture(ev) {
+          var d = ev && ev.data;
+          if (!d || typeof d !== "object") return;
+          if (!INBOUND[d.type]) return;
+          queue.push(ev);
+        }
+        window.addEventListener("message", capture);
+        window.__helmBridgeBootstrap = {
+          drain: function () {
+            window.removeEventListener("message", capture);
+            var out = queue;
+            queue = [];
+            return out;
+          },
+        };
+      })();
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

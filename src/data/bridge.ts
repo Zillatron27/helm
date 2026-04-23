@@ -52,21 +52,40 @@ function detectTier(): 2 | 3 {
   return window.self !== window.top ? 3 : 2;
 }
 
+interface BridgeBootstrap {
+  drain: () => MessageEvent[];
+}
+
 export function initBridge(): void {
   if (initialized) return;
   initialized = true;
 
+  // Drain any envelopes buffered by the inline bootstrap in index.html
+  // before attaching the real listener. The bootstrap's own listener is
+  // removed inside drain(), so there's no double-dispatch window.
+  const w = window as unknown as { __helmBridgeBootstrap?: BridgeBootstrap };
+  const buffered = w.__helmBridgeBootstrap?.drain() ?? [];
+  delete w.__helmBridgeBootstrap;
+
   window.addEventListener("message", handleMessage);
 
+  for (const ev of buffered) handleMessage(ev);
+
   // Local diagnostic timer — NOT a protocol timeout. The protocol §3.3
-  // timeout is enforced extension-side. This just surfaces the tier-1
-  // (no extension installed) case in the console for debugging.
+  // timeout is enforced extension-side. Distinguishes three cases at the
+  // 3s mark: handshake completed, bridge active via replay (hello missed
+  // but init arrived), or genuinely no extension.
   setTimeout(() => {
-    if (!handshakeComplete) {
+    if (handshakeComplete) return;
+    if (getBridgeSnapshot() !== null) {
       console.log(
-        "[Helm Bridge] no extension detected after 3s (tier-1 standalone path)",
+        "[Helm Bridge] bridge active but hello was not acked — extension detected via replay",
       );
+      return;
     }
+    console.log(
+      "[Helm Bridge] no extension detected after 3s (tier-1 standalone path)",
+    );
   }, HANDSHAKE_DIAGNOSTIC_TIMEOUT_MS);
 }
 
