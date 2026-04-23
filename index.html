@@ -42,6 +42,14 @@
             return out;
           },
         };
+        // Signal to the Helm Extension content script that this page is
+        // ready to receive window.postMessage traffic. The content script
+        // may have been holding envelopes (hello/init) that arrived via
+        // runtime IPC before the HTML parser reached this script tag.
+        // Dispatching synchronously after attaching `capture` guarantees the
+        // capture listener is live before any queued envelope is delivered.
+        console.log("[Helm Bootstrap] dispatching helm-bridge-page-ready");
+        window.dispatchEvent(new Event("helm-bridge-page-ready"));
       })();
     </script>
     <script type="module" src="/src/main.ts"></script>
