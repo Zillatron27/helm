@@ -22,12 +22,14 @@
       // hello is dropped and handshake never completes. See src/data/bridge.ts.
       // Inbound type list is duplicated from bridge.ts INBOUND_TYPES — keep in sync.
       (function () {
+        console.log("[Helm Bootstrap] inline script running, attaching capture listener");
         var INBOUND = { "helm-extension-hello": 1, "helm-init": 1, "helm-update": 1 };
         var queue = [];
         function capture(ev) {
           var d = ev && ev.data;
           if (!d || typeof d !== "object") return;
           if (!INBOUND[d.type]) return;
+          console.log("[Helm Bootstrap] captured", d.type, "source===window:", ev.source === window, "origin:", ev.origin);
           queue.push(ev);
         }
         window.addEventListener("message", capture);
@@ -36,6 +38,7 @@
             window.removeEventListener("message", capture);
             var out = queue;
             queue = [];
+            console.log("[Helm Bootstrap] drain returning", out.length, "events");
             return out;
           },
         };

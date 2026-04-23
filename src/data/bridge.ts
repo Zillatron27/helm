@@ -69,11 +69,13 @@ export function initBridge(): void {
   // before attaching the real listener. The bootstrap's own listener is
   // removed inside drain(), so there's no double-dispatch window.
   const w = window as unknown as { __helmBridgeBootstrap?: BridgeBootstrap };
+  console.log("[Helm Bridge] initBridge: bootstrap present =", !!w.__helmBridgeBootstrap);
   const buffered = w.__helmBridgeBootstrap?.drain() ?? [];
   delete w.__helmBridgeBootstrap;
 
   window.addEventListener("message", handleMessage);
 
+  console.log("[Helm Bridge] replaying", buffered.length, "buffered events");
   for (const ev of buffered) handleMessage(ev);
 
   // Local diagnostic timer — NOT a protocol timeout. The protocol §3.3
