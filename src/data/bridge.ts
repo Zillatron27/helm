@@ -41,12 +41,17 @@ const INBOUND_TYPES = new Set<string>([
   "helm-update",
 ]);
 
-const HANDSHAKE_DIAGNOSTIC_TIMEOUT_MS = 3000;
+// Longer than the extension's own HANDSHAKE_TIMEOUT_MS (3000) because this
+// window has to cover SW wake + runtime.sendMessage relay + extension-side
+// handshake on a cold reload path. Logs when we haven't seen a hello in
+// this long, which is a meaningful "extension probably not installed" signal.
+const HANDSHAKE_DIAGNOSTIC_TIMEOUT_MS = 10000;
 
 let initialized = false;
 let parentSource: Window | null = null;
 let parentOrigin: string | null = null;
 let handshakeComplete = false;
+let diagnosticTimer: ReturnType<typeof setTimeout> | null = null;
 
 function detectTier(): 2 | 3 {
   return window.self !== window.top ? 3 : 2;
@@ -72,10 +77,11 @@ export function initBridge(): void {
   for (const ev of buffered) handleMessage(ev);
 
   // Local diagnostic timer — NOT a protocol timeout. The protocol §3.3
-  // timeout is enforced extension-side. Distinguishes three cases at the
-  // 3s mark: handshake completed, bridge active via replay (hello missed
-  // but init arrived), or genuinely no extension.
-  setTimeout(() => {
+  // timeout is enforced extension-side. Cleared by handleHello on success;
+  // if it fires, distinguishes "bridge active via replay" (hello missed,
+  // but init arrived) from "no extension" (genuinely absent).
+  diagnosticTimer = setTimeout(() => {
+    diagnosticTimer = null;
     if (handshakeComplete) return;
     if (getBridgeSnapshot() !== null) {
       console.log(
@@ -84,7 +90,7 @@ export function initBridge(): void {
       return;
     }
     console.log(
-      "[Helm Bridge] no extension detected after 3s (tier-1 standalone path)",
+      `[Helm Bridge] no extension detected after ${HANDSHAKE_DIAGNOSTIC_TIMEOUT_MS / 1000}s (tier-1 standalone path)`,
     );
   }, HANDSHAKE_DIAGNOSTIC_TIMEOUT_MS);
 }
@@ -150,6 +156,10 @@ function handleHello(event: MessageEvent, msg: HelmExtensionHelloMessage): void 
   );
   sendAck(tier);
   handshakeComplete = true;
+  if (diagnosticTimer !== null) {
+    clearTimeout(diagnosticTimer);
+    diagnosticTimer = null;
+  }
 }
 
 function sendAck(tier: 2 | 3): void {
