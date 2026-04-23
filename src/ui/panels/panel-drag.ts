@@ -4,7 +4,9 @@
  * Shared pointer-event based drag and vertical resize for floating panels.
  * Includes localStorage layout persistence (debounced 500ms).
  *
- * Ported from apxm/shell/src/ui/panel-drag.ts. Verbatim — no deps.
+ * Ported verbatim (no deps) from the APXM desktop-view shell that this code
+ * was extracted from during the Helm/Helm-Extension separation; see
+ * APXM_Helm_Migration_Plan.md §Phase 3 HELM section.
  *
  * localStorage key convention: callers should pass "helm-panel-layout-<id>"
  * to avoid collision with existing helm-gateways / helm-settled keys.

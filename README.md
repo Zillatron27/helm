@@ -57,9 +57,9 @@ npm run typecheck  # TypeScript compiler check
 npm run build      # Production build → dist/
 ```
 
-## Also Powers APXM
+## With the Helm Extension
 
-Helm is packaged as a library and embedded inside [APXM](https://27bit.dev/apxm/) — the empire HUD extension for Prosperous Universe. The desktop mode overlays your bases and ships live onto the universe map.
+When the [Helm Extension](https://github.com/Zillatron27/helm-extension) is installed, Helm becomes the desktop empire-overview surface for Prosperous Universe. The extension reads live game state from APEX and feeds it across the Helm Bridge; Helm draws empire overlays on the map (your bases, ships, CX inventory presence) and renders overview panels (burn, fleet, etc.). Helm remains fully useful standalone without the extension — it's an additive enhancement, not a dependency.
 
 ## Acknowledgements
 

@@ -6,7 +6,9 @@
  * planet detail panels for the galaxy map. The two panel systems coexist
  * intentionally and must not be merged.
  *
- * Ported from apxm/shell/src/ui/panel-manager.ts. Verbatim — no shell deps.
+ * Ported verbatim (no shell deps) from the APXM desktop-view shell that this
+ * code was extracted from during the Helm/Helm-Extension separation; see
+ * APXM_Helm_Migration_Plan.md §Phase 3 HELM section.
  *
  * Backdrop is at z-index 49. Phase 4 note: existing Helm panels use z-index 50
  * (src/ui/panels/panel.css) and search/resource UI uses 60-62. Overview panel

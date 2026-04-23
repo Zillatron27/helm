@@ -1,5 +1,6 @@
 /* Shared styles for floating overview panels (pin button, resize handle).
- * Ported from apxm/shell/src/ui/panel-common.css. */
+ * Ported from the APXM desktop-view shell during the Helm/Helm-Extension
+ * separation; see APXM_Helm_Migration_Plan.md §Phase 3 HELM section. */
 
 .panel-pin-btn {
   background: none;
