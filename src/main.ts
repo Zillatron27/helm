@@ -5,7 +5,7 @@ import { RoutePanel } from "./ui/search/RoutePanel.js";
 import { SettingsPanel } from "./ui/SettingsPanel.js";
 import { ResourcePicker } from "./ui/resource/ResourcePicker.js";
 import { setupControls } from "./ui/controls.js";
-import { onStateChange, getGatewaysVisible, setGatewaysVisible, getSettledVisible, setSettledVisible, getResourceFilter, getCogcFilter, onResourceFilterChange, onCogcFilterChange } from "./ui/state.js";
+import { onStateChange, getGatewaysVisible, setGatewaysVisible, getSettledVisible, setSettledVisible, getResourceFilter, getCogcFilter, onResourceFilterChange, onCogcFilterChange, getBridgeSnapshot, onBridgeSnapshotChange } from "./ui/state.js";
 import { isResourceIndexReady, onResourceIndexReady, getSystemsWithCogcProgram } from "./data/resourceIndex.js";
 import { yieldToMain } from "./util/yieldToMain.js";
 import { initTheme, getTheme } from "./ui/theme.js";
@@ -51,6 +51,11 @@ async function boot(): Promise<void> {
   // createMap() resolves on a slow connection. There's no retry on the
   // extension side per protocol §3.3.
   initBridge();
+
+  (window as unknown as { __helm: unknown }).__helm = {
+    getBridgeSnapshot,
+    onBridgeSnapshotChange,
+  };
 
   try {
     const helm = await createMap(container);

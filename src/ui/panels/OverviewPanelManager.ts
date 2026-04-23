@@ -29,6 +29,10 @@ function ensureBackdrop(): HTMLDivElement {
   if (backdrop) return backdrop;
   backdrop = document.createElement("div");
   backdrop.id = "panel-backdrop";
+  // Z-INDEX LAYERING (Phase 3): Backdrop at 49 sits below Helm's existing
+  // overlays (50/60/62/100). Phase 4 must decide whether mounted HUD panels
+  // should sit under or above these overlays — if above, the entire HUD
+  // z-index range needs to shift above 100.
   backdrop.style.cssText = `
     position: fixed;
     inset: 0;
