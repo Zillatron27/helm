@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.11.0-dev — feature/hud
+
+Phase 3 HUD chassis + Helm Extension bridge reception + empire dim lens (Capability 1 of the empire overlay spec).
+
+### Added
+
+- **Empire dim / highlight lens** — toolbar button (tier-gated on bridge snapshot) and keyboard `E` toggle a lens that keeps empire systems bright and dims everything else on the galaxy view; same for empire planets in system view. Empty empire dims everything (intentional — matches empire-overlay.md §1). Toggling the lens on smoothly frames the empire's bounding box in the viewport via `MapRenderer.frameEmpire()`. State persists to `helm-empire-dim` localStorage key. Icon: concentric rings (bright centre + bright inner ring + dim outer ring at 0.4 opacity).
+- **Bridge reception layer** (`src/data/bridge.ts`) — receives Helm Extension envelopes, validates protocol version, publishes `BridgeSnapshot` via `state.ts` subscription pattern. Tier-2 (standalone tab) and tier-3 (embedded iframe) paths, inline bootstrap buffer + `helm-bridge-page-ready` handshake to close the document_start race.
+- **HUD framework chassis** (`src/ui/panels/OverviewPanelManager.ts`) — single-active-panel positioning, backdrop, viewport-clamped anchor, `#hud-toolbar-slot` placeholder. No panels mounted yet.
+- **`window.__helm` debug handle** — `{ getBridgeSnapshot, onBridgeSnapshotChange }`, exposed unconditionally for console verification across tier 2/3 origins.
+- **`empireIndex.ts`** — derived view of `snapshot.sites[]` yielding empire system UUIDs and planet natural IDs, exposed via `getEmpireSystemMatches` / `getEmpirePlanetMatches` / `onEmpireIndexChange`. Returns null when the lens is off so it drops out of composition.
+- **`filterMatches.ts`** — thin projection layer reading filter state and index data into `Set`s of match IDs (`getResourceSystemMatches`, `getResourcePlanetMatches`, `getCogcSystemMatches`).
+- **`MapRenderer.onAfterRebuild`** — callback surface fired at the end of `rebuild()` so consumers can re-apply composition state after a theme swap reconstructs layers.
+- **`MapRenderer.setDimmedPlanets` / `setResourceConcentrations` / `setResourceConcentrationsAsync`** — narrower renderer API that separates "draw concentration dots" from "apply dim."
+- **`MapRenderer.frameEmpire()`** — reads empire set and frames the empire's bounding box via the existing `frameRoute` path.
+
+### Changed
+
+- **Composition refactor.** Resource filter and COGC filter no longer drive dimming from inside their rendering paths. A single composition function in `main.ts` intersects the active (non-null) match sets from resource + COGC + empire and calls `renderer.setHighlightedSystems(compose())` and `renderer.setDimmedPlanets(compose())` once. Up to three filters can compose; bright set is the N-way intersection. Empire dim composes with the resource filter on the planet side too (COGC is galaxy-only). Composed sets are memoized so `onStateChange` tickling (view level, selection, route) doesn't re-enter `applyHighlightFilter` unnecessarily.
+- **`GalaxyLayer.setResourceFilter` / `setResourceFilterAsync` → `setResourceConcentrations` / `setResourceConcentrationsAsync`.** Concentration dots only; no longer touch highlight state. Async version carries a generation counter so rapid picker changes cancel stale runs instead of interleaving dots.
+- **`SystemLayer.setResourceFilter` → `setDimmedPlanets(naturalIds)`.** Layer no longer reaches into `resourceIndex` itself; main.ts supplies the composed set. `show()` replays the stored set after planet construction, covering the fire-and-forget planet-load re-entry path.
+- **Settled-system toolbar button removed.** Keyboard `S`, rendering, localStorage (`helm-settled`), and data layer all retained — only the toolbar entry point is gone.
+- **Bridge timing hardened.** Inline bootstrap in `index.html` captures `helm-extension-hello` / `helm-init` / `helm-update` before the module bundle evaluates; dispatches `helm-bridge-page-ready` to tell the extension it's safe to flush. Extension waits on that event before delivering, eliminating the document_start race.
+- **Bridge diagnostic timer** extended from 3s to 10s to cover SW cold start + runtime IPC on Firefox.
+
+### Fixed
+
+- **CX diamonds, gateway arcs/indicators, jump lines, glow container, and route overlay disappearing after system-view exit** — `applyComposition` was firing on every `onStateChange` (view level, selection, route), each pass calling `setHighlightedSystems` → `applyHighlightFilter` → `tweens.clear()`. The clear killed in-flight restore tweens that `galaxy.restore()` had just started to fade containers from 0.05 (system-view dim) back to 1.0, freezing them mid-tween. Fix: memoize the composed galaxy and planet sets so the renderer is only called when they actually change; reset the memo on `onAfterRebuild`.
+- **Stale cross-tab transport teardown** on helm-tab reload (`browser.tabs.onRemoved` doesn't fire on reload; extension now tears down stale transports before reconnecting).
+
 ## 0.10.1 — 2026-03-18
 
 Filter state refactor, highlight rendering fix, COGC data source fix, and UI polish.
