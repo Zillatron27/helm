@@ -107,7 +107,9 @@ export function setupControls(
       case "e":
         e.preventDefault();
         if (getBridgeSnapshot() !== null) {
-          setEmpireDim(!getEmpireDim());
+          const next = !getEmpireDim();
+          setEmpireDim(next);
+          if (next) renderer.frameEmpire();
         }
         break;
     }

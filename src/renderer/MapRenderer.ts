@@ -15,6 +15,7 @@ import {
   recolourCachedPlanets,
 } from "../data/cache.js";
 import { clearPlanetTextureCache } from "./PlanetTexture.js";
+import { getEmpireSystemMatches } from "../data/empireIndex.js";
 import { BackgroundLayer } from "./BackgroundLayer.js";
 import { HexGridLayer } from "./HexGridLayer.js";
 import { GalaxyLayer } from "./GalaxyLayer.js";
@@ -540,6 +541,12 @@ export class MapRenderer {
 
     // TRANSITION_MS for camera + 100ms buffer for system view fade-in
     setTimeout(selectAfterLoad, TRANSITION_MS + 100);
+  }
+
+  frameEmpire(): void {
+    const set = getEmpireSystemMatches();
+    if (!set || set.size === 0) return;
+    this.frameRoute(Array.from(set));
   }
 
   frameRoute(systemIds: string[]): void {

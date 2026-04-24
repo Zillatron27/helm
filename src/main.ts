@@ -40,10 +40,7 @@ const GATEWAY_ICON_SVG = `<svg width="26" height="26" viewBox="0 0 26 22" fill="
 const EMPIRE_ICON_SVG = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
   <circle cx="12" cy="12" r="2" fill="currentColor"/>
   <circle cx="12" cy="12" r="6"/>
-  <circle cx="4" cy="4" r="1" fill="currentColor" opacity="0.4"/>
-  <circle cx="20" cy="4" r="1" fill="currentColor" opacity="0.4"/>
-  <circle cx="4" cy="20" r="1" fill="currentColor" opacity="0.4"/>
-  <circle cx="20" cy="20" r="1" fill="currentColor" opacity="0.4"/>
+  <circle cx="12" cy="12" r="10" opacity="0.4"/>
 </svg>`;
 
 async function boot(): Promise<void> {
@@ -109,10 +106,12 @@ async function boot(): Promise<void> {
     empireRow.className = "toolbar-row";
     const empireBtn = document.createElement("button");
     empireBtn.className = "toolbar-btn toolbar-btn-empire-off";
-    empireBtn.title = "Toggle empire dim lens (E)";
+    empireBtn.title = "Toggle empire highlight (E)";
     empireBtn.innerHTML = EMPIRE_ICON_SVG;
     empireBtn.addEventListener("click", () => {
-      setEmpireDim(!getEmpireDim());
+      const next = !getEmpireDim();
+      setEmpireDim(next);
+      if (next) renderer.frameEmpire();
     });
     empireRow.appendChild(empireBtn);
     toolbar.appendChild(empireRow);
