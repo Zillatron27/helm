@@ -110,6 +110,23 @@ export function setSettledVisible(visible: boolean): void {
   notify();
 }
 
+let empireDim = (() => {
+  try {
+    return localStorage.getItem("helm-empire-dim") === "true";
+  } catch { return false; }
+})();
+
+export function getEmpireDim(): boolean {
+  return empireDim;
+}
+
+export function setEmpireDim(v: boolean): void {
+  if (v === empireDim) return;
+  empireDim = v;
+  try { localStorage.setItem("helm-empire-dim", String(v)); } catch { /* */ }
+  notify();
+}
+
 export function offStateChange(listener: StateListener): void {
   listeners.delete(listener);
 }

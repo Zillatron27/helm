@@ -210,6 +210,9 @@ export class GalaxyLayer {
   // Resource filter concentration indicators
   private resourceIndicators: Container;
 
+  // Generation counter — async concentration runs bail when superseded.
+  private resourceConcentrationGen = 0;
+
   // System selection halo
   private selectionHalo: Graphics;
 
@@ -1208,26 +1211,19 @@ export class GalaxyLayer {
   }
 
   /**
-   * Apply a resource filter — highlight matching systems, show concentration dots.
-   * Pass null to clear the filter.
+   * Draw resource concentration dots for the given matches.
+   * Pass null (or empty) to clear. Does not touch dim state — composition
+   * in main.ts owns the dim pass via setHighlightedSystems.
    */
-  setResourceFilter(materialId: string | null, matches: Array<{ systemId: string; bestFactor: number }> | null): void {
-    // Clear previous indicators
+  setResourceConcentrations(matches: Array<{ systemId: string; bestFactor: number }> | null): void {
+    this.resourceConcentrationGen++;
     this.resourceIndicators.removeChildren();
 
-    if (!materialId || !matches || matches.length === 0) {
+    if (!matches || matches.length === 0) {
       this.resourceIndicators.visible = false;
-      this.setHighlightedSystems(null);
       return;
     }
 
-    // Build highlight set from matching systems
-    const matchingIds = new Set<string>();
-    for (const m of matches) {
-      matchingIds.add(m.systemId);
-    }
-
-    // Build concentration dots
     for (const m of matches) {
       const system = this.systemLookup.get(m.systemId);
       if (!system) continue;
@@ -1242,37 +1238,28 @@ export class GalaxyLayer {
     }
 
     this.resourceIndicators.visible = true;
-    this.setHighlightedSystems(matchingIds);
   }
 
   /**
-   * Async version of setResourceFilter that yields between chunks so the
-   * browser can paint frames (spinner stays animated during processing).
+   * Chunk-yielding concentration draw for the picker's spinner-painted path.
+   * Generation counter bails out when a newer run supersedes this one —
+   * prevents interleaved dots from rapid picker changes.
    */
-  async setResourceFilterAsync(materialId: string | null, matches: Array<{ systemId: string; bestFactor: number }> | null): Promise<void> {
-    // Yield immediately so the spinner DOM has a chance to paint
+  async setResourceConcentrationsAsync(matches: Array<{ systemId: string; bestFactor: number }> | null): Promise<void> {
+    const gen = ++this.resourceConcentrationGen;
     await yieldToMain();
+    if (gen !== this.resourceConcentrationGen) return;
 
-    // Clear previous indicators
     this.resourceIndicators.removeChildren();
 
-    if (!materialId || !matches || matches.length === 0) {
+    if (!matches || matches.length === 0) {
       this.resourceIndicators.visible = false;
-      this.setHighlightedSystems(null);
       return;
     }
 
-    // Build highlight set
-    const matchingIds = new Set<string>();
-    for (const m of matches) {
-      matchingIds.add(m.systemId);
-    }
-
-    await yieldToMain();
-
-    // Build concentration dots in batches
     const DOT_BATCH = 30;
     for (let i = 0; i < matches.length; i++) {
+      if (gen !== this.resourceConcentrationGen) return;
       const m = matches[i]!;
       const system = this.systemLookup.get(m.systemId);
       if (!system) continue;
@@ -1287,156 +1274,11 @@ export class GalaxyLayer {
 
       if ((i + 1) % DOT_BATCH === 0) {
         await yieldToMain();
+        if (gen !== this.resourceConcentrationGen) return;
       }
     }
 
     this.resourceIndicators.visible = true;
-
-    await yieldToMain();
-
-    // Apply highlight filter with yields between passes
-    this.highlightedSystems = matchingIds;
-    if (this.isDimmedForSystemView) return;
-
-    // Kill any in-flight tweens (e.g. from hover highlight) before
-    // overwriting all star/glow/label alphas — stale tweens would
-    // overwrite the values we set during the yields.
-    this.tweens.clear();
-    this.twinkleActive = false;
-
-    for (const [id, star] of this.starGraphics) {
-      star.alpha = matchingIds.has(id) ? 1 : DIM_HIGHLIGHT_ALPHA;
-    }
-
-    await yieldToMain();
-
-    for (const [id, glow] of this.glowGraphics) {
-      glow.alpha = matchingIds.has(id) ? GLOW_ALPHA : GLOW_ALPHA * DIM_HIGHLIGHT_ALPHA;
-    }
-
-    await yieldToMain();
-
-    for (const [id, label] of this.ambientLabelMap) {
-      label.alpha = matchingIds.has(id) ? 1 : DIM_HIGHLIGHT_ALPHA;
-    }
-
-    await yieldToMain();
-
-    // Redraw connections with per-line highlight — classify in batches, draw at end
-    await this.redrawWithHighlightAsync(matchingIds);
-
-  }
-
-  /** Chunked version of redrawWithHighlight that yields during classification. */
-  private async redrawWithHighlightAsync(hl: Set<string>): Promise<void> {
-    const theme = getTheme();
-    const scale = this.currentViewportScale;
-    const width = scaledWidth(LINE_BASE, LINE_MIN, LINE_MAX, scale);
-
-    const brightLines: Array<[number, number, number, number]> = [];
-    const dimLines: Array<[number, number, number, number]> = [];
-
-    // Classify connections in batches
-    const CONN_BATCH = 200;
-    for (let i = 0; i < this.connections.length; i++) {
-      const conn = this.connections[i]!;
-      const from = this.systemLookup.get(conn.fromId);
-      const to = this.systemLookup.get(conn.toId);
-      if (!from || !to) continue;
-
-      if (hl.has(conn.fromId) && hl.has(conn.toId)) {
-        brightLines.push([from.worldX, from.worldY, to.worldX, to.worldY]);
-      } else {
-        dimLines.push([from.worldX, from.worldY, to.worldX, to.worldY]);
-      }
-
-      if ((i + 1) % CONN_BATCH === 0) {
-        await yieldToMain();
-      }
-    }
-
-    await yieldToMain();
-
-    // Draw dim connections
-    this.baseConnections.clear();
-    if (dimLines.length > 0) {
-      for (const [x1, y1, x2, y2] of dimLines) {
-        this.baseConnections.moveTo(x1, y1);
-        this.baseConnections.lineTo(x2, y2);
-      }
-      this.baseConnections.stroke({
-        width,
-        color: theme.jumpLine,
-        alpha: theme.jumpLineAlpha * DIM_HIGHLIGHT_ALPHA,
-      });
-    }
-
-    await yieldToMain();
-
-    // Draw bright connections
-    if (brightLines.length > 0) {
-      for (const [x1, y1, x2, y2] of brightLines) {
-        this.baseConnections.moveTo(x1, y1);
-        this.baseConnections.lineTo(x2, y2);
-      }
-      this.baseConnections.stroke({ width, color: theme.jumpLine, alpha: theme.jumpLineAlpha });
-    }
-
-    this.lastConnectionScale = scale;
-
-    await yieldToMain();
-
-    // Gateway arcs — classify and draw
-    const gwConns = getGalaxyGatewayConnections();
-    const gwWidth = scaledWidth(GATEWAY_ARC_BASE, GATEWAY_ARC_MIN, GATEWAY_ARC_MAX, scale);
-
-    this.gatewayArcs.clear();
-    const brightArcs: Array<() => void> = [];
-    const dimArcs: Array<() => void> = [];
-
-    for (const gw of gwConns) {
-      const from = this.systemLookup.get(gw.fromSystemId);
-      const to = this.systemLookup.get(gw.toSystemId);
-      if (!from || !to) continue;
-
-      const midX = (from.worldX + to.worldX) / 2;
-      const midY = (from.worldY + to.worldY) / 2;
-      const dx = to.worldX - from.worldX;
-      const dy = to.worldY - from.worldY;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      const arcHeight = Math.min(dist * GATEWAY_ARC_HEIGHT_FACTOR, GATEWAY_ARC_HEIGHT_MAX);
-
-      const drawArc = () => {
-        this.gatewayArcs.moveTo(from.worldX, from.worldY);
-        this.gatewayArcs.quadraticCurveTo(midX, midY - arcHeight, to.worldX, to.worldY);
-      };
-
-      if (hl.has(gw.fromSystemId) && hl.has(gw.toSystemId)) {
-        brightArcs.push(drawArc);
-      } else {
-        dimArcs.push(drawArc);
-      }
-    }
-
-    if (dimArcs.length > 0) {
-      for (const draw of dimArcs) draw();
-      this.gatewayArcs.stroke({
-        width: gwWidth,
-        color: GATEWAY_COLOUR,
-        alpha: GATEWAY_ARC_ALPHA * DIM_HIGHLIGHT_ALPHA,
-      });
-    }
-    if (brightArcs.length > 0) {
-      for (const draw of brightArcs) draw();
-      this.gatewayArcs.stroke({ width: gwWidth, color: GATEWAY_COLOUR, alpha: GATEWAY_ARC_ALPHA });
-    }
-
-    this.lastGatewayArcScale = scale;
-
-    // Two yields: first lets Pixi's ticker render the changes,
-    // second ensures the browser has painted the result to screen
-    await yieldToMain();
-    await yieldToMain();
   }
 
   /** Pulse CX diamond markers like station beacons. */

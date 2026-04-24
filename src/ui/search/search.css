@@ -70,24 +70,24 @@
   color: var(--text-primary);
 }
 
-/* Settled toggle — on state: accent highlight */
-.toolbar-btn-settled-on {
+/* Empire dim toggle — on state: accent highlight */
+.toolbar-btn-empire-on {
   border-color: var(--accent);
   color: var(--accent);
 }
 
-.toolbar-btn-settled-on:hover {
+.toolbar-btn-empire-on:hover {
   border-color: var(--accent);
   color: var(--accent);
 }
 
-/* Settled toggle — off state: subdued */
-.toolbar-btn-settled-off {
+/* Empire dim toggle — off state: subdued */
+.toolbar-btn-empire-off {
   border-color: var(--border);
   color: var(--text-secondary);
 }
 
-.toolbar-btn-settled-off:hover {
+.toolbar-btn-empire-off:hover {
   border-color: var(--accent);
   color: var(--accent);
 }

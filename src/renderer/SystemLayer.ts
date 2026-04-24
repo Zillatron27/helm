@@ -3,7 +3,6 @@ import type { StarSystem, Planet } from "../types/index.js";
 import { getTheme, getSpectralColour } from "../ui/theme.js";
 import { setSelectedEntity, getSelectedEntity, onStateChange } from "../ui/state.js";
 import { getGatewaysForPlanet, getSystemById } from "../data/cache.js";
-import { getPlanetsWithResource } from "../data/resourceIndex.js";
 import type { GatewayEndpoint } from "../types/index.js";
 import { generatePlanetTexture, generateStarTexture, getCloudTexture, getCloudTint } from "./PlanetTexture.js";
 
@@ -108,8 +107,9 @@ export class SystemLayer {
   private selectionHalo: Graphics;
   private selectedPlanetId: string | null = null;
 
-  // Resource filter state
-  private resourceFilterMaterialId: string | null = null;
+  // Composed planet dim set (naturalIds in the set stay bright; others dim).
+  // null = no dim filter active, all planets at full alpha.
+  private dimmedPlanets: Set<string> | null = null;
   private planetContainers: Map<string, Container> = new Map(); // naturalId → planet container
 
   // Bridge API: click interceptor (set by MapRenderer)
@@ -303,8 +303,8 @@ export class SystemLayer {
     this.container.addChild(this.selectionHalo);
     this.updateHalo();
 
-    // Apply resource filter dimming if active
-    this.applyResourceFilter();
+    // Replay composed planet dim if active
+    this.applyPlanetDim();
 
     this.container.visible = true;
   }
@@ -473,30 +473,21 @@ export class SystemLayer {
     }
   }
 
-  setResourceFilter(materialId: string | null): void {
-    this.resourceFilterMaterialId = materialId;
-    this.applyResourceFilter();
+  setDimmedPlanets(naturalIds: Set<string> | null): void {
+    this.dimmedPlanets = naturalIds;
+    this.applyPlanetDim();
   }
 
-  private applyResourceFilter(): void {
-    const matId = this.resourceFilterMaterialId;
-    if (!matId) {
-      // Restore all planets to full alpha
+  private applyPlanetDim(): void {
+    const ids = this.dimmedPlanets;
+    if (!ids) {
       for (const pc of this.planetContainers.values()) {
         pc.alpha = 1;
       }
       return;
     }
-
-    // Build set of planet naturalIds that have this resource
-    const matches = getPlanetsWithResource(matId);
-    const matchingPlanets = new Set<string>();
-    for (const m of matches) {
-      matchingPlanets.add(m.planetNaturalId);
-    }
-
     for (const [naturalId, pc] of this.planetContainers) {
-      pc.alpha = matchingPlanets.has(naturalId) ? 1 : 0.2;
+      pc.alpha = ids.has(naturalId) ? 1 : 0.2;
     }
   }
 

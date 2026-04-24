@@ -5,8 +5,10 @@ import { RoutePanel } from "./ui/search/RoutePanel.js";
 import { SettingsPanel } from "./ui/SettingsPanel.js";
 import { ResourcePicker } from "./ui/resource/ResourcePicker.js";
 import { setupControls } from "./ui/controls.js";
-import { onStateChange, getGatewaysVisible, setGatewaysVisible, getSettledVisible, getResourceFilter, getCogcFilter, onResourceFilterChange, onCogcFilterChange, getBridgeSnapshot, onBridgeSnapshotChange } from "./ui/state.js";
-import { isResourceIndexReady, onResourceIndexReady, getSystemsWithCogcProgram } from "./data/resourceIndex.js";
+import { onStateChange, getGatewaysVisible, setGatewaysVisible, getSettledVisible, getResourceFilter, getCogcFilter, getEmpireDim, setEmpireDim, onResourceFilterChange, onCogcFilterChange, getBridgeSnapshot, onBridgeSnapshotChange } from "./ui/state.js";
+import { isResourceIndexReady, onResourceIndexReady, getSystemsWithResource } from "./data/resourceIndex.js";
+import { getResourceSystemMatches, getResourcePlanetMatches, getCogcSystemMatches } from "./data/filterMatches.js";
+import { getEmpireSystemMatches, getEmpirePlanetMatches, onEmpireIndexChange } from "./data/empireIndex.js";
 import { yieldToMain } from "./util/yieldToMain.js";
 import { initTheme, getTheme } from "./ui/theme.js";
 import { createLoader } from "./ui/loader/LoaderAnimation.js";
@@ -33,6 +35,15 @@ const GATEWAY_ICON_SVG = `<svg width="26" height="26" viewBox="0 0 26 22" fill="
   <circle cx="4" cy="16" r="3"/>
   <circle cx="22" cy="16" r="3"/>
   <path d="M4 13 C4 1 22 1 22 13"/>
+</svg>`;
+
+const EMPIRE_ICON_SVG = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="2" fill="currentColor"/>
+  <circle cx="12" cy="12" r="6"/>
+  <circle cx="4" cy="4" r="1" fill="currentColor" opacity="0.4"/>
+  <circle cx="20" cy="4" r="1" fill="currentColor" opacity="0.4"/>
+  <circle cx="4" cy="20" r="1" fill="currentColor" opacity="0.4"/>
+  <circle cx="20" cy="20" r="1" fill="currentColor" opacity="0.4"/>
 </svg>`;
 
 async function boot(): Promise<void> {
@@ -69,7 +80,13 @@ async function boot(): Promise<void> {
 
     // Resource filter picker row — right after search
     const resourcePicker = new ResourcePicker();
-    resourcePicker.setFilterCallback((materialId) => renderer.setResourceFilterAsync(materialId));
+    resourcePicker.setFilterCallback(async (materialId) => {
+      if (materialId) {
+        await renderer.setResourceConcentrationsAsync(getSystemsWithResource(materialId));
+      } else {
+        renderer.clearResourceIndicators();
+      }
+    });
     toolbar.appendChild(resourcePicker.getElement());
 
     toolbar.appendChild(routePanel.getElement());
@@ -86,6 +103,19 @@ async function boot(): Promise<void> {
     });
     gatewayRow.appendChild(gatewayBtn);
     toolbar.appendChild(gatewayRow);
+
+    // Empire dim lens row — hidden until a bridge snapshot arrives (tier 1 has no empire data)
+    const empireRow = document.createElement("div");
+    empireRow.className = "toolbar-row";
+    const empireBtn = document.createElement("button");
+    empireBtn.className = "toolbar-btn toolbar-btn-empire-off";
+    empireBtn.title = "Toggle empire dim lens (E)";
+    empireBtn.innerHTML = EMPIRE_ICON_SVG;
+    empireBtn.addEventListener("click", () => {
+      setEmpireDim(!getEmpireDim());
+    });
+    empireRow.appendChild(empireBtn);
+    toolbar.appendChild(empireRow);
 
     // Settings panel row
     const settingsPanel = new SettingsPanel();
@@ -118,9 +148,9 @@ async function boot(): Promise<void> {
       ADVERTISING_RESOURCE_EXTRACTION: "Resource Extraction",
     };
 
-    // --- Global toggle sync (gateways, settled visibility) ---
-    // Only handles genuinely global visual state that doesn't interfere
-    // with filter-specific logic.
+    // --- Global toggle sync (gateways, settled visibility, empire button on/off) ---
+    // Manages on/off classes for pressed state. Does not touch `display` —
+    // that's syncEmpireDimVisibility's job.
     function syncToggles(): void {
       const gwVisible = getGatewaysVisible();
       renderer.setGatewaysVisible(gwVisible);
@@ -129,44 +159,86 @@ async function boot(): Promise<void> {
 
       const stVisible = getSettledVisible();
       renderer.setSettledVisible(stVisible);
+
+      const emDim = getEmpireDim();
+      empireBtn.classList.toggle("toolbar-btn-empire-on", emDim);
+      empireBtn.classList.toggle("toolbar-btn-empire-off", !emDim);
     }
     onStateChange(syncToggles);
     syncToggles();
 
+    // Show/hide the empire-dim button based on snapshot presence. Tier 1
+    // (no extension) → hidden; tier 2/3 → visible.
+    function syncEmpireDimVisibility(): void {
+      empireRow.style.display = getBridgeSnapshot() !== null ? "" : "none";
+    }
+    onBridgeSnapshotChange(syncEmpireDimVisibility);
+    syncEmpireDimVisibility();
+
+    // --- Dim composition ---
+    // Intersect the active (non-null) match sets into a single bright set.
+    // Galaxy dim = resource ∩ COGC ∩ empire. Planet dim = resource ∩ empire
+    // (COGC doesn't drive planet dim).
+    function intersectNonNull(sets: Array<Set<string> | null>): Set<string> | null {
+      const active = sets.filter((s): s is Set<string> => s !== null);
+      if (active.length === 0) return null;
+      if (active.length === 1) return active[0]!;
+      const smallest = active.reduce((a, b) => (a.size <= b.size ? a : b));
+      const out = new Set<string>();
+      for (const id of smallest) {
+        if (active.every((s) => s.has(id))) out.add(id);
+      }
+      return out;
+    }
+
+    function applyComposition(): void {
+      renderer.setHighlightedSystems(
+        intersectNonNull([
+          getResourceSystemMatches(),
+          getCogcSystemMatches(),
+          getEmpireSystemMatches(),
+        ]),
+      );
+      renderer.setDimmedPlanets(
+        intersectNonNull([
+          getResourcePlanetMatches(),
+          getEmpirePlanetMatches(),
+        ]),
+      );
+    }
+    onStateChange(applyComposition);
+    onEmpireIndexChange(applyComposition);
+    renderer.onAfterRebuild(() => {
+      applyComposition();
+      const id = getResourceFilter();
+      if (id) {
+        renderer.setResourceConcentrationsAsync(getSystemsWithResource(id));
+      }
+    });
+    applyComposition();
+
     // --- Resource filter handler ---
-    // Owns the full lifecycle of resource filter teardown.
-    // Setting a filter goes through the async path (ResourcePicker.setFilterCallback).
+    // On clear: drop concentration dots. Composition is re-applied via
+    // onStateChange (global notify) and covers the dim side.
     function handleResourceFilterChange(): void {
-      const filterMat = getResourceFilter();
-      if (!filterMat) {
+      if (!getResourceFilter()) {
         renderer.clearResourceIndicators();
-        // Only clear highlights if COGC isn't taking over
-        if (!getCogcFilter()) {
-          renderer.setHighlightedSystems(null);
-        }
       }
       resourcePicker.syncState();
     }
     onResourceFilterChange(handleResourceFilterChange);
 
     // --- COGC filter handler ---
-    // Owns the full lifecycle: spinner → highlight application → badge.
-    // Same pattern as resource filter: button spinner while working.
+    // Owns badge + spinner UX; composition is driven by onStateChange.
     async function handleCogcFilterChange(): Promise<void> {
       const cogcCat = getCogcFilter();
       if (!cogcCat) {
         searchBar.removeCogcBadge();
         searchBar.restoreButtonIcon();
-        // Only clear highlights if resource filter isn't taking over
-        if (!getResourceFilter()) {
-          renderer.setHighlightedSystems(null);
-        }
         return;
       }
 
       const label = COGC_NAMES[cogcCat] ?? cogcCat.replace(/_/g, " ");
-
-      // Show spinner on search button while working
       searchBar.showButtonSpinner();
 
       if (!isResourceIndexReady()) {
@@ -174,7 +246,7 @@ async function boot(): Promise<void> {
         return;
       }
 
-      // Yield so the spinner paints before highlight work
+      // Yield so the spinner paints before composition work
       await yieldToMain();
       await yieldToMain();
 
@@ -184,8 +256,7 @@ async function boot(): Promise<void> {
         return;
       }
 
-      const matchingSystems = getSystemsWithCogcProgram(cogcCat);
-      renderer.setHighlightedSystems(matchingSystems.size > 0 ? matchingSystems : null);
+      applyComposition();
       searchBar.restoreButtonIcon();
       searchBar.showCogcBadge(label);
     }

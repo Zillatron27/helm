@@ -14,7 +14,6 @@ import {
   getPlanetsForSystem,
   recolourCachedPlanets,
 } from "../data/cache.js";
-import { getSystemsWithResource } from "../data/resourceIndex.js";
 import { clearPlanetTextureCache } from "./PlanetTexture.js";
 import { BackgroundLayer } from "./BackgroundLayer.js";
 import { HexGridLayer } from "./HexGridLayer.js";
@@ -27,7 +26,6 @@ import {
   getSelectedEntity,
   getActiveRoute,
   getGatewaysVisible,
-  getResourceFilter,
   setSelectedEntity,
   setFocusedSystem,
   setViewLevel,
@@ -58,7 +56,6 @@ export class MapRenderer {
   private suppressTransitionAnimation = false;
   private elapsedTime = 0;
   private tweens = new TweenManager();
-  private savedHighlightedSystems: Set<string> | null = null;
 
   // Bridge API state
   private overlayEntries: Array<{ name: string; zOrder: number; container: Container }> = [];
@@ -67,6 +64,7 @@ export class MapRenderer {
   private systemClickCallbacks = new Set<(systemId: string, screenX: number, screenY: number) => boolean>();
   private systemViewEnterCallbacks = new Set<(systemId: string) => void>();
   private systemViewExitCallbacks = new Set<(systemId: string) => void>();
+  private afterRebuildCallbacks = new Set<() => void>();
 
   async init(container: HTMLElement): Promise<void> {
     const theme = getTheme();
@@ -273,14 +271,6 @@ export class MapRenderer {
     // Re-apply gateway visibility
     this.galaxy.setGatewaysVisible(getGatewaysVisible());
 
-    // Re-apply empire highlight filter or resource filter
-    const resourceFilterId = getResourceFilter();
-    if (resourceFilterId) {
-      this.setResourceFilter(resourceFilterId);
-    } else if (this.savedHighlightedSystems) {
-      this.galaxy.setHighlightedSystems(this.savedHighlightedSystems);
-    }
-
     // Re-apply active route
     const route = getActiveRoute();
     if (route && route.systemIds.length >= 2) {
@@ -298,6 +288,13 @@ export class MapRenderer {
         this.showSystemView(system);
       }
     }
+
+    for (const fn of this.afterRebuildCallbacks) fn();
+  }
+
+  onAfterRebuild(fn: () => void): () => void {
+    this.afterRebuildCallbacks.add(fn);
+    return () => { this.afterRebuildCallbacks.delete(fn); };
   }
 
   private handleStateChange(): void {
@@ -602,26 +599,24 @@ export class MapRenderer {
   }
 
   setHighlightedSystems(ids: Set<string> | null): void {
-    this.savedHighlightedSystems = ids;
     this.galaxy?.setHighlightedSystems(ids);
   }
 
-  /** Remove resource indicator dots without touching highlight state. */
+  setDimmedPlanets(ids: Set<string> | null): void {
+    this.systemLayer?.setDimmedPlanets(ids);
+  }
+
+  /** Remove resource indicator dots. */
   clearResourceIndicators(): void {
     this.galaxy?.clearResourceIndicators();
-    this.systemLayer?.setResourceFilter(null);
   }
 
-  setResourceFilter(materialId: string | null): void {
-    const matches = materialId ? getSystemsWithResource(materialId) : null;
-    this.galaxy?.setResourceFilter(materialId, matches);
-    this.systemLayer?.setResourceFilter(materialId);
+  setResourceConcentrations(matches: Array<{ systemId: string; bestFactor: number }> | null): void {
+    this.galaxy?.setResourceConcentrations(matches);
   }
 
-  async setResourceFilterAsync(materialId: string | null): Promise<void> {
-    const matches = materialId ? getSystemsWithResource(materialId) : null;
-    await this.galaxy?.setResourceFilterAsync(materialId, matches);
-    this.systemLayer?.setResourceFilter(materialId);
+  async setResourceConcentrationsAsync(matches: Array<{ systemId: string; bestFactor: number }> | null): Promise<void> {
+    await this.galaxy?.setResourceConcentrationsAsync(matches);
   }
 
   getViewport(): Viewport | null {

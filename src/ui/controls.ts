@@ -12,6 +12,9 @@ import {
   setResourceFilter,
   getCogcFilter,
   setCogcFilter,
+  getEmpireDim,
+  setEmpireDim,
+  getBridgeSnapshot,
 } from "./state.js";
 import type { PanelManager } from "./panels/PanelManager.js";
 import type { SearchBar } from "./search/SearchBar.js";
@@ -100,6 +103,12 @@ export function setupControls(
       case "r":
         e.preventDefault();
         resourcePicker?.toggle();
+        break;
+      case "e":
+        e.preventDefault();
+        if (getBridgeSnapshot() !== null) {
+          setEmpireDim(!getEmpireDim());
+        }
         break;
     }
   };
