@@ -190,24 +190,46 @@ async function boot(): Promise<void> {
       return out;
     }
 
+    function setsEqualNullable(a: Set<string> | null, b: Set<string> | null): boolean {
+      if (a === b) return true;
+      if (a === null || b === null) return false;
+      if (a.size !== b.size) return false;
+      for (const v of a) if (!b.has(v)) return false;
+      return true;
+    }
+
+    // Memoize so onStateChange tickling (view level, selection, route, etc.)
+    // doesn't re-enter applyHighlightFilter mid-tween and trash the
+    // system-view restore animation.
+    let lastGalaxyBright: Set<string> | null = null;
+    let lastPlanetBright: Set<string> | null = null;
+
     function applyComposition(): void {
-      renderer.setHighlightedSystems(
-        intersectNonNull([
-          getResourceSystemMatches(),
-          getCogcSystemMatches(),
-          getEmpireSystemMatches(),
-        ]),
-      );
-      renderer.setDimmedPlanets(
-        intersectNonNull([
-          getResourcePlanetMatches(),
-          getEmpirePlanetMatches(),
-        ]),
-      );
+      const galaxyBright = intersectNonNull([
+        getResourceSystemMatches(),
+        getCogcSystemMatches(),
+        getEmpireSystemMatches(),
+      ]);
+      const planetBright = intersectNonNull([
+        getResourcePlanetMatches(),
+        getEmpirePlanetMatches(),
+      ]);
+      if (!setsEqualNullable(galaxyBright, lastGalaxyBright)) {
+        renderer.setHighlightedSystems(galaxyBright);
+        lastGalaxyBright = galaxyBright;
+      }
+      if (!setsEqualNullable(planetBright, lastPlanetBright)) {
+        renderer.setDimmedPlanets(planetBright);
+        lastPlanetBright = planetBright;
+      }
     }
     onStateChange(applyComposition);
     onEmpireIndexChange(applyComposition);
     renderer.onAfterRebuild(() => {
+      // Galaxy layer is a fresh instance after rebuild; drop the memo so
+      // the current composed state is actually pushed to it.
+      lastGalaxyBright = null;
+      lastPlanetBright = null;
       applyComposition();
       const id = getResourceFilter();
       if (id) {
