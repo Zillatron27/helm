@@ -5,7 +5,7 @@ import { RoutePanel } from "./ui/search/RoutePanel.js";
 import { SettingsPanel } from "./ui/SettingsPanel.js";
 import { ResourcePicker } from "./ui/resource/ResourcePicker.js";
 import { setupControls } from "./ui/controls.js";
-import { onStateChange, getGatewaysVisible, setGatewaysVisible, getSettledVisible, setSettledVisible, getResourceFilter, getCogcFilter, onResourceFilterChange, onCogcFilterChange, getBridgeSnapshot, onBridgeSnapshotChange } from "./ui/state.js";
+import { onStateChange, getGatewaysVisible, setGatewaysVisible, getSettledVisible, getResourceFilter, getCogcFilter, onResourceFilterChange, onCogcFilterChange, getBridgeSnapshot, onBridgeSnapshotChange } from "./ui/state.js";
 import { isResourceIndexReady, onResourceIndexReady, getSystemsWithCogcProgram } from "./data/resourceIndex.js";
 import { yieldToMain } from "./util/yieldToMain.js";
 import { initTheme, getTheme } from "./ui/theme.js";
@@ -33,15 +33,6 @@ const GATEWAY_ICON_SVG = `<svg width="26" height="26" viewBox="0 0 26 22" fill="
   <circle cx="4" cy="16" r="3"/>
   <circle cx="22" cy="16" r="3"/>
   <path d="M4 13 C4 1 22 1 22 13"/>
-</svg>`;
-
-const SETTLED_ICON_SVG = `<svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <circle cx="13" cy="8" r="4"/>
-  <path d="M5 24c0-4.4 3.6-8 8-8s8 3.6 8 8"/>
-  <circle cx="4" cy="12" r="3"/>
-  <path d="M0 22c0-2.8 1.8-5 4-5"/>
-  <circle cx="22" cy="12" r="3"/>
-  <path d="M26 22c0-2.8-1.8-5-4-5"/>
 </svg>`;
 
 async function boot(): Promise<void> {
@@ -96,19 +87,6 @@ async function boot(): Promise<void> {
     gatewayRow.appendChild(gatewayBtn);
     toolbar.appendChild(gatewayRow);
 
-    // Settled toggle row
-    const settledRow = document.createElement("div");
-    settledRow.className = "toolbar-row";
-    const settledBtn = document.createElement("button");
-    settledBtn.className = "toolbar-btn toolbar-btn-settled-off";
-    settledBtn.title = "Toggle settled systems (S)";
-    settledBtn.innerHTML = SETTLED_ICON_SVG;
-    settledBtn.addEventListener("click", () => {
-      setSettledVisible(!getSettledVisible());
-    });
-    settledRow.appendChild(settledBtn);
-    toolbar.appendChild(settledRow);
-
     // Settings panel row
     const settingsPanel = new SettingsPanel();
     toolbar.appendChild(settingsPanel.getElement());
@@ -151,8 +129,6 @@ async function boot(): Promise<void> {
 
       const stVisible = getSettledVisible();
       renderer.setSettledVisible(stVisible);
-      settledBtn.classList.toggle("toolbar-btn-settled-on", stVisible);
-      settledBtn.classList.toggle("toolbar-btn-settled-off", !stVisible);
     }
     onStateChange(syncToggles);
     syncToggles();
