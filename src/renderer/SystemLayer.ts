@@ -1,10 +1,11 @@
 import { CanvasSource, Container, Graphics, Sprite, Text, Texture, Circle } from "pixi.js";
 import type { StarSystem, Planet } from "../types/index.js";
 import { getTheme, getSpectralColour } from "../ui/theme.js";
-import { setSelectedEntity, getSelectedEntity, onStateChange, onBridgeSnapshotChange } from "../ui/state.js";
+import { setSelectedEntity, getSelectedEntity, onStateChange, onBridgeSnapshotChange, getBridgeSnapshot } from "../ui/state.js";
 import { getGatewaysForPlanet, getSystemById } from "../data/cache.js";
 import { getEmpirePlanetIds, onEmpireIndexChange } from "../data/empireIndex.js";
 import type { GatewayEndpoint } from "../types/index.js";
+import type { ShipSummary } from "../data/bridge-types.js";
 import { generatePlanetTexture, generateStarTexture, getCloudTexture, getCloudTint } from "./PlanetTexture.js";
 
 const CENTRAL_STAR_RADIUS = 30;
@@ -81,6 +82,19 @@ const EMPIRE_PLANET_RING_GAP = 4;
 const EMPIRE_PLANET_RING_STROKE = 1.5;
 const EMPIRE_PLANET_RING_ALPHA = 0.7;
 
+// Docked-ship indicator — a fixed three-glyph stack of right-pointing
+// chevrons beside any planet that has 1+ docked ships in the snapshot.
+// The three glyphs are a visual signature, not a count; the actual list
+// is in the hover tooltip. Anchored just outside the empire ring (or
+// planet edge if no ring). CX-docked ships are filtered out per
+// empire-overlay.md §3.
+const SHIP_STACK_GLYPH_SIZE = 8;
+const SHIP_STACK_GLYPH_OFFSET = 3;
+const SHIP_STACK_GLYPH_COUNT = 3;
+const SHIP_STACK_OFFSET_FROM_RING = 6;
+const SHIP_STACK_ALPHA = 1.0;
+const SHIP_TOOLTIP_MAX_ROWS = 6;
+
 interface PlanetCloud {
   sprite: Sprite;
   mask: Graphics;
@@ -112,6 +126,7 @@ export class SystemLayer {
   private particleGfx: Graphics;
   private particleColour = 0xffffff;
   private gatewayHoverLabel: Text | null = null;
+  private shipHoverLabel: Text | null = null;
   private selectionHalo: Graphics;
   private selectedPlanetId: string | null = null;
 
@@ -534,14 +549,16 @@ export class SystemLayer {
     this.particleGfx.clear();
     this.selectionHalo.clear();
     this.gatewayHoverLabel = null;
+    this.shipHoverLabel = null;
     this.empireOverlayContainer = null;
   }
 
   /**
    * Build (or rebuild) the empire overlay for the current system: a ring
-   * around each user-owned planet. Runs from show() and from snapshot/index
-   * subscriptions while the system view is visible. The selection halo
-   * stays on top by being removed and re-added after the overlay.
+   * around each user-owned planet, and a fixed three-chevron stack beside
+   * any planet that has docked ships. Runs from show() and from snapshot/
+   * index subscriptions while the system view is visible. The selection
+   * halo stays on top by being removed and re-added after the overlay.
    */
   private applyEmpireOverlay(): void {
     if (!this.currentSystem) return;
@@ -551,6 +568,9 @@ export class SystemLayer {
       this.empireOverlayContainer.destroy({ children: true });
       this.empireOverlayContainer = null;
     }
+    // Any old hover label is on the parent container; clear it too —
+    // the stack it pointed at is about to be destroyed and rebuilt.
+    this.hideShipLabel();
 
     const overlay = new Container();
     overlay.eventMode = "passive";
@@ -558,22 +578,86 @@ export class SystemLayer {
     const empirePlanetSet = getEmpirePlanetIds();
     const accent = getTheme().accent;
 
+    // Group docked ships by planet natural ID. Filter out:
+    //   - locationPlanetNaturalId === null  (CX-docked, out of scope per
+    //     empire-overlay.md §3 — silently dropped, no log/warn)
+    //   - status === "IN_FLIGHT"           (in transit, not docked)
+    const shipsAtPlanet = new Map<string, ShipSummary[]>();
+    const snapshot = getBridgeSnapshot();
+    if (snapshot) {
+      for (const ship of snapshot.ships) {
+        if (ship.locationPlanetNaturalId === null) continue;
+        if (ship.status === "IN_FLIGHT") continue;
+        const list = shipsAtPlanet.get(ship.locationPlanetNaturalId);
+        if (list) list.push(ship);
+        else shipsAtPlanet.set(ship.locationPlanetNaturalId, [ship]);
+      }
+    }
+
     for (const planet of this.currentPlanets) {
       const pos = this.planetPositions.get(planet.naturalId);
       if (!pos) continue;
-      if (!empirePlanetSet.has(planet.naturalId)) continue;
 
+      // Ring radius is consistent whether or not the planet is empire-owned
+      // — keeps the ship-stack anchor at a uniform distance from the planet.
       const ringRadius = pos.radius + EMPIRE_PLANET_RING_GAP;
-      const ring = new Graphics();
-      ring.circle(0, 0, ringRadius);
-      ring.stroke({
-        width: EMPIRE_PLANET_RING_STROKE,
-        color: accent,
-        alpha: EMPIRE_PLANET_RING_ALPHA,
-      });
-      ring.x = pos.x;
-      ring.y = pos.y;
-      overlay.addChild(ring);
+
+      // Capability 2: empire ring on owned planets.
+      if (empirePlanetSet.has(planet.naturalId)) {
+        const ring = new Graphics();
+        ring.circle(0, 0, ringRadius);
+        ring.stroke({
+          width: EMPIRE_PLANET_RING_STROKE,
+          color: accent,
+          alpha: EMPIRE_PLANET_RING_ALPHA,
+        });
+        ring.x = pos.x;
+        ring.y = pos.y;
+        overlay.addChild(ring);
+      }
+
+      // Capability 3: docked-ship stack beside any planet with 1+ ships.
+      const ships = shipsAtPlanet.get(planet.naturalId);
+      if (ships && ships.length > 0) {
+        const half = SHIP_STACK_GLYPH_SIZE / 2;
+        const anchorX = pos.x + ringRadius + SHIP_STACK_OFFSET_FROM_RING + half;
+        const anchorY = pos.y;
+
+        const stack = new Container();
+        stack.x = anchorX;
+        stack.y = anchorY;
+
+        // Three overlapping right-pointing filled isoceles triangles —
+        // a fixed visual signature, not a count.
+        for (let i = 0; i < SHIP_STACK_GLYPH_COUNT; i++) {
+          const glyph = new Graphics();
+          glyph.moveTo(-half, -half);
+          glyph.lineTo(half, 0);
+          glyph.lineTo(-half, half);
+          glyph.closePath();
+          glyph.fill({ color: accent, alpha: SHIP_STACK_ALPHA });
+          glyph.x = i * SHIP_STACK_GLYPH_OFFSET;
+          stack.addChild(glyph);
+        }
+
+        // Hit area centred on the overlapping cluster.
+        const clusterCentre = ((SHIP_STACK_GLYPH_COUNT - 1) * SHIP_STACK_GLYPH_OFFSET) / 2;
+        stack.eventMode = "static";
+        stack.cursor = "default";
+        stack.hitArea = new Circle(clusterCentre, 0, SHIP_STACK_GLYPH_SIZE);
+
+        const tooltip = this.formatShipTooltip(ships);
+        const labelX = anchorX + clusterCentre;
+        const labelY = anchorY - SHIP_STACK_GLYPH_SIZE - 4;
+        stack.on("pointerover", () => {
+          this.showShipLabel(labelX, labelY, tooltip);
+        });
+        stack.on("pointerout", () => {
+          this.hideShipLabel();
+        });
+
+        overlay.addChild(stack);
+      }
     }
 
     // Insert before the selection halo so the halo stays on top.
@@ -582,5 +666,46 @@ export class SystemLayer {
     this.container.addChild(this.selectionHalo);
 
     this.empireOverlayContainer = overlay;
+  }
+
+  private formatShipTooltip(ships: ShipSummary[]): string {
+    const header = `${ships.length} ${ships.length === 1 ? "ship" : "ships"} docked`;
+    const visible = ships.slice(0, SHIP_TOOLTIP_MAX_ROWS);
+    const lines = visible.map(
+      (s) => `${s.name} (${s.registration}) — ${s.status}`,
+    );
+    if (ships.length > SHIP_TOOLTIP_MAX_ROWS) {
+      lines.push(`+${ships.length - SHIP_TOOLTIP_MAX_ROWS} more`);
+    }
+    return [header, ...lines].join("\n");
+  }
+
+  private showShipLabel(x: number, y: number, text: string): void {
+    this.hideShipLabel();
+    const theme = getTheme();
+    const label = new Text({
+      text,
+      style: {
+        fontFamily: "IBM Plex Mono, monospace",
+        fontSize: 13,
+        fill: theme.textPrimary,
+        align: "left",
+      },
+    });
+    // Anchor at bottom-centre of the label so it sits above the hovered glyphs
+    // without overlapping them. Multi-line text stacks upward from the anchor.
+    label.anchor.set(0.5, 1);
+    label.x = x;
+    label.y = y;
+    label.eventMode = "none";
+    this.container.addChild(label);
+    this.shipHoverLabel = label;
+  }
+
+  private hideShipLabel(): void {
+    if (this.shipHoverLabel) {
+      this.container.removeChild(this.shipHoverLabel);
+      this.shipHoverLabel = null;
+    }
   }
 }
