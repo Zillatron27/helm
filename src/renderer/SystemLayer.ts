@@ -7,6 +7,7 @@ import { getEmpirePlanetIds, onEmpireIndexChange } from "../data/empireIndex.js"
 import type { GatewayEndpoint } from "../types/index.js";
 import type { ShipSummary } from "../data/bridge-types.js";
 import { generatePlanetTexture, generateStarTexture, getCloudTexture, getCloudTint } from "./PlanetTexture.js";
+import { showMapTooltip, hideMapTooltip } from "../ui/MapTooltip.js";
 
 const CENTRAL_STAR_RADIUS = 30;
 const GLOW_RADIUS = 110;
@@ -126,7 +127,6 @@ export class SystemLayer {
   private particleGfx: Graphics;
   private particleColour = 0xffffff;
   private gatewayHoverLabel: Text | null = null;
-  private shipHoverLabel: Text | null = null;
   private selectionHalo: Graphics;
   private selectedPlanetId: string | null = null;
 
@@ -549,8 +549,9 @@ export class SystemLayer {
     this.particleGfx.clear();
     this.selectionHalo.clear();
     this.gatewayHoverLabel = null;
-    this.shipHoverLabel = null;
     this.empireOverlayContainer = null;
+    // Any open ship tooltip is for a stack we're about to destroy.
+    hideMapTooltip();
   }
 
   /**
@@ -568,9 +569,8 @@ export class SystemLayer {
       this.empireOverlayContainer.destroy({ children: true });
       this.empireOverlayContainer = null;
     }
-    // Any old hover label is on the parent container; clear it too —
-    // the stack it pointed at is about to be destroyed and rebuilt.
-    this.hideShipLabel();
+    // Any open tooltip is for a stack we're about to destroy and rebuild.
+    hideMapTooltip();
 
     const overlay = new Container();
     overlay.eventMode = "passive";
@@ -647,13 +647,12 @@ export class SystemLayer {
         stack.hitArea = new Circle(clusterCentre, 0, SHIP_STACK_GLYPH_SIZE);
 
         const tooltip = this.formatShipTooltip(ships);
-        const labelX = anchorX + clusterCentre;
-        const labelY = anchorY - SHIP_STACK_GLYPH_SIZE - 4;
-        stack.on("pointerover", () => {
-          this.showShipLabel(labelX, labelY, tooltip);
+        stack.on("pointerover", (e) => {
+          // Pixi event globals are screen-space; perfect for an HTML overlay.
+          showMapTooltip(e.globalX, e.globalY, tooltip);
         });
         stack.on("pointerout", () => {
-          this.hideShipLabel();
+          hideMapTooltip();
         });
 
         overlay.addChild(stack);
@@ -668,7 +667,7 @@ export class SystemLayer {
     this.empireOverlayContainer = overlay;
   }
 
-  private formatShipTooltip(ships: ShipSummary[]): string {
+  private formatShipTooltip(ships: ShipSummary[]): { header: string; lines: string[] } {
     const header = `${ships.length} ${ships.length === 1 ? "ship" : "ships"} docked`;
     const visible = ships.slice(0, SHIP_TOOLTIP_MAX_ROWS);
     const lines = visible.map(
@@ -677,35 +676,6 @@ export class SystemLayer {
     if (ships.length > SHIP_TOOLTIP_MAX_ROWS) {
       lines.push(`+${ships.length - SHIP_TOOLTIP_MAX_ROWS} more`);
     }
-    return [header, ...lines].join("\n");
-  }
-
-  private showShipLabel(x: number, y: number, text: string): void {
-    this.hideShipLabel();
-    const theme = getTheme();
-    const label = new Text({
-      text,
-      style: {
-        fontFamily: "IBM Plex Mono, monospace",
-        fontSize: 13,
-        fill: theme.textPrimary,
-        align: "left",
-      },
-    });
-    // Anchor at bottom-centre of the label so it sits above the hovered glyphs
-    // without overlapping them. Multi-line text stacks upward from the anchor.
-    label.anchor.set(0.5, 1);
-    label.x = x;
-    label.y = y;
-    label.eventMode = "none";
-    this.container.addChild(label);
-    this.shipHoverLabel = label;
-  }
-
-  private hideShipLabel(): void {
-    if (this.shipHoverLabel) {
-      this.container.removeChild(this.shipHoverLabel);
-      this.shipHoverLabel = null;
-    }
+    return { header, lines };
   }
 }

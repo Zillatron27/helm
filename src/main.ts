@@ -16,6 +16,7 @@ import { initBridge } from "./data/bridge.js";
 import "./ui/search/search.css";
 import "./ui/settings.css";
 import "./ui/resource/resource.css";
+import "./ui/map-tooltip.css";
 
 console.log(`Helm v${VERSION}`);
 
