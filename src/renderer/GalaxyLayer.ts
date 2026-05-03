@@ -8,6 +8,7 @@ import {
 } from "../ui/state.js";
 import { getAllCxStations, getGalaxyGatewayConnections, isGatewaySystem } from "../data/cache.js";
 import { isSettledSystem } from "../data/siteCounts.js";
+import { getEmpireSystemIds } from "../data/empireIndex.js";
 import { StarParticles } from "./StarParticles.js";
 import { TweenManager } from "./Tween.js";
 import { yieldToMain } from "../util/yieldToMain.js";
@@ -122,6 +123,12 @@ const SETTLED_GLOW_SIZE = 14;
 const SETTLED_GLOW_ALPHA = 0.86;
 const SETTLED_ROTATION_PERIOD = 5.0;
 
+// Empire base ring indicators — rendered on systems containing user sites
+// whenever the bridge snapshot is present.
+const EMPIRE_RING_RADIUS_MULT = 2.0;
+const EMPIRE_RING_STROKE = 1.5;
+const EMPIRE_RING_ALPHA = 0.7;
+
 let glowTexture: Texture | null = null;
 function getGlowTexture(): Texture {
   if (glowTexture) return glowTexture;
@@ -210,6 +217,9 @@ export class GalaxyLayer {
   // Resource filter concentration indicators
   private resourceIndicators: Container;
 
+  // Empire base rings — owned-system markers from bridge snapshot
+  private empireBaseRings: Container;
+
   // Generation counter — async concentration runs bail when superseded.
   private resourceConcentrationGen = 0;
 
@@ -287,6 +297,13 @@ export class GalaxyLayer {
     this.resourceIndicators.eventMode = "none";
     this.resourceIndicators.visible = false;
     this.container.addChild(this.resourceIndicators);
+
+    // Empire base rings — owned-system markers, above resource indicators,
+    // below particles / labels / stars / CX markers / gateway indicators.
+    // Populated lazily by rebuildEmpireRings(); empty until bridge snapshot arrives.
+    this.empireBaseRings = new Container();
+    this.empireBaseRings.eventMode = "none";
+    this.container.addChild(this.empireBaseRings);
 
     // Hover particles — above glows, below labels and stars
     this.starParticles = new StarParticles();
@@ -758,6 +775,36 @@ export class GalaxyLayer {
     }
   }
 
+  /**
+   * Rebuild empire base rings from the current bridge snapshot's empire
+   * system set. Cheap to run — empire sets are typically <100 entries.
+   * Called on snapshot change, index change, and theme rebuild.
+   */
+  rebuildEmpireRings(): void {
+    this.empireBaseRings.removeChildren();
+    const empireSet = getEmpireSystemIds();
+    if (empireSet.size === 0) return;
+
+    const accent = getTheme().accent;
+
+    for (const systemId of empireSet) {
+      const system = this.systemLookup.get(systemId);
+      if (!system) continue;
+
+      const connCount = system.connectionIds.length;
+      const sizeScale = connCount >= 5 ? 1.6 : connCount >= 3 ? 1.3 : 1;
+      const ringRadius = STAR_RADIUS * sizeScale * EMPIRE_RING_RADIUS_MULT;
+
+      const ring = new Graphics();
+      ring.circle(0, 0, ringRadius);
+      ring.stroke({ width: EMPIRE_RING_STROKE, color: accent, alpha: EMPIRE_RING_ALPHA });
+      ring.x = system.worldX;
+      ring.y = system.worldY;
+
+      this.empireBaseRings.addChild(ring);
+    }
+  }
+
   dimExcept(systemId: string, tw?: TweenManager): void {
     this.isDimmedForSystemView = true;
     this.twinkleActive = false;
@@ -779,6 +826,7 @@ export class GalaxyLayer {
       tw.to(this.settledRingsStatic, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
       tw.to(this.settledRingsAnimated, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
       tw.to(this.resourceIndicators, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
+      tw.to(this.empireBaseRings, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
       // Fade out ambient labels then hide
       tw.to(this.ambientLabels, "alpha", 0, 0.3);
     } else {
@@ -791,6 +839,7 @@ export class GalaxyLayer {
       this.settledRingsStatic.alpha = SYSTEM_VIEW_LINES_ALPHA;
       this.settledRingsAnimated.alpha = SYSTEM_VIEW_LINES_ALPHA;
       this.resourceIndicators.alpha = SYSTEM_VIEW_LINES_ALPHA;
+      this.empireBaseRings.alpha = SYSTEM_VIEW_LINES_ALPHA;
       this.ambientLabels.visible = false;
     }
 
@@ -829,6 +878,7 @@ export class GalaxyLayer {
       tw.to(this.settledRingsStatic, "alpha", settledAlpha, dur);
       tw.to(this.settledRingsAnimated, "alpha", settledAlpha, dur);
       tw.to(this.resourceIndicators, "alpha", resourceAlpha, dur);
+      tw.to(this.empireBaseRings, "alpha", containerAlpha, dur);
     } else {
       this.baseConnections.alpha = containerAlpha;
       this.routeOverlay.alpha = containerAlpha;
@@ -839,6 +889,7 @@ export class GalaxyLayer {
       this.settledRingsStatic.alpha = this.settledVisible ? containerAlpha : 0;
       this.settledRingsAnimated.alpha = this.settledVisible ? containerAlpha : 0;
       this.resourceIndicators.alpha = resourceAlpha;
+      this.empireBaseRings.alpha = containerAlpha;
     }
 
     // Per-star alpha: respect highlight filter when active

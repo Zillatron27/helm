@@ -1,8 +1,9 @@
 import { CanvasSource, Container, Graphics, Sprite, Text, Texture, Circle } from "pixi.js";
 import type { StarSystem, Planet } from "../types/index.js";
 import { getTheme, getSpectralColour } from "../ui/theme.js";
-import { setSelectedEntity, getSelectedEntity, onStateChange } from "../ui/state.js";
+import { setSelectedEntity, getSelectedEntity, onStateChange, onBridgeSnapshotChange } from "../ui/state.js";
 import { getGatewaysForPlanet, getSystemById } from "../data/cache.js";
+import { getEmpirePlanetIds, onEmpireIndexChange } from "../data/empireIndex.js";
 import type { GatewayEndpoint } from "../types/index.js";
 import { generatePlanetTexture, generateStarTexture, getCloudTexture, getCloudTint } from "./PlanetTexture.js";
 
@@ -73,6 +74,13 @@ const HALO_ARC_SPAN = Math.PI * 0.7; // each arc covers 70% of a semicircle
 const HALO_PULSE_FREQUENCY = 1.0;
 const HALO_PULSE_AMPLITUDE = 0.2;
 
+// Empire planet ring — drawn around user-owned planets whenever the bridge
+// snapshot is present. Sits inside the selection halo (HALO_GAP = 6) so
+// a selected empire planet nests cleanly: planet → empire ring → halo.
+const EMPIRE_PLANET_RING_GAP = 4;
+const EMPIRE_PLANET_RING_STROKE = 1.5;
+const EMPIRE_PLANET_RING_ALPHA = 0.7;
+
 interface PlanetCloud {
   sprite: Sprite;
   mask: Graphics;
@@ -112,6 +120,12 @@ export class SystemLayer {
   private dimmedPlanets: Set<string> | null = null;
   private planetContainers: Map<string, Container> = new Map(); // naturalId → planet container
 
+  // Cached system + planets so snapshot/index changes can re-apply the
+  // empire overlay without re-running the whole system view.
+  private currentSystem: StarSystem | null = null;
+  private currentPlanets: Planet[] = [];
+  private empireOverlayContainer: Container | null = null;
+
   // Bridge API: click interceptor (set by MapRenderer)
   planetClickInterceptor: ((naturalId: string, screenX: number, screenY: number) => boolean) | null = null;
 
@@ -132,6 +146,18 @@ export class SystemLayer {
         this.updateHalo();
       }
     });
+
+    // Re-apply the empire overlay when the bridge snapshot updates or the
+    // empire index recomputes — but only while the system view is showing.
+    // The double subscription (snapshot + index) is intentional: ship updates
+    // arrive via snapshot but don't change the empire index, while site
+    // updates change both. Both call into the same idempotent rebuild.
+    const reapplyOverlay = (): void => {
+      if (!this.container.visible || !this.currentSystem) return;
+      this.applyEmpireOverlay();
+    };
+    onBridgeSnapshotChange(reapplyOverlay);
+    onEmpireIndexChange(reapplyOverlay);
   }
 
   show(system: StarSystem, planets: Planet[]): void {
@@ -306,11 +332,18 @@ export class SystemLayer {
     // Replay composed planet dim if active
     this.applyPlanetDim();
 
+    // Cache for snapshot-driven re-applies, then paint the empire overlay
+    this.currentSystem = system;
+    this.currentPlanets = planets;
+    this.applyEmpireOverlay();
+
     this.container.visible = true;
   }
 
   hide(): void {
     this.selectedPlanetId = null;
+    this.currentSystem = null;
+    this.currentPlanets = [];
     this.clear();
     this.container.visible = false;
   }
@@ -501,5 +534,53 @@ export class SystemLayer {
     this.particleGfx.clear();
     this.selectionHalo.clear();
     this.gatewayHoverLabel = null;
+    this.empireOverlayContainer = null;
+  }
+
+  /**
+   * Build (or rebuild) the empire overlay for the current system: a ring
+   * around each user-owned planet. Runs from show() and from snapshot/index
+   * subscriptions while the system view is visible. The selection halo
+   * stays on top by being removed and re-added after the overlay.
+   */
+  private applyEmpireOverlay(): void {
+    if (!this.currentSystem) return;
+
+    if (this.empireOverlayContainer) {
+      this.container.removeChild(this.empireOverlayContainer);
+      this.empireOverlayContainer.destroy({ children: true });
+      this.empireOverlayContainer = null;
+    }
+
+    const overlay = new Container();
+    overlay.eventMode = "passive";
+
+    const empirePlanetSet = getEmpirePlanetIds();
+    const accent = getTheme().accent;
+
+    for (const planet of this.currentPlanets) {
+      const pos = this.planetPositions.get(planet.naturalId);
+      if (!pos) continue;
+      if (!empirePlanetSet.has(planet.naturalId)) continue;
+
+      const ringRadius = pos.radius + EMPIRE_PLANET_RING_GAP;
+      const ring = new Graphics();
+      ring.circle(0, 0, ringRadius);
+      ring.stroke({
+        width: EMPIRE_PLANET_RING_STROKE,
+        color: accent,
+        alpha: EMPIRE_PLANET_RING_ALPHA,
+      });
+      ring.x = pos.x;
+      ring.y = pos.y;
+      overlay.addChild(ring);
+    }
+
+    // Insert before the selection halo so the halo stays on top.
+    this.container.removeChild(this.selectionHalo);
+    this.container.addChild(overlay);
+    this.container.addChild(this.selectionHalo);
+
+    this.empireOverlayContainer = overlay;
   }
 }

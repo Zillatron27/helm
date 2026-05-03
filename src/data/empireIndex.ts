@@ -64,6 +64,17 @@ export function getEmpirePlanetMatches(): Set<string> | null {
   return empirePlanetIds;
 }
 
+// Unconditional reads — for passive indicators that render whenever the
+// bridge snapshot is present, regardless of the dim toggle. Empty set is
+// the "no bridge / no sites" state.
+export function getEmpireSystemIds(): Set<string> {
+  return empireSystemIds;
+}
+
+export function getEmpirePlanetIds(): Set<string> {
+  return empirePlanetIds;
+}
+
 export function onEmpireIndexChange(fn: Listener): () => void {
   listeners.add(fn);
   return () => { listeners.delete(fn); };

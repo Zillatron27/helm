@@ -613,6 +613,10 @@ export class MapRenderer {
     this.systemLayer?.setDimmedPlanets(ids);
   }
 
+  rebuildEmpireRings(): void {
+    this.galaxy?.rebuildEmpireRings();
+  }
+
   /** Remove resource indicator dots. */
   clearResourceIndicators(): void {
     this.galaxy?.clearResourceIndicators();

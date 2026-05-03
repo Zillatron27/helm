@@ -2,10 +2,11 @@
 
 ## 0.11.0-dev — feature/hud
 
-Phase 3 HUD chassis + Helm Extension bridge reception + empire dim lens (Capability 1 of the empire overlay spec).
+Phase 3 HUD chassis + Helm Extension bridge reception + empire dim lens (Capability 1) + empire base markers (Capability 2) of the empire overlay spec.
 
 ### Added
 
+- **Empire base markers** (Capability 2 of empire-overlay spec) — solid theme-accent rings render automatically on systems containing user sites (galaxy view, ring radius 2.0× the connection-scaled star radius) and on planets that are user sites (system view, planet edge + 4px). Visible whenever the bridge snapshot is present, independent of the empire-dim toggle. Galaxy rings live in a new `empireBaseRings` container on `GalaxyLayer`, repainted on snapshot change, empire-index change, and theme rebuild via the existing `onAfterRebuild` hook. System-view rings draw inside `SystemLayer.applyEmpireOverlay()`, sitting inside the selection halo so a selected empire planet nests cleanly: planet → ring → halo. `getEmpireSystemIds()` / `getEmpirePlanetIds()` added to `empireIndex.ts` as the unconditional read path; existing toggle-gated `getEmpire*Matches` and the dim composition are untouched.
 - **Empire dim / highlight lens** — toolbar button (tier-gated on bridge snapshot) and keyboard `E` toggle a lens that keeps empire systems bright and dims everything else on the galaxy view; same for empire planets in system view. Empty empire dims everything (intentional — matches empire-overlay.md §1). Toggling the lens on smoothly frames the empire's bounding box in the viewport via `MapRenderer.frameEmpire()`. State persists to `helm-empire-dim` localStorage key. Icon: concentric rings (bright centre + bright inner ring + dim outer ring at 0.4 opacity).
 - **Bridge reception layer** (`src/data/bridge.ts`) — receives Helm Extension envelopes, validates protocol version, publishes `BridgeSnapshot` via `state.ts` subscription pattern. Tier-2 (standalone tab) and tier-3 (embedded iframe) paths, inline bootstrap buffer + `helm-bridge-page-ready` handshake to close the document_start race.
 - **HUD framework chassis** (`src/ui/panels/OverviewPanelManager.ts`) — single-active-panel positioning, backdrop, viewport-clamped anchor, `#hud-toolbar-slot` placeholder. No panels mounted yet.

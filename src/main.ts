@@ -235,8 +235,19 @@ async function boot(): Promise<void> {
       if (id) {
         renderer.setResourceConcentrationsAsync(getSystemsWithResource(id));
       }
+      // Empire rings live on the freshly-constructed GalaxyLayer; repaint.
+      renderer.rebuildEmpireRings();
     });
     applyComposition();
+
+    // Empire base rings (passive, ungated by the dim toggle). Repaint on
+    // snapshot or index change. The snapshot subscription covers tier
+    // arrival / disappearance; the index subscription covers site-level
+    // changes that recompute the empire set. Both call into the same
+    // idempotent rebuild on GalaxyLayer.
+    onBridgeSnapshotChange(() => renderer.rebuildEmpireRings());
+    onEmpireIndexChange(() => renderer.rebuildEmpireRings());
+    renderer.rebuildEmpireRings();
 
     // --- Resource filter handler ---
     // On clear: drop concentration dots. Composition is re-applied via
