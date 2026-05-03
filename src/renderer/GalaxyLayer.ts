@@ -101,8 +101,10 @@ const GATEWAY_ARC_ALPHA = 0.6;
 const GATEWAY_ARC_HEIGHT_FACTOR = 0.3;
 const GATEWAY_ARC_HEIGHT_MAX = 200;
 
-// System selection halo — matches planet selection style
-const SYSTEM_HALO_RADIUS = 14;
+// System selection halo — matches the planet selection style. Sits at a
+// fixed gap outside the star edge regardless of star size, mirroring the
+// system-view halo's relationship to a planet (HALO_GAP in SystemLayer).
+const SYSTEM_HALO_GAP = 6;
 const SYSTEM_HALO_COLOUR = 0x3399ff;
 const SYSTEM_HALO_ALPHA = 0.7;
 const SYSTEM_HALO_STROKE = 2.0;
@@ -124,8 +126,12 @@ const SETTLED_GLOW_ALPHA = 0.86;
 const SETTLED_ROTATION_PERIOD = 5.0;
 
 // Empire base ring indicators — rendered on systems containing user sites
-// whenever the bridge snapshot is present.
-const EMPIRE_RING_RADIUS_MULT = 2.0;
+// whenever the bridge snapshot is present. Fixed gap outside the star edge,
+// mirroring the system-view ring's relationship to a planet
+// (EMPIRE_PLANET_RING_GAP in SystemLayer). The gap is intentionally smaller
+// than SYSTEM_HALO_GAP so a selected empire system nests cleanly:
+// star → empire ring → halo.
+const EMPIRE_RING_GAP = 4;
 const EMPIRE_RING_STROKE = 1.5;
 const EMPIRE_RING_ALPHA = 0.7;
 
@@ -593,11 +599,17 @@ export class GalaxyLayer {
     const system = this.systemLookup.get(id);
     if (!system) return;
 
+    // Halo sits at a fixed gap outside the star edge, regardless of star
+    // size — matches the system-view planet halo behaviour.
+    const connCount = system.connectionIds.length;
+    const sizeScale = connCount >= 5 ? 1.6 : connCount >= 3 ? 1.3 : 1;
+    const haloRadius = STAR_RADIUS * sizeScale + SYSTEM_HALO_GAP;
+
     this.selectionHalo.x = system.worldX;
     this.selectionHalo.y = system.worldY;
-    this.selectionHalo.arc(0, 0, SYSTEM_HALO_RADIUS, -SYSTEM_HALO_ARC_SPAN / 2, SYSTEM_HALO_ARC_SPAN / 2);
+    this.selectionHalo.arc(0, 0, haloRadius, -SYSTEM_HALO_ARC_SPAN / 2, SYSTEM_HALO_ARC_SPAN / 2);
     this.selectionHalo.stroke({ width: SYSTEM_HALO_STROKE, color: SYSTEM_HALO_COLOUR, alpha: SYSTEM_HALO_ALPHA });
-    this.selectionHalo.arc(0, 0, SYSTEM_HALO_RADIUS, Math.PI - SYSTEM_HALO_ARC_SPAN / 2, Math.PI + SYSTEM_HALO_ARC_SPAN / 2);
+    this.selectionHalo.arc(0, 0, haloRadius, Math.PI - SYSTEM_HALO_ARC_SPAN / 2, Math.PI + SYSTEM_HALO_ARC_SPAN / 2);
     this.selectionHalo.stroke({ width: SYSTEM_HALO_STROKE, color: SYSTEM_HALO_COLOUR, alpha: SYSTEM_HALO_ALPHA });
     this.selectionHalo.visible = true;
   }
@@ -793,7 +805,7 @@ export class GalaxyLayer {
 
       const connCount = system.connectionIds.length;
       const sizeScale = connCount >= 5 ? 1.6 : connCount >= 3 ? 1.3 : 1;
-      const ringRadius = STAR_RADIUS * sizeScale * EMPIRE_RING_RADIUS_MULT;
+      const ringRadius = STAR_RADIUS * sizeScale + EMPIRE_RING_GAP;
 
       const ring = new Graphics();
       ring.circle(0, 0, ringRadius);
