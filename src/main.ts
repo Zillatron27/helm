@@ -226,6 +226,17 @@ async function boot(): Promise<void> {
     }
     onStateChange(applyComposition);
     onEmpireIndexChange(applyComposition);
+
+    // Galaxy-view empire indicators (passive, ungated by the dim toggle):
+    // base rings on owned systems + ship stacks on systems with docked
+    // ships. Snapshot subscription covers tier arrival / disappearance;
+    // index subscription covers site-level changes (rings only, but
+    // calling both is idempotent and avoids stale state).
+    const rebuildEmpireGalaxyOverlay = (): void => {
+      renderer.rebuildEmpireRings();
+      renderer.rebuildEmpireShipStacks();
+    };
+
     renderer.onAfterRebuild(() => {
       // Galaxy layer is a fresh instance after rebuild; drop the memo so
       // the current composed state is actually pushed to it.
@@ -236,19 +247,13 @@ async function boot(): Promise<void> {
       if (id) {
         renderer.setResourceConcentrationsAsync(getSystemsWithResource(id));
       }
-      // Empire rings live on the freshly-constructed GalaxyLayer; repaint.
-      renderer.rebuildEmpireRings();
+      rebuildEmpireGalaxyOverlay();
     });
     applyComposition();
 
-    // Empire base rings (passive, ungated by the dim toggle). Repaint on
-    // snapshot or index change. The snapshot subscription covers tier
-    // arrival / disappearance; the index subscription covers site-level
-    // changes that recompute the empire set. Both call into the same
-    // idempotent rebuild on GalaxyLayer.
-    onBridgeSnapshotChange(() => renderer.rebuildEmpireRings());
-    onEmpireIndexChange(() => renderer.rebuildEmpireRings());
-    renderer.rebuildEmpireRings();
+    onBridgeSnapshotChange(rebuildEmpireGalaxyOverlay);
+    onEmpireIndexChange(rebuildEmpireGalaxyOverlay);
+    rebuildEmpireGalaxyOverlay();
 
     // --- Resource filter handler ---
     // On clear: drop concentration dots. Composition is re-applied via

@@ -9,6 +9,9 @@ import {
 import { getAllCxStations, getGalaxyGatewayConnections, isGatewaySystem } from "../data/cache.js";
 import { isSettledSystem } from "../data/siteCounts.js";
 import { getEmpireSystemIds } from "../data/empireIndex.js";
+import { getBridgeSnapshot } from "../ui/state.js";
+import { getSystemUuidByNaturalId } from "../data/searchIndex.js";
+import { drawChevronStack, CHEVRON_GLYPH_SIZE } from "./ChevronStack.js";
 import { StarParticles } from "./StarParticles.js";
 import { TweenManager } from "./Tween.js";
 import { yieldToMain } from "../util/yieldToMain.js";
@@ -135,6 +138,14 @@ const EMPIRE_RING_GAP = 4;
 const EMPIRE_RING_STROKE = 1.5;
 const EMPIRE_RING_ALPHA = 0.7;
 
+// Galaxy-view ship stack — same chevron signature as the system-view
+// per-planet stack, but aggregated to the system level (any docked ship
+// in the system, including CX-docked, contributes to the system's count).
+// Anchored just outside the empire ring's outer edge (or star edge when
+// the system isn't empire-owned).
+const SHIP_STACK_OFFSET_FROM_RING = 6;
+const SHIP_STACK_ALPHA = 1.0;
+
 let glowTexture: Texture | null = null;
 function getGlowTexture(): Texture {
   if (glowTexture) return glowTexture;
@@ -226,6 +237,9 @@ export class GalaxyLayer {
   // Empire base rings — owned-system markers from bridge snapshot
   private empireBaseRings: Container;
 
+  // Empire ship stacks — per-system docked-ship indicators from snapshot
+  private empireShipStacks: Container;
+
   // Generation counter — async concentration runs bail when superseded.
   private resourceConcentrationGen = 0;
 
@@ -310,6 +324,12 @@ export class GalaxyLayer {
     this.empireBaseRings = new Container();
     this.empireBaseRings.eventMode = "none";
     this.container.addChild(this.empireBaseRings);
+
+    // Empire ship stacks — per-system docked-ship indicators. Same z-order
+    // tier as base rings; populated by rebuildEmpireShipStacks().
+    this.empireShipStacks = new Container();
+    this.empireShipStacks.eventMode = "none";
+    this.container.addChild(this.empireShipStacks);
 
     // Hover particles — above glows, below labels and stars
     this.starParticles = new StarParticles();
@@ -817,6 +837,54 @@ export class GalaxyLayer {
     }
   }
 
+  /**
+   * Rebuild per-system docked-ship stacks from the current bridge
+   * snapshot. A system contributes to the count for any docked ship
+   * inside it (planet-docked or CX-docked, status !== IN_FLIGHT).
+   * Glyph count: 1 for a single ship, 3 for 2+. Stack anchors just
+   * outside the empire ring footprint (or star edge when the system
+   * isn't empire-owned).
+   */
+  rebuildEmpireShipStacks(): void {
+    this.empireShipStacks.removeChildren();
+
+    const snapshot = getBridgeSnapshot();
+    if (!snapshot || snapshot.ships.length === 0) return;
+
+    // Aggregate ships per system natural ID. CX-docked ships count here
+    // (a different rule from system view, which can't render them
+    // without a CX grid — this aggregate-level signal still wants to
+    // tell the player "ships are present in this system").
+    const shipsPerSystem = new Map<string, number>();
+    for (const ship of snapshot.ships) {
+      if (ship.status === "IN_FLIGHT") continue;
+      const sysNid = ship.locationSystemNaturalId;
+      if (!sysNid) continue;
+      shipsPerSystem.set(sysNid, (shipsPerSystem.get(sysNid) ?? 0) + 1);
+    }
+    if (shipsPerSystem.size === 0) return;
+
+    const accent = getTheme().accent;
+    const half = CHEVRON_GLYPH_SIZE / 2;
+
+    for (const [sysNid, count] of shipsPerSystem) {
+      const uuid = getSystemUuidByNaturalId(sysNid);
+      if (!uuid) continue;
+      const system = this.systemLookup.get(uuid);
+      if (!system) continue;
+
+      const connCount = system.connectionIds.length;
+      const sizeScale = connCount >= 5 ? 1.6 : connCount >= 3 ? 1.3 : 1;
+      const ringRadius = STAR_RADIUS * sizeScale + EMPIRE_RING_GAP;
+
+      const stack = new Container();
+      stack.x = system.worldX + ringRadius + SHIP_STACK_OFFSET_FROM_RING + half;
+      stack.y = system.worldY;
+      drawChevronStack(stack, count, accent, SHIP_STACK_ALPHA);
+      this.empireShipStacks.addChild(stack);
+    }
+  }
+
   dimExcept(systemId: string, tw?: TweenManager): void {
     this.isDimmedForSystemView = true;
     this.twinkleActive = false;
@@ -839,6 +907,7 @@ export class GalaxyLayer {
       tw.to(this.settledRingsAnimated, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
       tw.to(this.resourceIndicators, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
       tw.to(this.empireBaseRings, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
+      tw.to(this.empireShipStacks, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
       // Fade out ambient labels then hide
       tw.to(this.ambientLabels, "alpha", 0, 0.3);
     } else {
@@ -852,6 +921,7 @@ export class GalaxyLayer {
       this.settledRingsAnimated.alpha = SYSTEM_VIEW_LINES_ALPHA;
       this.resourceIndicators.alpha = SYSTEM_VIEW_LINES_ALPHA;
       this.empireBaseRings.alpha = SYSTEM_VIEW_LINES_ALPHA;
+      this.empireShipStacks.alpha = SYSTEM_VIEW_LINES_ALPHA;
       this.ambientLabels.visible = false;
     }
 
@@ -891,6 +961,7 @@ export class GalaxyLayer {
       tw.to(this.settledRingsAnimated, "alpha", settledAlpha, dur);
       tw.to(this.resourceIndicators, "alpha", resourceAlpha, dur);
       tw.to(this.empireBaseRings, "alpha", containerAlpha, dur);
+      tw.to(this.empireShipStacks, "alpha", containerAlpha, dur);
     } else {
       this.baseConnections.alpha = containerAlpha;
       this.routeOverlay.alpha = containerAlpha;
@@ -902,6 +973,7 @@ export class GalaxyLayer {
       this.settledRingsAnimated.alpha = this.settledVisible ? containerAlpha : 0;
       this.resourceIndicators.alpha = resourceAlpha;
       this.empireBaseRings.alpha = containerAlpha;
+      this.empireShipStacks.alpha = containerAlpha;
     }
 
     // Per-star alpha: respect highlight filter when active

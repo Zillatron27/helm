@@ -8,6 +8,7 @@ import type { GatewayEndpoint } from "../types/index.js";
 import type { ShipSummary } from "../data/bridge-types.js";
 import { generatePlanetTexture, generateStarTexture, getCloudTexture, getCloudTint } from "./PlanetTexture.js";
 import { showMapTooltip, hideMapTooltip } from "../ui/MapTooltip.js";
+import { drawChevronStack, CHEVRON_GLYPH_SIZE } from "./ChevronStack.js";
 
 const CENTRAL_STAR_RADIUS = 30;
 const GLOW_RADIUS = 110;
@@ -83,15 +84,11 @@ const EMPIRE_PLANET_RING_GAP = 4;
 const EMPIRE_PLANET_RING_STROKE = 1.5;
 const EMPIRE_PLANET_RING_ALPHA = 0.7;
 
-// Docked-ship indicator — a fixed three-glyph stack of right-pointing
-// chevrons beside any planet that has 1+ docked ships in the snapshot.
-// The three glyphs are a visual signature, not a count; the actual list
-// is in the hover tooltip. Anchored just outside the empire ring (or
-// planet edge if no ring). CX-docked ships are filtered out per
-// empire-overlay.md §3.
-const SHIP_STACK_GLYPH_SIZE = 8;
-const SHIP_STACK_GLYPH_OFFSET = 3;
-const SHIP_STACK_GLYPH_COUNT = 3;
+// Docked-ship indicator — chevron stack beside any planet with 1+ docked
+// ships in the snapshot. Glyph count adapts to fleet size: 1 ship → 1
+// chevron, 2+ ships → fixed 3-glyph stack. Anchored just outside the
+// empire ring (or planet edge if no ring). CX-docked ships are filtered
+// out per empire-overlay.md §3.
 const SHIP_STACK_OFFSET_FROM_RING = 6;
 const SHIP_STACK_ALPHA = 1.0;
 const SHIP_TOOLTIP_MAX_ROWS = 6;
@@ -619,7 +616,7 @@ export class SystemLayer {
       // Capability 3: docked-ship stack beside any planet with 1+ ships.
       const ships = shipsAtPlanet.get(planet.naturalId);
       if (ships && ships.length > 0) {
-        const half = SHIP_STACK_GLYPH_SIZE / 2;
+        const half = CHEVRON_GLYPH_SIZE / 2;
         const anchorX = pos.x + ringRadius + SHIP_STACK_OFFSET_FROM_RING + half;
         const anchorY = pos.y;
 
@@ -627,24 +624,12 @@ export class SystemLayer {
         stack.x = anchorX;
         stack.y = anchorY;
 
-        // Three overlapping right-pointing filled isoceles triangles —
-        // a fixed visual signature, not a count.
-        for (let i = 0; i < SHIP_STACK_GLYPH_COUNT; i++) {
-          const glyph = new Graphics();
-          glyph.moveTo(-half, -half);
-          glyph.lineTo(half, 0);
-          glyph.lineTo(-half, half);
-          glyph.closePath();
-          glyph.fill({ color: accent, alpha: SHIP_STACK_ALPHA });
-          glyph.x = i * SHIP_STACK_GLYPH_OFFSET;
-          stack.addChild(glyph);
-        }
+        const clusterCentre = drawChevronStack(stack, ships.length, accent, SHIP_STACK_ALPHA);
 
-        // Hit area centred on the overlapping cluster.
-        const clusterCentre = ((SHIP_STACK_GLYPH_COUNT - 1) * SHIP_STACK_GLYPH_OFFSET) / 2;
+        // Hit area centred on the cluster.
         stack.eventMode = "static";
         stack.cursor = "default";
-        stack.hitArea = new Circle(clusterCentre, 0, SHIP_STACK_GLYPH_SIZE);
+        stack.hitArea = new Circle(clusterCentre, 0, CHEVRON_GLYPH_SIZE);
 
         const tooltip = this.formatShipTooltip(ships);
         stack.on("pointerover", (e) => {

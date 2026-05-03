@@ -617,6 +617,10 @@ export class MapRenderer {
     this.galaxy?.rebuildEmpireRings();
   }
 
+  rebuildEmpireShipStacks(): void {
+    this.galaxy?.rebuildEmpireShipStacks();
+  }
+
   /** Remove resource indicator dots. */
   clearResourceIndicators(): void {
     this.galaxy?.clearResourceIndicators();
