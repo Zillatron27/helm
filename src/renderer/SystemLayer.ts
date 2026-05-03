@@ -88,8 +88,9 @@ const EMPIRE_PLANET_RING_ALPHA = 0.7;
 // Docked-ship indicator — chevron stack beside any planet with 1+ docked
 // ships in the snapshot. Glyph count adapts to fleet size: 1 ship → 1
 // chevron, 2+ ships → fixed 3-glyph stack. Anchored just outside the
-// empire ring (or planet edge if no ring). CX-docked ships are filtered
-// out per empire-overlay.md §3.
+// empire ring (or planet edge if no ring). Ships docked at the system's
+// CX (locationPlanetNaturalId === null) get their own stack beside the
+// central star — no per-planet anchor exists for them.
 const SHIP_STACK_OFFSET_FROM_RING = 6;
 const SHIP_STACK_ALPHA = 1.0;
 
@@ -575,16 +576,20 @@ export class SystemLayer {
     const empirePlanetSet = getEmpirePlanetIds();
     const accent = getTheme().accent;
 
-    // Group docked ships by planet natural ID. Filter out:
-    //   - locationPlanetNaturalId === null  (CX-docked, out of scope per
-    //     empire-overlay.md §3 — silently dropped, no log/warn)
-    //   - status === "IN_FLIGHT"           (in transit, not docked)
+    // Group docked ships into per-planet stacks + a system-level stack
+    // for CX-docked ships (locationPlanetNaturalId === null). Ships in
+    // flight are omitted (handled by Cap 4 in-flight chevrons).
     const shipsAtPlanet = new Map<string, ShipSummary[]>();
+    const cxDockedShips: ShipSummary[] = [];
     const snapshot = getBridgeSnapshot();
+    const systemNid = this.currentSystem.naturalId;
     if (snapshot) {
       for (const ship of snapshot.ships) {
-        if (ship.locationPlanetNaturalId === null) continue;
         if (ship.status === "IN_FLIGHT") continue;
+        if (ship.locationPlanetNaturalId === null) {
+          if (ship.locationSystemNaturalId === systemNid) cxDockedShips.push(ship);
+          continue;
+        }
         const list = shipsAtPlanet.get(ship.locationPlanetNaturalId);
         if (list) list.push(ship);
         else shipsAtPlanet.set(ship.locationPlanetNaturalId, [ship]);
@@ -640,6 +645,35 @@ export class SystemLayer {
 
         overlay.addChild(stack);
       }
+    }
+
+    // System-level stack for CX-docked ships — anchored beside the central
+    // star (the star sits at container origin). Same chevron signature as
+    // per-planet stacks; tooltip uses the system-context header to make
+    // clear these ships aren't attached to any one planet.
+    if (cxDockedShips.length > 0) {
+      const half = CHEVRON_GLYPH_SIZE / 2;
+      const { graphics: stack, clusterCentre } = buildChevronStack(
+        cxDockedShips.length,
+        accent,
+        SHIP_STACK_ALPHA,
+      );
+      stack.x = CENTRAL_STAR_RADIUS + SHIP_STACK_OFFSET_FROM_RING + half;
+      stack.y = 0;
+
+      stack.eventMode = "static";
+      stack.cursor = "default";
+      stack.hitArea = new Circle(clusterCentre, 0, CHEVRON_GLYPH_SIZE);
+
+      const tooltip = formatDockedShipTooltip(cxDockedShips, { systemNaturalId: systemNid });
+      stack.on("pointerover", (e) => {
+        showMapTooltip(e.globalX, e.globalY, tooltip);
+      });
+      stack.on("pointerout", () => {
+        hideMapTooltip();
+      });
+
+      overlay.addChild(stack);
     }
 
     // Insert before the selection halo so the halo stays on top.
