@@ -1,4 +1,4 @@
-import { Container, Graphics } from "pixi.js";
+import { Graphics } from "pixi.js";
 
 /**
  * Right-pointing chevron stack — the "ships here" visual signature used
@@ -8,6 +8,12 @@ import { Container, Graphics } from "pixi.js";
  *
  * Glyphs are filled isoceles triangles drawn at integer offsets so the
  * stack reads as motion / direction rather than a single shape.
+ *
+ * Returns a single Graphics so the caller can place + hit-test it
+ * without an intermediate Container — Pixi v8 hit-testing on a
+ * Container-with-Graphics-children proved unreliable as a child of
+ * deeply-nested viewport layers (worked in system view, missed in
+ * galaxy view), so the stack is now drawn as one shape.
  */
 
 export const CHEVRON_GLYPH_SIZE = 8;
@@ -18,30 +24,35 @@ export function chevronGlyphCount(shipCount: number): number {
   return shipCount >= 2 ? 3 : 1;
 }
 
-/**
- * Draw a chevron stack into `container` anchored at its local origin
- * (the leftmost glyph's centre is at x=0). Returns the x-offset of the
- * cluster centre — useful for centring a hit area or tooltip anchor.
- */
-export function drawChevronStack(
-  container: Container,
+export interface ChevronStackResult {
+  graphics: Graphics;
+  /** x-offset of the cluster centre (for centring hit areas / tooltips). */
+  clusterCentre: number;
+  /** Outer extent of the stack from the anchor (for hit-area sizing). */
+  width: number;
+}
+
+export function buildChevronStack(
   shipCount: number,
   color: number,
   alpha = 1,
-): number {
+): ChevronStackResult {
   const glyphCount = chevronGlyphCount(shipCount);
   const half = CHEVRON_GLYPH_SIZE / 2;
+  const g = new Graphics();
 
   for (let i = 0; i < glyphCount; i++) {
-    const glyph = new Graphics();
-    glyph.moveTo(-half, -half);
-    glyph.lineTo(half, 0);
-    glyph.lineTo(-half, half);
-    glyph.closePath();
-    glyph.fill({ color, alpha });
-    glyph.x = i * CHEVRON_GLYPH_OFFSET;
-    container.addChild(glyph);
+    const cx = i * CHEVRON_GLYPH_OFFSET;
+    g.moveTo(cx - half, -half);
+    g.lineTo(cx + half, 0);
+    g.lineTo(cx - half, half);
+    g.closePath();
   }
+  g.fill({ color, alpha });
 
-  return ((glyphCount - 1) * CHEVRON_GLYPH_OFFSET) / 2;
+  const clusterCentre = ((glyphCount - 1) * CHEVRON_GLYPH_OFFSET) / 2;
+  // From left edge of leftmost glyph to right tip of rightmost glyph
+  const width = (glyphCount - 1) * CHEVRON_GLYPH_OFFSET + CHEVRON_GLYPH_SIZE;
+
+  return { graphics: g, clusterCentre, width };
 }

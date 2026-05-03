@@ -8,7 +8,8 @@ import type { GatewayEndpoint } from "../types/index.js";
 import type { ShipSummary } from "../data/bridge-types.js";
 import { generatePlanetTexture, generateStarTexture, getCloudTexture, getCloudTint } from "./PlanetTexture.js";
 import { showMapTooltip, hideMapTooltip } from "../ui/MapTooltip.js";
-import { drawChevronStack, CHEVRON_GLYPH_SIZE } from "./ChevronStack.js";
+import { buildChevronStack, CHEVRON_GLYPH_SIZE } from "./ChevronStack.js";
+import { formatDockedShipTooltip } from "../data/shipTooltip.js";
 
 const CENTRAL_STAR_RADIUS = 30;
 const GLOW_RADIUS = 110;
@@ -91,7 +92,6 @@ const EMPIRE_PLANET_RING_ALPHA = 0.7;
 // out per empire-overlay.md §3.
 const SHIP_STACK_OFFSET_FROM_RING = 6;
 const SHIP_STACK_ALPHA = 1.0;
-const SHIP_TOOLTIP_MAX_ROWS = 6;
 
 interface PlanetCloud {
   sprite: Sprite;
@@ -617,21 +617,19 @@ export class SystemLayer {
       const ships = shipsAtPlanet.get(planet.naturalId);
       if (ships && ships.length > 0) {
         const half = CHEVRON_GLYPH_SIZE / 2;
-        const anchorX = pos.x + ringRadius + SHIP_STACK_OFFSET_FROM_RING + half;
-        const anchorY = pos.y;
+        const { graphics: stack, clusterCentre } = buildChevronStack(
+          ships.length,
+          accent,
+          SHIP_STACK_ALPHA,
+        );
+        stack.x = pos.x + ringRadius + SHIP_STACK_OFFSET_FROM_RING + half;
+        stack.y = pos.y;
 
-        const stack = new Container();
-        stack.x = anchorX;
-        stack.y = anchorY;
-
-        const clusterCentre = drawChevronStack(stack, ships.length, accent, SHIP_STACK_ALPHA);
-
-        // Hit area centred on the cluster.
         stack.eventMode = "static";
         stack.cursor = "default";
         stack.hitArea = new Circle(clusterCentre, 0, CHEVRON_GLYPH_SIZE);
 
-        const tooltip = this.formatShipTooltip(ships);
+        const tooltip = formatDockedShipTooltip(ships);
         stack.on("pointerover", (e) => {
           // Pixi event globals are screen-space; perfect for an HTML overlay.
           showMapTooltip(e.globalX, e.globalY, tooltip);
@@ -652,15 +650,4 @@ export class SystemLayer {
     this.empireOverlayContainer = overlay;
   }
 
-  private formatShipTooltip(ships: ShipSummary[]): { header: string; lines: string[] } {
-    const header = `${ships.length} ${ships.length === 1 ? "ship" : "ships"} docked`;
-    const visible = ships.slice(0, SHIP_TOOLTIP_MAX_ROWS);
-    const lines = visible.map(
-      (s) => `${s.name} (${s.registration}) — ${s.status}`,
-    );
-    if (ships.length > SHIP_TOOLTIP_MAX_ROWS) {
-      lines.push(`+${ships.length - SHIP_TOOLTIP_MAX_ROWS} more`);
-    }
-    return { header, lines };
-  }
 }

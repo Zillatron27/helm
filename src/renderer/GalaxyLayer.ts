@@ -11,7 +11,10 @@ import { isSettledSystem } from "../data/siteCounts.js";
 import { getEmpireSystemIds } from "../data/empireIndex.js";
 import { getBridgeSnapshot } from "../ui/state.js";
 import { getSystemUuidByNaturalId } from "../data/searchIndex.js";
-import { drawChevronStack, CHEVRON_GLYPH_SIZE } from "./ChevronStack.js";
+import { buildChevronStack, CHEVRON_GLYPH_SIZE } from "./ChevronStack.js";
+import { showMapTooltip, hideMapTooltip } from "../ui/MapTooltip.js";
+import { formatDockedShipTooltip } from "../data/shipTooltip.js";
+import type { ShipSummary } from "../data/bridge-types.js";
 import { StarParticles } from "./StarParticles.js";
 import { TweenManager } from "./Tween.js";
 import { yieldToMain } from "../util/yieldToMain.js";
@@ -326,9 +329,11 @@ export class GalaxyLayer {
     this.container.addChild(this.empireBaseRings);
 
     // Empire ship stacks — per-system docked-ship indicators. Same z-order
-    // tier as base rings; populated by rebuildEmpireShipStacks().
+    // tier as base rings; populated by rebuildEmpireShipStacks(). Container
+    // is passive (doesn't intercept) so its interactive child stacks
+    // dispatch hover events for the tooltip.
     this.empireShipStacks = new Container();
-    this.empireShipStacks.eventMode = "none";
+    this.empireShipStacks.eventMode = "passive";
     this.container.addChild(this.empireShipStacks);
 
     // Hover particles — above glows, below labels and stars
@@ -855,19 +860,21 @@ export class GalaxyLayer {
     // (a different rule from system view, which can't render them
     // without a CX grid — this aggregate-level signal still wants to
     // tell the player "ships are present in this system").
-    const shipsPerSystem = new Map<string, number>();
+    const shipsPerSystem = new Map<string, ShipSummary[]>();
     for (const ship of snapshot.ships) {
       if (ship.status === "IN_FLIGHT") continue;
       const sysNid = ship.locationSystemNaturalId;
       if (!sysNid) continue;
-      shipsPerSystem.set(sysNid, (shipsPerSystem.get(sysNid) ?? 0) + 1);
+      const list = shipsPerSystem.get(sysNid);
+      if (list) list.push(ship);
+      else shipsPerSystem.set(sysNid, [ship]);
     }
     if (shipsPerSystem.size === 0) return;
 
     const accent = getTheme().accent;
     const half = CHEVRON_GLYPH_SIZE / 2;
 
-    for (const [sysNid, count] of shipsPerSystem) {
+    for (const [sysNid, ships] of shipsPerSystem) {
       const uuid = getSystemUuidByNaturalId(sysNid);
       if (!uuid) continue;
       const system = this.systemLookup.get(uuid);
@@ -877,10 +884,30 @@ export class GalaxyLayer {
       const sizeScale = connCount >= 5 ? 1.6 : connCount >= 3 ? 1.3 : 1;
       const ringRadius = STAR_RADIUS * sizeScale + EMPIRE_RING_GAP;
 
-      const stack = new Container();
+      const { graphics: stack, clusterCentre } = buildChevronStack(
+        ships.length,
+        accent,
+        SHIP_STACK_ALPHA,
+      );
       stack.x = system.worldX + ringRadius + SHIP_STACK_OFFSET_FROM_RING + half;
       stack.y = system.worldY;
-      drawChevronStack(stack, count, accent, SHIP_STACK_ALPHA);
+
+      // Hover → ship-list tooltip, same singleton overlay used in system view.
+      // Bail when galaxy view is dimmed (under the system view); the stacks
+      // remain hit-testable but firing the tooltip there would surface
+      // background content over the foreground panel.
+      stack.eventMode = "static";
+      stack.cursor = "default";
+      stack.hitArea = new Circle(clusterCentre, 0, CHEVRON_GLYPH_SIZE);
+      const tooltip = formatDockedShipTooltip(ships, { systemNaturalId: sysNid });
+      stack.on("pointerover", (e) => {
+        if (this.isDimmedForSystemView) return;
+        showMapTooltip(e.globalX, e.globalY, tooltip);
+      });
+      stack.on("pointerout", () => {
+        hideMapTooltip();
+      });
+
       this.empireShipStacks.addChild(stack);
     }
   }
@@ -894,6 +921,9 @@ export class GalaxyLayer {
     this.selectionHalo.clear();
     this.selectionHalo.visible = false;
     this.starParticles.clear();
+    // Any tooltip opened from a galaxy ship stack would otherwise float
+    // over the system view until the pointer moves off the stack.
+    hideMapTooltip();
 
     const dur = tw ? 0.6 : 0;
     if (tw) {
