@@ -5,7 +5,11 @@ import {
   onResourceIndexReady,
   getExtractableResourceMaterialIds,
 } from "../../data/resourceIndex.js";
-import { getResourceFilters, setResourceFilter } from "../state.js";
+import {
+  getResourceFilters,
+  addResourceFilter,
+  removeResourceFilter,
+} from "../state.js";
 import { getTheme } from "../theme.js";
 import { createMiniLoader } from "../loader/LoaderAnimation.js";
 
@@ -21,7 +25,7 @@ export class ResourcePicker {
   private btnEl: HTMLButtonElement;
   private inputEl: HTMLInputElement;
   private dropdownEl: HTMLElement;
-  private badgeEl: HTMLElement | null = null;
+  private badgesContainer: HTMLDivElement;
   // filteredMaterials is rebuilt in grouped display order after every search
   private filteredMaterials: FioMaterial[] = [];
   private activeIndex = -1;
@@ -74,7 +78,11 @@ export class ResourcePicker {
 
     this.btnEl.addEventListener("click", () => this.handleButtonClick());
 
+    this.badgesContainer = document.createElement("div");
+    this.badgesContainer.className = "resource-badges";
+
     this.rowEl.appendChild(this.expandEl);
+    this.rowEl.appendChild(this.badgesContainer);
     this.rowEl.appendChild(this.btnEl);
 
     this.bindEvents();
@@ -166,7 +174,15 @@ export class ResourcePicker {
       case "Enter":
         e.preventDefault();
         if (this.activeIndex >= 0 && this.activeIndex < this.filteredMaterials.length) {
-          this.selectMaterial(this.filteredMaterials[this.activeIndex]!);
+          this.selectMaterial(this.filteredMaterials[this.activeIndex]!, /* close */ true);
+        }
+        break;
+      case "Tab":
+        // Tab chains: add the highlighted material to the filter set
+        // and keep the picker open so the user can type the next one.
+        if (this.activeIndex >= 0 && this.activeIndex < this.filteredMaterials.length) {
+          e.preventDefault();
+          this.selectMaterial(this.filteredMaterials[this.activeIndex]!, /* close */ false);
         }
         break;
       case "Escape":
@@ -249,12 +265,14 @@ export class ResourcePicker {
       list.push({ material: m, index: i });
     }
 
+    const selected = new Set(getResourceFilters());
     let html = "";
     for (const [category, entries] of grouped) {
       html += `<div class="resource-category">${esc(formatCamelCase(category))}</div>`;
       for (const { material, index } of entries) {
         const activeClass = index === this.activeIndex ? " resource-item-active" : "";
-        html += `<div class="resource-item${activeClass}" data-index="${index}">
+        const selectedClass = selected.has(material.MaterialId) ? " resource-item-selected" : "";
+        html += `<div class="resource-item${activeClass}${selectedClass}" data-index="${index}">
           <span class="resource-item-ticker">${esc(material.Ticker)}</span>
           <span class="resource-item-name">${esc(formatCamelCase(material.Name))}</span>
         </div>`;
@@ -264,13 +282,19 @@ export class ResourcePicker {
     this.dropdownEl.innerHTML = html;
     this.dropdownEl.classList.add("resource-dropdown-open");
 
-    // Bind mousedown (not click) to fire before blur
+    // Bind mousedown (not click) to fire before blur. Click-on-row chains
+    // like Tab — adds and keeps the picker open. Click on an already-
+    // selected row removes it from the filter (toggle).
     this.dropdownEl.querySelectorAll(".resource-item").forEach((el) => {
       el.addEventListener("mousedown", (e) => {
         e.preventDefault();
         const idx = parseInt((el as HTMLElement).dataset["index"] ?? "-1", 10);
-        if (idx >= 0 && idx < this.filteredMaterials.length) {
-          this.selectMaterial(this.filteredMaterials[idx]!);
+        if (idx < 0 || idx >= this.filteredMaterials.length) return;
+        const material = this.filteredMaterials[idx]!;
+        if (getResourceFilters().includes(material.MaterialId)) {
+          this.deselectMaterial(material);
+        } else {
+          this.selectMaterial(material, /* close */ false);
         }
       });
     });
@@ -293,29 +317,56 @@ export class ResourcePicker {
     activeEl?.scrollIntoView({ block: "nearest" });
   }
 
-  private selectMaterial(material: FioMaterial): void {
+  /**
+   * Add a material to the filter set and trigger the async render.
+   *
+   * close=true (Enter): clears input, collapses the picker — the
+   * "I'm done" path. close=false (Tab / click): clears input but
+   * keeps the picker open and re-runs the search so the user can chain
+   * another selection — the dropdown refreshes with the just-added
+   * material now marked as selected.
+   */
+  private selectMaterial(material: FioMaterial, close: boolean): void {
     this.inputEl.value = "";
-    this.hideDropdown();
-    this.collapse();
-    this.inputEl.blur();
+    addResourceFilter(material.MaterialId);
 
-    // Show spinner — the async filter yields between chunks so the spinner
-    // stays animated throughout the multi-second computation.
+    if (close) {
+      this.hideDropdown();
+      this.collapse();
+      this.inputEl.blur();
+    } else {
+      this.showAllResources();
+      this.inputEl.focus();
+    }
+
+    this.runFilterApply();
+  }
+
+  /** Remove a material from the filter set; refresh dropdown if open. */
+  private deselectMaterial(material: FioMaterial): void {
+    removeResourceFilter(material.MaterialId);
+    if (this.expanded) {
+      if (this.inputEl.value) this.runSearch();
+      else this.showAllResources();
+    }
+    this.runFilterApply();
+  }
+
+  /** Spinner + applyFilterAsync(ids) + button-state restore. */
+  private runFilterApply(): void {
+    const ids = getResourceFilters();
+    if (ids.length === 0) {
+      this.btnEl.classList.remove("toolbar-btn-resource-on");
+      if (this.applyFilterAsync) this.applyFilterAsync([]);
+      return;
+    }
     this.showButtonSpinner();
-
-    // Set state first (lightweight — triggers panel update, badge)
-    setResourceFilter(material.MaterialId);
-    this.showBadge(material.Ticker);
-
-    // Apply the heavy rendering work asynchronously (chunked with yields).
-    // Pass the full filter set; commit 1 only ever has 1, commit 2 may have more.
     if (this.applyFilterAsync) {
-      this.applyFilterAsync(getResourceFilters()).then(() => {
+      this.applyFilterAsync(ids).then(() => {
         this.restoreButtonIcon();
         this.btnEl.classList.add("toolbar-btn-resource-on");
       });
     } else {
-      // Fallback: no async callback wired, restore immediately
       this.restoreButtonIcon();
       this.btnEl.classList.add("toolbar-btn-resource-on");
     }
@@ -332,47 +383,32 @@ export class ResourcePicker {
     this.btnEl.innerHTML = FILTER_ICON_SVG;
   }
 
-  private showBadge(ticker: string): void {
-    this.removeBadge();
-
-    const badge = document.createElement("div");
-    badge.className = "resource-badge";
-    badge.textContent = ticker;
-
-    const clearBtn = document.createElement("button");
-    clearBtn.className = "resource-badge-clear";
-    clearBtn.textContent = "\u00d7";
-    clearBtn.addEventListener("click", () => {
-      setResourceFilter(null);
-      this.removeBadge();
-    });
-
-    badge.appendChild(clearBtn);
-    // Insert badge before the button (pops out to the left)
-    this.rowEl.insertBefore(badge, this.btnEl);
-    this.badgeEl = badge;
-  }
-
-  private removeBadge(): void {
-    if (this.badgeEl) {
-      this.badgeEl.remove();
-      this.badgeEl = null;
-    }
-    this.btnEl.classList.remove("toolbar-btn-resource-on");
-  }
-
-  /** Sync button state with external filter changes. Commit 1: shows the
-   * first material's ticker only — commit 2 will render per-resource badges. */
-  syncState(): void {
+  /** Rebuild the badges container from the current filter state. */
+  private renderBadges(): void {
     const ids = getResourceFilters();
-    if (ids.length > 0) {
-      const ticker = getMaterialTicker(ids[0]!);
-      if (!this.badgeEl) {
-        this.showBadge(ticker);
-      }
-    } else {
-      this.removeBadge();
+    this.badgesContainer.innerHTML = "";
+    for (const id of ids) {
+      const badge = document.createElement("div");
+      badge.className = "resource-badge";
+      badge.textContent = getMaterialTicker(id);
+
+      const clearBtn = document.createElement("button");
+      clearBtn.className = "resource-badge-clear";
+      clearBtn.textContent = "×";
+      clearBtn.addEventListener("click", () => {
+        removeResourceFilter(id);
+        this.runFilterApply();
+      });
+
+      badge.appendChild(clearBtn);
+      this.badgesContainer.appendChild(badge);
     }
+    this.btnEl.classList.toggle("toolbar-btn-resource-on", ids.length > 0);
+  }
+
+  /** Sync UI with external filter state changes. */
+  syncState(): void {
+    this.renderBadges();
   }
 }
 
