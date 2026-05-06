@@ -191,23 +191,45 @@ export function offBridgeSnapshotChange(listener: StateListener): void {
   bridgeSnapshotListeners.delete(listener);
 }
 
-// Resource filter — persists until explicitly cleared
-let resourceFilter: string | null = null; // MaterialId
+// Resource filter — list of MaterialIds. Empty = inactive. Multiple
+// entries = AND across resources (matching planets must contain all).
+let resourceFilters: string[] = [];
 
-export function getResourceFilter(): string | null {
-  return resourceFilter;
+export function getResourceFilters(): readonly string[] {
+  return resourceFilters;
 }
 
-export function setResourceFilter(materialId: string | null): void {
-  if (materialId === resourceFilter) return;
-  resourceFilter = materialId;
-  // Mutually exclusive: setting resource clears COGC
-  if (materialId !== null && cogcFilter !== null) {
+function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+export function setResourceFilters(ids: readonly string[]): void {
+  if (arraysEqual(ids, resourceFilters)) return;
+  resourceFilters = ids.slice();
+  // Mutually exclusive: setting any resource clears COGC
+  if (resourceFilters.length > 0 && cogcFilter !== null) {
     cogcFilter = null;
     notifyCogcFilterListeners();
   }
   notifyResourceFilterListeners();
   notify();
+}
+
+/** Convenience: replace the entire filter with a single material, or clear. */
+export function setResourceFilter(materialId: string | null): void {
+  setResourceFilters(materialId === null ? [] : [materialId]);
+}
+
+export function addResourceFilter(materialId: string): void {
+  if (resourceFilters.includes(materialId)) return;
+  setResourceFilters([...resourceFilters, materialId]);
+}
+
+export function removeResourceFilter(materialId: string): void {
+  if (!resourceFilters.includes(materialId)) return;
+  setResourceFilters(resourceFilters.filter((id) => id !== materialId));
 }
 
 // COGC filter — persists until explicitly cleared, mutually exclusive with resource filter
@@ -221,8 +243,8 @@ export function setCogcFilter(category: string | null): void {
   if (category === cogcFilter) return;
   cogcFilter = category;
   // Mutually exclusive: setting COGC clears resource
-  if (category !== null && resourceFilter !== null) {
-    resourceFilter = null;
+  if (category !== null && resourceFilters.length > 0) {
+    resourceFilters = [];
     notifyResourceFilterListeners();
   }
   notifyCogcFilterListeners();

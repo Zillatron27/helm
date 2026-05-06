@@ -131,6 +131,76 @@ export function getPlanetsWithResource(materialId: string): PlanetResourceMatch[
   return planetIndex.get(materialId) ?? [];
 }
 
+/** Per-planet AND match across multiple materials. */
+export interface MultiResourcePlanetMatch {
+  planetNaturalId: string;
+  systemId: string;
+  /** min(factor) across all selected materials — the "bottleneck" the
+   * planet imposes on a chain that needs every selected resource. */
+  bottleneckFactor: number;
+  /** Per-material factor for the planet, keyed by MaterialId. */
+  factors: Map<string, number>;
+}
+
+/**
+ * Return planets that contain every material in the input set, with the
+ * bottleneck (minimum) factor across the materials and per-material
+ * factors. With 0 materials, returns []. With 1, behaves identically to
+ * getPlanetsWithResource projected into the multi shape.
+ */
+export function getMatchingPlanetsAll(materialIds: readonly string[]): MultiResourcePlanetMatch[] {
+  if (materialIds.length === 0) return [];
+  // Walk each material's planet list, accumulate per-planet factors.
+  const accum = new Map<string, { systemId: string; factors: Map<string, number> }>();
+  for (const matId of materialIds) {
+    const list = planetIndex.get(matId);
+    if (!list || list.length === 0) return []; // Any material absent → AND empty.
+    for (const p of list) {
+      let entry = accum.get(p.planetNaturalId);
+      if (!entry) {
+        entry = { systemId: p.systemId, factors: new Map() };
+        accum.set(p.planetNaturalId, entry);
+      }
+      entry.factors.set(matId, p.factor);
+    }
+  }
+  const out: MultiResourcePlanetMatch[] = [];
+  for (const [planetNaturalId, { systemId, factors }] of accum) {
+    if (factors.size !== materialIds.length) continue; // missing one or more
+    let bottleneck = Infinity;
+    for (const f of factors.values()) if (f < bottleneck) bottleneck = f;
+    out.push({ planetNaturalId, systemId, bottleneckFactor: bottleneck, factors });
+  }
+  return out;
+}
+
+/**
+ * Per-system summary for the AND match: each system's score is the best
+ * bottleneck among its matching planets. Output shape matches single-
+ * resource ResourceMatch so the concentration-dot pipeline can consume
+ * either.
+ */
+export function getMatchingSystemsAll(materialIds: readonly string[]): ResourceMatch[] {
+  if (materialIds.length === 0) return [];
+  const matches = getMatchingPlanetsAll(materialIds);
+  const sysAccum = new Map<string, { bestFactor: number; planetCount: number }>();
+  for (const p of matches) {
+    const existing = sysAccum.get(p.systemId);
+    if (existing) {
+      if (p.bottleneckFactor > existing.bestFactor) existing.bestFactor = p.bottleneckFactor;
+      existing.planetCount++;
+    } else {
+      sysAccum.set(p.systemId, { bestFactor: p.bottleneckFactor, planetCount: 1 });
+    }
+  }
+  const out: ResourceMatch[] = [];
+  for (const [systemId, data] of sysAccum) {
+    out.push({ systemId, bestFactor: data.bestFactor, planetCount: data.planetCount });
+  }
+  out.sort((a, b) => b.bestFactor - a.bestFactor);
+  return out;
+}
+
 export function getExtractableResourceMaterialIds(): Set<string> {
   return extractableMaterialIds;
 }

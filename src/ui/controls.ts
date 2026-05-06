@@ -8,8 +8,8 @@ import {
   setGatewaysVisible,
   getSettledVisible,
   setSettledVisible,
-  getResourceFilter,
-  setResourceFilter,
+  getResourceFilters,
+  setResourceFilters,
   getCogcFilter,
   setCogcFilter,
   getEmpireDim,
@@ -54,9 +54,9 @@ export function setupControls(
         break;
       case "Escape":
         e.preventDefault();
-        if (getResourceFilter() || getCogcFilter()) {
+        if (getResourceFilters().length > 0 || getCogcFilter()) {
           // Clear any active filter first
-          setResourceFilter(null);
+          setResourceFilters([]);
           setCogcFilter(null);
         } else if (panelManager.isVisible()) {
           setSelectedEntity(null);

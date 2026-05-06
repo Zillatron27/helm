@@ -9,7 +9,7 @@ import {
   setFocusedSystem,
   setActiveRoute,
   onStateChange,
-  getResourceFilter,
+  getResourceFilters,
   getCogcFilter,
 } from "../state.js";
 import {
@@ -64,13 +64,16 @@ export class PanelManager {
     if (entity.type === "system") {
       const system = getSystemById(entity.id);
       if (system) {
-        const resourceFilterId = getResourceFilter();
+        const resourceFilterIds = getResourceFilters();
         const cogcFilterId = getCogcFilter();
-        if (resourceFilterId) {
-          const panelKey = `resource:${system.id}:${resourceFilterId}`;
+        if (resourceFilterIds.length > 0) {
+          // Commit 1: panel still renders against the first material; the
+          // multi-resource composite view lands in commit 3. Cache key
+          // includes the full set so the panel refreshes when filter changes.
+          const panelKey = `resource:${system.id}:${resourceFilterIds.join(",")}`;
           if (this.lastPanelKey === panelKey && this.isOpen) return;
           this.lastPanelKey = panelKey;
-          this.showResourceFilterPanel(system, resourceFilterId);
+          this.showResourceFilterPanel(system, resourceFilterIds[0]!);
         } else if (cogcFilterId) {
           const panelKey = `cogc:${system.id}:${cogcFilterId}`;
           if (this.lastPanelKey === panelKey && this.isOpen) return;
@@ -248,7 +251,7 @@ export class PanelManager {
     if (!cachedPlanets) {
       loadPlanetsForSystem(system.naturalId).then(() => {
         const current = getSelectedEntity();
-        if (current?.type === "system" && current.id === system.id && getResourceFilter() === materialId) {
+        if (current?.type === "system" && current.id === system.id && getResourceFilters().includes(materialId)) {
           this.showResourceFilterPanel(system, materialId);
         }
       });
@@ -545,7 +548,7 @@ export class PanelManager {
     }
 
     const sorted = [...planet.resources].sort((a, b) => b.Factor - a.Factor);
-    const activeFilter = getResourceFilter();
+    const activeFilters = getResourceFilters();
     const rows = sorted
       .map(
         (r) => {
@@ -554,7 +557,7 @@ export class PanelManager {
           const priceText = price && price.ask !== null
             ? `<span class="panel-resource-price">${Math.round(price.ask)} ${esc(price.currency)}</span>`
             : "";
-          const highlightClass = activeFilter === r.MaterialId ? " panel-resource-highlight" : "";
+          const highlightClass = activeFilters.includes(r.MaterialId) ? " panel-resource-highlight" : "";
           return `
           <div class="panel-resource${highlightClass}">
             <span class="panel-resource-ticker">${esc(ticker)}</span>

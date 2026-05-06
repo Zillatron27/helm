@@ -5,7 +5,7 @@ import {
   onResourceIndexReady,
   getExtractableResourceMaterialIds,
 } from "../../data/resourceIndex.js";
-import { getResourceFilter, setResourceFilter } from "../state.js";
+import { getResourceFilters, setResourceFilter } from "../state.js";
 import { getTheme } from "../theme.js";
 import { createMiniLoader } from "../loader/LoaderAnimation.js";
 
@@ -27,7 +27,7 @@ export class ResourcePicker {
   private activeIndex = -1;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private expanded = false;
-  private applyFilterAsync: ((materialId: string | null) => Promise<void>) | null = null;
+  private applyFilterAsync: ((materialIds: readonly string[]) => Promise<void>) | null = null;
 
   constructor() {
     // Toolbar row: [expand panel] [badge area] [button]
@@ -92,7 +92,7 @@ export class ResourcePicker {
   }
 
   /** Wire the async filter callback (called from main.ts after renderer is available). */
-  setFilterCallback(fn: (materialId: string | null) => Promise<void>): void {
+  setFilterCallback(fn: (materialIds: readonly string[]) => Promise<void>): void {
     this.applyFilterAsync = fn;
   }
 
@@ -138,7 +138,7 @@ export class ResourcePicker {
     });
     this.inputEl.addEventListener("blur", () => {
       setTimeout(() => {
-        if (!this.inputEl.value && !getResourceFilter()) {
+        if (!this.inputEl.value && getResourceFilters().length === 0) {
           this.collapse();
         } else {
           this.hideDropdown();
@@ -307,9 +307,10 @@ export class ResourcePicker {
     setResourceFilter(material.MaterialId);
     this.showBadge(material.Ticker);
 
-    // Apply the heavy rendering work asynchronously (chunked with yields)
+    // Apply the heavy rendering work asynchronously (chunked with yields).
+    // Pass the full filter set; commit 1 only ever has 1, commit 2 may have more.
     if (this.applyFilterAsync) {
-      this.applyFilterAsync(material.MaterialId).then(() => {
+      this.applyFilterAsync(getResourceFilters()).then(() => {
         this.restoreButtonIcon();
         this.btnEl.classList.add("toolbar-btn-resource-on");
       });
@@ -360,11 +361,12 @@ export class ResourcePicker {
     this.btnEl.classList.remove("toolbar-btn-resource-on");
   }
 
-  /** Sync button state with external filter changes. */
+  /** Sync button state with external filter changes. Commit 1: shows the
+   * first material's ticker only — commit 2 will render per-resource badges. */
   syncState(): void {
-    const materialId = getResourceFilter();
-    if (materialId) {
-      const ticker = getMaterialTicker(materialId);
+    const ids = getResourceFilters();
+    if (ids.length > 0) {
+      const ticker = getMaterialTicker(ids[0]!);
       if (!this.badgeEl) {
         this.showBadge(ticker);
       }

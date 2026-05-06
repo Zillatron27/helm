@@ -74,8 +74,11 @@ export {
   getSettledVisible,
   setSettledVisible,
   offStateChange,
-  getResourceFilter,
+  getResourceFilters,
   setResourceFilter,
+  setResourceFilters,
+  addResourceFilter,
+  removeResourceFilter,
   getCogcFilter,
   setCogcFilter,
 } from "./ui/state.js";

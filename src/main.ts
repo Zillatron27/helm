@@ -5,8 +5,8 @@ import { RoutePanel } from "./ui/search/RoutePanel.js";
 import { SettingsPanel } from "./ui/SettingsPanel.js";
 import { ResourcePicker } from "./ui/resource/ResourcePicker.js";
 import { setupControls } from "./ui/controls.js";
-import { onStateChange, getGatewaysVisible, setGatewaysVisible, getSettledVisible, getResourceFilter, getCogcFilter, getEmpireDim, setEmpireDim, onResourceFilterChange, onCogcFilterChange, getBridgeSnapshot, onBridgeSnapshotChange } from "./ui/state.js";
-import { isResourceIndexReady, onResourceIndexReady, getSystemsWithResource } from "./data/resourceIndex.js";
+import { onStateChange, getGatewaysVisible, setGatewaysVisible, getSettledVisible, getResourceFilters, getCogcFilter, getEmpireDim, setEmpireDim, onResourceFilterChange, onCogcFilterChange, getBridgeSnapshot, onBridgeSnapshotChange } from "./ui/state.js";
+import { isResourceIndexReady, onResourceIndexReady, getMatchingSystemsAll } from "./data/resourceIndex.js";
 import { getResourceSystemMatches, getResourcePlanetMatches, getCogcSystemMatches } from "./data/filterMatches.js";
 import { getEmpireSystemMatches, getEmpirePlanetMatches, onEmpireIndexChange } from "./data/empireIndex.js";
 import { yieldToMain } from "./util/yieldToMain.js";
@@ -78,12 +78,12 @@ async function boot(): Promise<void> {
 
     // Resource filter picker row — right after search
     const resourcePicker = new ResourcePicker();
-    resourcePicker.setFilterCallback(async (materialId) => {
-      if (materialId) {
-        await renderer.setResourceConcentrationsAsync(getSystemsWithResource(materialId));
-      } else {
+    resourcePicker.setFilterCallback(async (materialIds) => {
+      if (materialIds.length === 0) {
         renderer.clearResourceIndicators();
+        return;
       }
+      await renderer.setResourceConcentrationsAsync(getMatchingSystemsAll(materialIds));
     });
     toolbar.appendChild(resourcePicker.getElement());
 
@@ -243,9 +243,9 @@ async function boot(): Promise<void> {
       lastGalaxyBright = null;
       lastPlanetBright = null;
       applyComposition();
-      const id = getResourceFilter();
-      if (id) {
-        renderer.setResourceConcentrationsAsync(getSystemsWithResource(id));
+      const ids = getResourceFilters();
+      if (ids.length > 0) {
+        renderer.setResourceConcentrationsAsync(getMatchingSystemsAll(ids));
       }
       rebuildEmpireGalaxyOverlay();
     });
@@ -259,7 +259,7 @@ async function boot(): Promise<void> {
     // On clear: drop concentration dots. Composition is re-applied via
     // onStateChange (global notify) and covers the dim side.
     function handleResourceFilterChange(): void {
-      if (!getResourceFilter()) {
+      if (getResourceFilters().length === 0) {
         renderer.clearResourceIndicators();
       }
       resourcePicker.syncState();
