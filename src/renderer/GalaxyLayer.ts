@@ -486,10 +486,14 @@ export class GalaxyLayer {
     }
 
     // Gateway system indicators — small purple rings offset top-right of
-    // the star. Per-system offset clears the star's actual display
-    // radius (which scales with connection count up to 1.6×) and, on CX
-    // systems, the diamond marker — its top-right edge sits at
-    // CX_DIAMOND_RADIUS/√2 ≈ 28.3 from centre on the 45° ray.
+    // the star. Per-system offset clears the dominant obstacle:
+    //   - CX systems: the diamond marker (top-right edge sits at
+    //     CX_DIAMOND_RADIUS/√2 ≈ 28.3 from centre on the 45° ray);
+    //   - non-CX systems: the empire base ring's outer edge — even when
+    //     no bridge snapshot is loaded, the indicator's resting position
+    //     accounts for the ring's slot so it stays clear when an empire
+    //     overlay later turns the system into a base.
+    // Always added to the indicator ring's own radius and a small visual gap.
     this.gatewayIndicators = new Container();
     this.gatewayIndicators.eventMode = "none";
     for (const system of systems) {
@@ -498,7 +502,9 @@ export class GalaxyLayer {
       const sizeScale = connCount >= 5 ? 1.6 : connCount >= 3 ? 1.3 : 1;
       const starRadius = STAR_RADIUS * sizeScale;
       const hasCx = getCxForSystem(system.id) !== null;
-      const obstacleRadius = hasCx ? CX_DIAMOND_RADIUS / Math.SQRT2 : starRadius;
+      const obstacleRadius = hasCx
+        ? CX_DIAMOND_RADIUS / Math.SQRT2
+        : starRadius + EMPIRE_RING_GAP + EMPIRE_RING_STROKE / 2;
       const offset = (obstacleRadius + GATEWAY_INDICATOR_RADIUS + GATEWAY_INDICATOR_GAP) / Math.SQRT2;
 
       const indicator = new Graphics();
