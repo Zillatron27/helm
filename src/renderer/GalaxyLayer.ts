@@ -884,7 +884,7 @@ export class GalaxyLayer {
       const sizeScale = connCount >= 5 ? 1.6 : connCount >= 3 ? 1.3 : 1;
       const ringRadius = STAR_RADIUS * sizeScale + EMPIRE_RING_GAP;
 
-      const { graphics: stack, clusterCentre } = buildChevronStack(
+      const { graphics: stack } = buildChevronStack(
         ships.length,
         accent,
         SHIP_STACK_ALPHA,
@@ -898,7 +898,6 @@ export class GalaxyLayer {
       // background content over the foreground panel.
       stack.eventMode = "static";
       stack.cursor = "default";
-      stack.hitArea = new Circle(clusterCentre, 0, CHEVRON_GLYPH_SIZE);
       const tooltip = formatDockedShipTooltip(ships, { systemNaturalId: sysNid });
       stack.on("pointerover", (e) => {
         if (this.isDimmedForSystemView) return;

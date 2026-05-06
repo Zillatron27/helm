@@ -1,4 +1,4 @@
-import { Graphics } from "pixi.js";
+import { Graphics, Rectangle } from "pixi.js";
 
 /**
  * Right-pointing chevron stack — the "ships here" visual signature used
@@ -14,10 +14,16 @@ import { Graphics } from "pixi.js";
  * Container-with-Graphics-children proved unreliable as a child of
  * deeply-nested viewport layers (worked in system view, missed in
  * galaxy view), so the stack is now drawn as one shape.
+ *
+ * Hit area is a padded Rectangle covering the full glyph extent — a
+ * Circle centred on the cluster missed the corners of the leftmost
+ * glyph in the 3-glyph case, so hovering near the left edge would lose
+ * the tooltip.
  */
 
 export const CHEVRON_GLYPH_SIZE = 8;
 export const CHEVRON_GLYPH_OFFSET = 3;
+const HIT_PADDING = 3;
 
 /** Number of glyphs drawn for a given ship count. */
 export function chevronGlyphCount(shipCount: number): number {
@@ -26,10 +32,6 @@ export function chevronGlyphCount(shipCount: number): number {
 
 export interface ChevronStackResult {
   graphics: Graphics;
-  /** x-offset of the cluster centre (for centring hit areas / tooltips). */
-  clusterCentre: number;
-  /** Outer extent of the stack from the anchor (for hit-area sizing). */
-  width: number;
 }
 
 export function buildChevronStack(
@@ -50,9 +52,13 @@ export function buildChevronStack(
   }
   g.fill({ color, alpha });
 
-  const clusterCentre = ((glyphCount - 1) * CHEVRON_GLYPH_OFFSET) / 2;
-  // From left edge of leftmost glyph to right tip of rightmost glyph
-  const width = (glyphCount - 1) * CHEVRON_GLYPH_OFFSET + CHEVRON_GLYPH_SIZE;
+  const totalWidth = (glyphCount - 1) * CHEVRON_GLYPH_OFFSET + CHEVRON_GLYPH_SIZE;
+  g.hitArea = new Rectangle(
+    -half - HIT_PADDING,
+    -half - HIT_PADDING,
+    totalWidth + HIT_PADDING * 2,
+    CHEVRON_GLYPH_SIZE + HIT_PADDING * 2,
+  );
 
-  return { graphics: g, clusterCentre, width };
+  return { graphics: g };
 }

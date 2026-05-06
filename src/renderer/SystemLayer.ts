@@ -622,7 +622,7 @@ export class SystemLayer {
       const ships = shipsAtPlanet.get(planet.naturalId);
       if (ships && ships.length > 0) {
         const half = CHEVRON_GLYPH_SIZE / 2;
-        const { graphics: stack, clusterCentre } = buildChevronStack(
+        const { graphics: stack } = buildChevronStack(
           ships.length,
           accent,
           SHIP_STACK_ALPHA,
@@ -632,7 +632,6 @@ export class SystemLayer {
 
         stack.eventMode = "static";
         stack.cursor = "default";
-        stack.hitArea = new Circle(clusterCentre, 0, CHEVRON_GLYPH_SIZE);
 
         const tooltip = formatDockedShipTooltip(ships);
         stack.on("pointerover", (e) => {
@@ -653,7 +652,7 @@ export class SystemLayer {
     // clear these ships aren't attached to any one planet.
     if (cxDockedShips.length > 0) {
       const half = CHEVRON_GLYPH_SIZE / 2;
-      const { graphics: stack, clusterCentre } = buildChevronStack(
+      const { graphics: stack } = buildChevronStack(
         cxDockedShips.length,
         accent,
         SHIP_STACK_ALPHA,
@@ -663,7 +662,6 @@ export class SystemLayer {
 
       stack.eventMode = "static";
       stack.cursor = "default";
-      stack.hitArea = new Circle(clusterCentre, 0, CHEVRON_GLYPH_SIZE);
 
       const tooltip = formatDockedShipTooltip(cxDockedShips, { systemNaturalId: systemNid });
       stack.on("pointerover", (e) => {

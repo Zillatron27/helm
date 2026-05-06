@@ -1,6 +1,9 @@
 /* Floating hover tooltip for map-canvas elements (ship stacks, etc.).
  * Visual language matches the panel system (panel.css): blurred secondary
  * background, accent-tinted border, accent header, monospaced body.
+ *
+ * Position is set entirely by JS (MapTooltip.ts measures the box after
+ * insertion and clamps to the viewport with optional vertical flip).
  */
 
 .map-tooltip {
@@ -16,10 +19,7 @@
   z-index: 60;
   font-family: "IBM Plex Mono", monospace;
   color: var(--text-primary);
-  /* Anchor at bottom-centre so the body sits above and centred on the
-   * hovered point. The 8px lift gives breathing room above the target. */
-  transform: translate(-50%, calc(-100% - 8px));
-  white-space: nowrap;
+  max-width: min(360px, calc(100vw - 16px));
   visibility: hidden;
   opacity: 0;
   transition: opacity 0.12s ease, visibility 0s 0.12s;
@@ -43,4 +43,7 @@
   font-size: 12px;
   line-height: 1.45;
   color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
