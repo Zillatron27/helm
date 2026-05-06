@@ -20,7 +20,7 @@ import {
   getMaterialTicker,
   getMaterialByTicker,
 } from "../../data/cache.js";
-import { getPlanetsWithResource, getCogcProgramPlanets } from "../../data/resourceIndex.js";
+import { getMatchingPlanetsAll, getCogcProgramPlanets } from "../../data/resourceIndex.js";
 import { getCxDistances } from "../../data/cxDistances.js";
 import { findRoute } from "../../data/pathfinding.js";
 import { getPlanetBaseCount } from "../../data/siteCounts.js";
@@ -67,13 +67,10 @@ export class PanelManager {
         const resourceFilterIds = getResourceFilters();
         const cogcFilterId = getCogcFilter();
         if (resourceFilterIds.length > 0) {
-          // Commit 1: panel still renders against the first material; the
-          // multi-resource composite view lands in commit 3. Cache key
-          // includes the full set so the panel refreshes when filter changes.
           const panelKey = `resource:${system.id}:${resourceFilterIds.join(",")}`;
           if (this.lastPanelKey === panelKey && this.isOpen) return;
           this.lastPanelKey = panelKey;
-          this.showResourceFilterPanel(system, resourceFilterIds[0]!);
+          this.showResourceFilterPanel(system, resourceFilterIds);
         } else if (cogcFilterId) {
           const panelKey = `cogc:${system.id}:${cogcFilterId}`;
           if (this.lastPanelKey === panelKey && this.isOpen) return;
@@ -168,57 +165,100 @@ export class PanelManager {
     });
   }
 
-  private showResourceFilterPanel(system: StarSystem, materialId: string): void {
-    const ticker = getMaterialTicker(materialId);
-    const material = getMaterialByTicker(ticker);
-    const materialName = formatCamelCase(material?.Name ?? ticker);
+  private showResourceFilterPanel(system: StarSystem, materialIds: readonly string[]): void {
+    if (materialIds.length === 0) return;
+    const isMulti = materialIds.length > 1;
 
-    // Find matching planets in this system from the resource index
-    const allMatches = getPlanetsWithResource(materialId);
+    // Resolve display info per material (for the header badges + breakdown rows).
+    const materials = materialIds.map((id) => {
+      const ticker = getMaterialTicker(id);
+      const material = getMaterialByTicker(ticker);
+      return { id, ticker, name: formatCamelCase(material?.Name ?? ticker) };
+    });
+
+    // Find matching planets in this system. AND semantics: planet must
+    // contain every selected material. bottleneckFactor = min across them.
+    const allMatches = getMatchingPlanetsAll(materialIds);
     const systemMatches = allMatches
       .filter((m) => m.systemId === system.id)
-      .sort((a, b) => b.factor - a.factor);
+      .sort((a, b) => b.bottleneckFactor - a.bottleneckFactor);
 
-    // Try to resolve planet names from cache
     const cachedPlanets = getPlanetsForSystem(system.naturalId);
 
     const planetRows = systemMatches.map((match) => {
       const cached = cachedPlanets?.find((p) => p.naturalId === match.planetNaturalId);
       const name = cached?.name || match.planetNaturalId;
       const planetId = cached?.id || match.planetNaturalId;
-      const price = getNearestCxPrice(ticker, system.id);
-      const priceText = price && price.ask !== null
-        ? `<span class="panel-resource-price">${Math.round(price.ask)} ${esc(price.currency)}</span>`
-        : "";
-      const pct = Math.round(match.factor * 100);
-      return `
-        <div class="panel-resource-filter-row">
-          <a class="panel-planet-link" data-planet-id="${esc(planetId)}" data-planet-system="${esc(system.id)}">${esc(name)}</a>
-          <div class="panel-resource-bar">
-            <div class="panel-resource-bar-fill" style="width: ${pct}%"></div>
+
+      const bottleneckPct = Math.round(match.bottleneckFactor * 100);
+
+      if (!isMulti) {
+        // Single material — keep the existing compact row.
+        const ticker = materials[0]!.ticker;
+        const price = getNearestCxPrice(ticker, system.id);
+        const priceText = price && price.ask !== null
+          ? `<span class="panel-resource-price">${Math.round(price.ask)} ${esc(price.currency)}</span>`
+          : "";
+        return `
+          <div class="panel-resource-filter-row">
+            <a class="panel-planet-link" data-planet-id="${esc(planetId)}" data-planet-system="${esc(system.id)}">${esc(name)}</a>
+            <div class="panel-resource-bar">
+              <div class="panel-resource-bar-fill" style="width: ${bottleneckPct}%"></div>
+            </div>
+            <span class="panel-resource-pct">${bottleneckPct}%</span>
+            ${priceText}
           </div>
-          <span class="panel-resource-pct">${pct}%</span>
-          ${priceText}
+        `;
+      }
+
+      // Multi: bar represents the bottleneck (the limiting resource on
+      // this planet); breakdown lists each material's factor with the
+      // bottleneck visually distinguished so the bottlenecked resource
+      // is easy to spot.
+      const breakdown = materials.map((m) => {
+        const f = match.factors.get(m.id) ?? 0;
+        const pct = Math.round(f * 100);
+        const isBottleneck = Math.abs(f - match.bottleneckFactor) < 1e-9;
+        const cls = isBottleneck ? "panel-resource-pct panel-resource-pct-bottleneck" : "panel-resource-pct";
+        return `<span class="${cls}">${esc(m.ticker)} ${pct}%</span>`;
+      }).join("");
+
+      return `
+        <div class="panel-resource-filter-row panel-resource-filter-row-multi">
+          <a class="panel-planet-link" data-planet-id="${esc(planetId)}" data-planet-system="${esc(system.id)}">${esc(name)}</a>
+          <div class="panel-resource-bar" title="Bottleneck across selected resources">
+            <div class="panel-resource-bar-fill" style="width: ${bottleneckPct}%"></div>
+          </div>
+          <div class="panel-resource-breakdown">${breakdown}</div>
         </div>
       `;
     }).join("");
 
+    const tickerList = materials.map((m) => m.ticker).join(" + ");
     const noMatches = systemMatches.length === 0
-      ? `<div class="panel-loading">No ${esc(ticker)} in this system</div>`
+      ? `<div class="panel-loading">No planets with ${esc(tickerList)} in this system</div>`
       : "";
+
+    const sectionTitle = isMulti
+      ? `${esc(tickerList)} (${systemMatches.length})`
+      : `${esc(materials[0]!.name)} (${systemMatches.length})`;
+
+    const headerBadges = materials
+      .map((m) => `<span class="panel-badge panel-badge-resource">${esc(m.ticker)}</span>`)
+      .join(" ");
 
     const html = `
       <div class="panel-header">
         <h2 class="panel-title">${esc(system.name)}</h2>
         <div class="panel-subtitle">
           ${esc(system.naturalId)}
-          <span class="panel-badge panel-badge-resource">${esc(ticker)}</span>
+          ${headerBadges}
         </div>
         <button class="panel-close" aria-label="Close panel">&times;</button>
       </div>
       <div class="panel-body">
         <div class="panel-section">
-          <h3 class="panel-section-title">${esc(materialName)} (${systemMatches.length})</h3>
+          <h3 class="panel-section-title">${sectionTitle}</h3>
           ${noMatches}
           ${planetRows}
         </div>
@@ -235,7 +275,6 @@ export class PanelManager {
 
       this.wireCxBadgeClicks();
 
-      // Wire planet links — zoom to system view and select
       this.panelEl.querySelectorAll("[data-planet-id]").forEach((el) => {
         el.addEventListener("click", (e) => {
           e.preventDefault();
@@ -247,12 +286,15 @@ export class PanelManager {
       });
     });
 
-    // If planets aren't cached, fetch and re-render to get proper names
+    // If planets aren't cached, fetch and re-render to get proper names.
     if (!cachedPlanets) {
       loadPlanetsForSystem(system.naturalId).then(() => {
         const current = getSelectedEntity();
-        if (current?.type === "system" && current.id === system.id && getResourceFilters().includes(materialId)) {
-          this.showResourceFilterPanel(system, materialId);
+        const now = getResourceFilters();
+        const stillSameFilter = now.length === materialIds.length
+          && now.every((id, i) => id === materialIds[i]);
+        if (current?.type === "system" && current.id === system.id && stillSameFilter) {
+          this.showResourceFilterPanel(system, materialIds);
         }
       });
     }
