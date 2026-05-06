@@ -96,7 +96,10 @@
   white-space: nowrap;
 }
 
-/* Container holding 0..N filter badges, anchored left of the toolbar button. */
+/* Outer (floating) badges container — visible when the picker is
+ * collapsed. Sits left of the toolbar button. Hidden while the picker
+ * is open; the inline container takes over so the user can see what's
+ * being added without the dropdown panel covering the badges. */
 .resource-badges {
   position: absolute;
   right: 48px;
@@ -108,6 +111,27 @@
   gap: 6px;
   max-width: 360px;
   pointer-events: none; /* let row clicks pass through gaps; badges re-enable */
+}
+
+/* Hide the outer badges while the expand panel is open — the inline
+ * ones inside the search bar are now visible instead. */
+.toolbar-row:has(> .toolbar-expand-open) .resource-badges {
+  display: none;
+}
+
+/* Inline badges sit inside the search bar, before the input. Each
+ * badge re-uses the .resource-badge styling. */
+.resource-badges-inline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-right: 8px;
+}
+
+.resource-badges-inline:empty {
+  display: none;
 }
 
 /* Active filter badge — pill, one per selected resource. */

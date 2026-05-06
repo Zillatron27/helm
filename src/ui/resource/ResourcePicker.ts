@@ -25,7 +25,15 @@ export class ResourcePicker {
   private btnEl: HTMLButtonElement;
   private inputEl: HTMLInputElement;
   private dropdownEl: HTMLElement;
+  // Outer badges container — visible when the picker is collapsed,
+  // sitting left of the toolbar button. Hidden via CSS when the panel
+  // opens; the inline container takes over so the user can see what
+  // they're adding while the picker is still open.
   private badgesContainer: HTMLDivElement;
+  // Inline badges container — lives inside the search bar, before the
+  // input. Visible only when the picker is expanded. Both containers
+  // are populated by renderBadges() from the same state.
+  private inlineBadgesContainer: HTMLDivElement;
   // filteredMaterials is rebuilt in grouped display order after every search
   private filteredMaterials: FioMaterial[] = [];
   private activeIndex = -1;
@@ -53,6 +61,13 @@ export class ResourcePicker {
     this.inputEl.autocomplete = "off";
     this.inputEl.spellcheck = false;
 
+    // Inline badges sit inside the search bar before the input — they
+    // become visible as soon as the picker opens, like chips in an
+    // email recipient field, so the user sees what they've selected.
+    this.inlineBadgesContainer = document.createElement("div");
+    this.inlineBadgesContainer.className = "resource-badges-inline";
+
+    bar.appendChild(this.inlineBadgesContainer);
     bar.appendChild(this.inputEl);
 
     // Dropdown
@@ -161,6 +176,17 @@ export class ResourcePicker {
     this.debounceTimer = setTimeout(() => this.runSearch(), DEBOUNCE_MS);
   }
 
+  /** Cancel a pending debounce and run the search now. Called before
+   * Tab/Enter so a fast typist who presses Tab inside the debounce
+   * window doesn't end up adding the stale activeIndex's material. */
+  private flushSearch(): void {
+    if (this.debounceTimer !== null) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+      this.runSearch();
+    }
+  }
+
   private onKeyDown(e: KeyboardEvent): void {
     switch (e.key) {
       case "ArrowDown":
@@ -173,6 +199,7 @@ export class ResourcePicker {
         break;
       case "Enter":
         e.preventDefault();
+        this.flushSearch();
         if (this.activeIndex >= 0 && this.activeIndex < this.filteredMaterials.length) {
           this.selectMaterial(this.filteredMaterials[this.activeIndex]!, /* close */ true);
         }
@@ -180,8 +207,12 @@ export class ResourcePicker {
       case "Tab":
         // Tab chains: add the highlighted material to the filter set
         // and keep the picker open so the user can type the next one.
+        // preventDefault unconditionally so the browser never shifts
+        // focus to the toolbar button — which it would do as soon as
+        // the dropdown is empty (e.g. while the user is mid-typing).
+        e.preventDefault();
+        this.flushSearch();
         if (this.activeIndex >= 0 && this.activeIndex < this.filteredMaterials.length) {
-          e.preventDefault();
           this.selectMaterial(this.filteredMaterials[this.activeIndex]!, /* close */ false);
         }
         break;
@@ -383,27 +414,39 @@ export class ResourcePicker {
     this.btnEl.innerHTML = FILTER_ICON_SVG;
   }
 
-  /** Rebuild the badges container from the current filter state. */
+  /** Rebuild both badge containers (outer floating + inline) from
+   * current filter state. CSS handles which is visible. */
   private renderBadges(): void {
     const ids = getResourceFilters();
     this.badgesContainer.innerHTML = "";
+    this.inlineBadgesContainer.innerHTML = "";
     for (const id of ids) {
-      const badge = document.createElement("div");
-      badge.className = "resource-badge";
-      badge.textContent = getMaterialTicker(id);
-
-      const clearBtn = document.createElement("button");
-      clearBtn.className = "resource-badge-clear";
-      clearBtn.textContent = "×";
-      clearBtn.addEventListener("click", () => {
-        removeResourceFilter(id);
-        this.runFilterApply();
-      });
-
-      badge.appendChild(clearBtn);
-      this.badgesContainer.appendChild(badge);
+      this.badgesContainer.appendChild(this.makeBadge(id));
+      this.inlineBadgesContainer.appendChild(this.makeBadge(id));
     }
     this.btnEl.classList.toggle("toolbar-btn-resource-on", ids.length > 0);
+  }
+
+  private makeBadge(materialId: string): HTMLDivElement {
+    const badge = document.createElement("div");
+    badge.className = "resource-badge";
+    badge.textContent = getMaterialTicker(materialId);
+
+    const clearBtn = document.createElement("button");
+    clearBtn.className = "resource-badge-clear";
+    clearBtn.textContent = "×";
+    // Use mousedown — when the picker is open, clicking the badge × in
+    // the inline container would otherwise blur the input first, and
+    // the blur handler's setTimeout could collapse the picker before
+    // the click handler runs.
+    clearBtn.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      removeResourceFilter(materialId);
+      this.runFilterApply();
+    });
+
+    badge.appendChild(clearBtn);
+    return badge;
   }
 
   /** Sync UI with external filter state changes. */
