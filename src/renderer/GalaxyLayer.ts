@@ -328,13 +328,14 @@ export class GalaxyLayer {
     this.empireBaseRings.eventMode = "none";
     this.container.addChild(this.empireBaseRings);
 
-    // Empire ship stacks — per-system docked-ship indicators. Same z-order
-    // tier as base rings; populated by rebuildEmpireShipStacks(). Container
-    // is passive (doesn't intercept) so its interactive child stacks
-    // dispatch hover events for the tooltip.
+    // Empire ship stacks — per-system docked-ship indicators. Created
+    // here so rebuildEmpireShipStacks() can populate it; added to the
+    // scene graph in the final-ordering block below so the chevron's
+    // hit area wins over the star's larger hover hit-radius when they
+    // overlap (chevron sits ~7px inside the star's hit circle for small
+    // stars, and Pixi hit-tests last-added-first).
     this.empireShipStacks = new Container();
     this.empireShipStacks.eventMode = "passive";
-    this.container.addChild(this.empireShipStacks);
 
     // Hover particles — above glows, below labels and stars
     this.starParticles = new StarParticles();
@@ -506,6 +507,7 @@ export class GalaxyLayer {
 
     this.container.addChild(this.cxMarkers);
     this.container.addChild(this.gatewayIndicators);
+    this.container.addChild(this.empireShipStacks);
     this.container.addChild(this.selectionHalo);
     this.container.addChild(this.routeOverlay);
   }
