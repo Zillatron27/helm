@@ -6,7 +6,7 @@ import { SettingsPanel } from "./ui/SettingsPanel.js";
 import { ResourcePicker } from "./ui/resource/ResourcePicker.js";
 import { setupControls } from "./ui/controls.js";
 import { onStateChange, getGatewaysVisible, setGatewaysVisible, getSettledVisible, getResourceFilters, getCogcFilter, getEmpireDim, setEmpireDim, onResourceFilterChange, onCogcFilterChange, getBridgeSnapshot, onBridgeSnapshotChange } from "./ui/state.js";
-import { isResourceIndexReady, onResourceIndexReady, getMatchingSystemsAll } from "./data/resourceIndex.js";
+import { isResourceIndexReady, onResourceIndexReady, getSystemsWithAllResources } from "./data/resourceIndex.js";
 import { getResourceSystemMatches, getResourcePlanetMatches, getCogcSystemMatches } from "./data/filterMatches.js";
 import { getEmpireSystemMatches, getEmpirePlanetMatches, onEmpireIndexChange } from "./data/empireIndex.js";
 import { yieldToMain } from "./util/yieldToMain.js";
@@ -83,7 +83,7 @@ async function boot(): Promise<void> {
         renderer.clearResourceIndicators();
         return;
       }
-      await renderer.setResourceConcentrationsAsync(getMatchingSystemsAll(materialIds));
+      await renderer.setResourceConcentrationsAsync(getSystemsWithAllResources(materialIds));
     });
     toolbar.appendChild(resourcePicker.getElement());
 
@@ -245,7 +245,7 @@ async function boot(): Promise<void> {
       applyComposition();
       const ids = getResourceFilters();
       if (ids.length > 0) {
-        renderer.setResourceConcentrationsAsync(getMatchingSystemsAll(ids));
+        renderer.setResourceConcentrationsAsync(getSystemsWithAllResources(ids));
       }
       rebuildEmpireGalaxyOverlay();
     });

@@ -20,7 +20,11 @@ import {
   getMaterialTicker,
   getMaterialByTicker,
 } from "../../data/cache.js";
-import { getMatchingPlanetsAll, getCogcProgramPlanets } from "../../data/resourceIndex.js";
+import {
+  getMatchingPlanetsInSystem,
+  getSystemsWithAllResources,
+  getCogcProgramPlanets,
+} from "../../data/resourceIndex.js";
 import { getCxDistances } from "../../data/cxDistances.js";
 import { findRoute } from "../../data/pathfinding.js";
 import { getPlanetBaseCount } from "../../data/siteCounts.js";
@@ -176,25 +180,33 @@ export class PanelManager {
       return { id, ticker, name: formatCamelCase(material?.Name ?? ticker) };
     });
 
-    // Find matching planets in this system. AND semantics: planet must
-    // contain every selected material. bottleneckFactor = min across them.
-    const allMatches = getMatchingPlanetsAll(materialIds);
-    const systemMatches = allMatches
-      .filter((m) => m.systemId === system.id)
-      .sort((a, b) => b.bottleneckFactor - a.bottleneckFactor);
+    // System bottleneck: min over selected materials of best-in-system
+    // factor. Useful header context — tells the user which resource is
+    // the limiting factor for a chain anchored here.
+    const allSystemMatches = getSystemsWithAllResources(materialIds);
+    const thisSystemMatch = allSystemMatches.find((m) => m.systemId === system.id);
+    const systemBottleneckPct = thisSystemMatch
+      ? Math.round(thisSystemMatch.bestFactor * 100)
+      : null;
 
+    // Planets in this system that contribute any of the selected
+    // materials — pre-sorted by their max factor so the strongest
+    // contributors come first.
+    const planetRows = getMatchingPlanetsInSystem(system.id, materialIds);
     const cachedPlanets = getPlanetsForSystem(system.naturalId);
 
-    const planetRows = systemMatches.map((match) => {
-      const cached = cachedPlanets?.find((p) => p.naturalId === match.planetNaturalId);
-      const name = cached?.name || match.planetNaturalId;
-      const planetId = cached?.id || match.planetNaturalId;
-
-      const bottleneckPct = Math.round(match.bottleneckFactor * 100);
+    const planetRowsHtml = planetRows.map((row) => {
+      const cached = cachedPlanets?.find((p) => p.naturalId === row.planetNaturalId);
+      const name = cached?.name || row.planetNaturalId;
+      const planetId = cached?.id || row.planetNaturalId;
+      const planetMax = Math.max(...Array.from(row.factors.values()), 0);
+      const planetMaxPct = Math.round(planetMax * 100);
 
       if (!isMulti) {
         // Single material — keep the existing compact row.
         const ticker = materials[0]!.ticker;
+        const f = row.factors.get(materials[0]!.id) ?? 0;
+        const pct = Math.round(f * 100);
         const price = getNearestCxPrice(ticker, system.id);
         const priceText = price && price.ask !== null
           ? `<span class="panel-resource-price">${Math.round(price.ask)} ${esc(price.currency)}</span>`
@@ -203,31 +215,31 @@ export class PanelManager {
           <div class="panel-resource-filter-row">
             <a class="panel-planet-link" data-planet-id="${esc(planetId)}" data-planet-system="${esc(system.id)}">${esc(name)}</a>
             <div class="panel-resource-bar">
-              <div class="panel-resource-bar-fill" style="width: ${bottleneckPct}%"></div>
+              <div class="panel-resource-bar-fill" style="width: ${pct}%"></div>
             </div>
-            <span class="panel-resource-pct">${bottleneckPct}%</span>
+            <span class="panel-resource-pct">${pct}%</span>
             ${priceText}
           </div>
         `;
       }
 
-      // Multi: bar represents the bottleneck (the limiting resource on
-      // this planet); breakdown lists each material's factor with the
-      // bottleneck visually distinguished so the bottlenecked resource
-      // is easy to spot.
+      // Multi: row's bar shows the planet's MAX contribution; breakdown
+      // shows per-material factors as cells. Missing materials render
+      // as a dash so the user sees which resources the planet covers.
       const breakdown = materials.map((m) => {
-        const f = match.factors.get(m.id) ?? 0;
+        const f = row.factors.get(m.id);
+        if (f === undefined) {
+          return `<span class="panel-resource-pct panel-resource-pct-absent">${esc(m.ticker)} —</span>`;
+        }
         const pct = Math.round(f * 100);
-        const isBottleneck = Math.abs(f - match.bottleneckFactor) < 1e-9;
-        const cls = isBottleneck ? "panel-resource-pct panel-resource-pct-bottleneck" : "panel-resource-pct";
-        return `<span class="${cls}">${esc(m.ticker)} ${pct}%</span>`;
+        return `<span class="panel-resource-pct">${esc(m.ticker)} ${pct}%</span>`;
       }).join("");
 
       return `
         <div class="panel-resource-filter-row panel-resource-filter-row-multi">
           <a class="panel-planet-link" data-planet-id="${esc(planetId)}" data-planet-system="${esc(system.id)}">${esc(name)}</a>
-          <div class="panel-resource-bar" title="Bottleneck across selected resources">
-            <div class="panel-resource-bar-fill" style="width: ${bottleneckPct}%"></div>
+          <div class="panel-resource-bar" title="Best contribution from this planet">
+            <div class="panel-resource-bar-fill" style="width: ${planetMaxPct}%"></div>
           </div>
           <div class="panel-resource-breakdown">${breakdown}</div>
         </div>
@@ -235,13 +247,15 @@ export class PanelManager {
     }).join("");
 
     const tickerList = materials.map((m) => m.ticker).join(" + ");
-    const noMatches = systemMatches.length === 0
-      ? `<div class="panel-loading">No planets with ${esc(tickerList)} in this system</div>`
+    const noMatches = planetRows.length === 0
+      ? `<div class="panel-loading">No ${esc(tickerList)} in this system</div>`
       : "";
 
     const sectionTitle = isMulti
-      ? `${esc(tickerList)} (${systemMatches.length})`
-      : `${esc(materials[0]!.name)} (${systemMatches.length})`;
+      ? (systemBottleneckPct !== null
+          ? `${esc(tickerList)} — system bottleneck ${systemBottleneckPct}% (${planetRows.length} planets)`
+          : `${esc(tickerList)} (${planetRows.length} planets)`)
+      : `${esc(materials[0]!.name)} (${planetRows.length})`;
 
     const headerBadges = materials
       .map((m) => `<span class="panel-badge panel-badge-resource">${esc(m.ticker)}</span>`)
@@ -260,7 +274,7 @@ export class PanelManager {
         <div class="panel-section">
           <h3 class="panel-section-title">${sectionTitle}</h3>
           ${noMatches}
-          ${planetRows}
+          ${planetRowsHtml}
         </div>
         ${renderCxDistanceSection(system.id)}
       </div>

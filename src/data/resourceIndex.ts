@@ -131,74 +131,126 @@ export function getPlanetsWithResource(materialId: string): PlanetResourceMatch[
   return planetIndex.get(materialId) ?? [];
 }
 
-/** Per-planet AND match across multiple materials. */
-export interface MultiResourcePlanetMatch {
+/**
+ * Per-system AND match: a system qualifies when every selected
+ * material is present on at least one of its planets (not necessarily
+ * the same planet — the production-chain use case is "I want a system
+ * with both ALO and HAL anywhere I can build bases on").
+ *
+ * Bottleneck = min over selected materials of (best factor that
+ * material reaches anywhere in the system). It's the limiting
+ * resource for a chain that wants the highest-yield base for each.
+ *
+ * Output shape matches single-resource ResourceMatch so the
+ * concentration-dot pipeline can consume single- or multi-resource
+ * input uniformly. With 1 selected material this degenerates to the
+ * single-material case (best factor = best planet factor in system).
+ */
+export function getSystemsWithAllResources(materialIds: readonly string[]): ResourceMatch[] {
+  if (materialIds.length === 0) return [];
+
+  // Per material → systemId → best factor in that system.
+  const perMaterial: Map<string, Map<string, number>> = new Map();
+  for (const matId of materialIds) {
+    const list = planetIndex.get(matId);
+    if (!list || list.length === 0) return []; // any material absent → AND empty
+    const sysMap = new Map<string, number>();
+    for (const p of list) {
+      const existing = sysMap.get(p.systemId);
+      if (existing === undefined || p.factor > existing) sysMap.set(p.systemId, p.factor);
+    }
+    perMaterial.set(matId, sysMap);
+  }
+
+  // System qualifies when it appears in every per-material map.
+  const seedMap = perMaterial.get(materialIds[0]!)!;
+  const out: ResourceMatch[] = [];
+  for (const sysId of seedMap.keys()) {
+    let bottleneck = Infinity;
+    let qualifies = true;
+    for (const matId of materialIds) {
+      const f = perMaterial.get(matId)!.get(sysId);
+      if (f === undefined) { qualifies = false; break; }
+      if (f < bottleneck) bottleneck = f;
+    }
+    if (!qualifies) continue;
+    // planetCount is the per-system planet count for the FIRST material,
+    // kept for parity with single-resource ResourceMatch — not really
+    // meaningful in multi mode, but only used as supplemental info.
+    const planetCount = systemIndex.get(materialIds[0]!)?.find((m) => m.systemId === sysId)?.planetCount ?? 1;
+    out.push({ systemId: sysId, bestFactor: bottleneck, planetCount });
+  }
+  out.sort((a, b) => b.bestFactor - a.bestFactor);
+  return out;
+}
+
+/**
+ * Planet IDs to include in the bright set for the AND filter — every
+ * planet in a qualifying system that contributes any of the selected
+ * materials. (Planets in qualifying systems that have none of the
+ * selected materials are dimmed; non-qualifying systems are dimmed
+ * entirely.)
+ */
+export function getQualifyingPlanetIds(materialIds: readonly string[]): Set<string> {
+  if (materialIds.length === 0) return new Set();
+  const matches = getSystemsWithAllResources(materialIds);
+  if (matches.length === 0) return new Set();
+  const qualifyingSystems = new Set(matches.map((m) => m.systemId));
+  const out = new Set<string>();
+  for (const matId of materialIds) {
+    const list = planetIndex.get(matId);
+    if (!list) continue;
+    for (const p of list) {
+      if (qualifyingSystems.has(p.systemId)) out.add(p.planetNaturalId);
+    }
+  }
+  return out;
+}
+
+/** Per-planet contribution row for the panel view. */
+export interface PlanetFactorRow {
   planetNaturalId: string;
-  systemId: string;
-  /** min(factor) across all selected materials — the "bottleneck" the
-   * planet imposes on a chain that needs every selected resource. */
-  bottleneckFactor: number;
-  /** Per-material factor for the planet, keyed by MaterialId. */
+  /** factor keyed by MaterialId; absent key = planet doesn't have that material */
   factors: Map<string, number>;
 }
 
 /**
- * Return planets that contain every material in the input set, with the
- * bottleneck (minimum) factor across the materials and per-material
- * factors. With 0 materials, returns []. With 1, behaves identically to
- * getPlanetsWithResource projected into the multi shape.
+ * For a given system, list every planet that has at least one of the
+ * selected materials, with each planet's per-material factor (or
+ * absent in the map if the planet doesn't have that material).
  */
-export function getMatchingPlanetsAll(materialIds: readonly string[]): MultiResourcePlanetMatch[] {
+export function getMatchingPlanetsInSystem(
+  systemId: string,
+  materialIds: readonly string[],
+): PlanetFactorRow[] {
   if (materialIds.length === 0) return [];
-  // Walk each material's planet list, accumulate per-planet factors.
-  const accum = new Map<string, { systemId: string; factors: Map<string, number> }>();
+  const accum = new Map<string, Map<string, number>>();
   for (const matId of materialIds) {
     const list = planetIndex.get(matId);
-    if (!list || list.length === 0) return []; // Any material absent → AND empty.
+    if (!list) continue;
     for (const p of list) {
+      if (p.systemId !== systemId) continue;
       let entry = accum.get(p.planetNaturalId);
       if (!entry) {
-        entry = { systemId: p.systemId, factors: new Map() };
+        entry = new Map();
         accum.set(p.planetNaturalId, entry);
       }
-      entry.factors.set(matId, p.factor);
+      entry.set(matId, p.factor);
     }
   }
-  const out: MultiResourcePlanetMatch[] = [];
-  for (const [planetNaturalId, { systemId, factors }] of accum) {
-    if (factors.size !== materialIds.length) continue; // missing one or more
-    let bottleneck = Infinity;
-    for (const f of factors.values()) if (f < bottleneck) bottleneck = f;
-    out.push({ planetNaturalId, systemId, bottleneckFactor: bottleneck, factors });
+  const rows: PlanetFactorRow[] = [];
+  for (const [planetNaturalId, factors] of accum) {
+    rows.push({ planetNaturalId, factors });
   }
-  return out;
+  // Sort so planets contributing high-factor resources come first.
+  rows.sort((a, b) => maxFactor(b.factors) - maxFactor(a.factors));
+  return rows;
 }
 
-/**
- * Per-system summary for the AND match: each system's score is the best
- * bottleneck among its matching planets. Output shape matches single-
- * resource ResourceMatch so the concentration-dot pipeline can consume
- * either.
- */
-export function getMatchingSystemsAll(materialIds: readonly string[]): ResourceMatch[] {
-  if (materialIds.length === 0) return [];
-  const matches = getMatchingPlanetsAll(materialIds);
-  const sysAccum = new Map<string, { bestFactor: number; planetCount: number }>();
-  for (const p of matches) {
-    const existing = sysAccum.get(p.systemId);
-    if (existing) {
-      if (p.bottleneckFactor > existing.bestFactor) existing.bestFactor = p.bottleneckFactor;
-      existing.planetCount++;
-    } else {
-      sysAccum.set(p.systemId, { bestFactor: p.bottleneckFactor, planetCount: 1 });
-    }
-  }
-  const out: ResourceMatch[] = [];
-  for (const [systemId, data] of sysAccum) {
-    out.push({ systemId, bestFactor: data.bestFactor, planetCount: data.planetCount });
-  }
-  out.sort((a, b) => b.bestFactor - a.bestFactor);
-  return out;
+function maxFactor(factors: Map<string, number>): number {
+  let max = 0;
+  for (const f of factors.values()) if (f > max) max = f;
+  return max;
 }
 
 export function getExtractableResourceMaterialIds(): Set<string> {

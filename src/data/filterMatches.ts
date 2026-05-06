@@ -8,15 +8,17 @@
  * result disables dimming rather than dimming everything. Empire is the
  * only filter whose empty-state is different (see empireIndex.ts).
  *
- * Resource filter is multi-select with AND semantics: a planet matches
- * iff it contains every selected material; a system matches iff it
- * contains at least one matching planet.
+ * Resource filter is multi-select with AND-across-system semantics: a
+ * SYSTEM matches iff every selected material is present on at least
+ * one of its planets (the production-chain use case). The bright
+ * planet set is every planet in a qualifying system that contributes
+ * any of the selected materials.
  */
 
 import { getResourceFilters, getCogcFilter } from "../ui/state.js";
 import {
-  getMatchingPlanetsAll,
-  getMatchingSystemsAll,
+  getSystemsWithAllResources,
+  getQualifyingPlanetIds,
   getSystemsWithCogcProgram,
   isResourceIndexReady,
 } from "./resourceIndex.js";
@@ -24,7 +26,7 @@ import {
 export function getResourceSystemMatches(): Set<string> | null {
   const ids = getResourceFilters();
   if (ids.length === 0) return null;
-  const matches = getMatchingSystemsAll(ids);
+  const matches = getSystemsWithAllResources(ids);
   if (matches.length === 0) return null;
   return new Set(matches.map((m) => m.systemId));
 }
@@ -32,9 +34,9 @@ export function getResourceSystemMatches(): Set<string> | null {
 export function getResourcePlanetMatches(): Set<string> | null {
   const ids = getResourceFilters();
   if (ids.length === 0) return null;
-  const matches = getMatchingPlanetsAll(ids);
-  if (matches.length === 0) return null;
-  return new Set(matches.map((m) => m.planetNaturalId));
+  const planetIds = getQualifyingPlanetIds(ids);
+  if (planetIds.size === 0) return null;
+  return planetIds;
 }
 
 export function getCogcSystemMatches(): Set<string> | null {

@@ -237,6 +237,13 @@
   font-weight: 600;
 }
 
+/* Per-planet cell where the planet doesn't have that material — shown
+ * as a dash so the user can see which slots the planet does/doesn't
+ * cover at a glance. */
+.panel-resource-pct-absent {
+  opacity: 0.4;
+}
+
 /* Resource badge in panel header */
 .panel-badge-resource {
   background: rgba(0, 204, 170, 0.15);
