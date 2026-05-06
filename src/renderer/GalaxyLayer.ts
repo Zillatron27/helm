@@ -6,7 +6,7 @@ import {
   setViewLevel,
   setFocusedSystem,
 } from "../ui/state.js";
-import { getAllCxStations, getGalaxyGatewayConnections, isGatewaySystem } from "../data/cache.js";
+import { getAllCxStations, getCxForSystem, getGalaxyGatewayConnections, isGatewaySystem } from "../data/cache.js";
 import { isSettledSystem } from "../data/siteCounts.js";
 import { getEmpireSystemIds } from "../data/empireIndex.js";
 import { getBridgeSnapshot } from "../ui/state.js";
@@ -99,7 +99,7 @@ const GATEWAY_COLOUR = 0xbb77ff;
 const GATEWAY_INDICATOR_RADIUS = 7;
 const GATEWAY_INDICATOR_STROKE = 1.5;
 const GATEWAY_INDICATOR_ALPHA = 0.8;
-const GATEWAY_INDICATOR_OFFSET = 14; // offset from star centre (top-right)
+const GATEWAY_INDICATOR_GAP = 4; // visual gap between obstacle edge and indicator ring
 const GATEWAY_ARC_BASE = 1.5;
 const GATEWAY_ARC_MIN = 0.5;
 const GATEWAY_ARC_MAX = 5.0;
@@ -485,16 +485,27 @@ export class GalaxyLayer {
       if (ambientLabel) ambientLabel.visible = false;
     }
 
-    // Gateway system indicators — small purple rings offset top-right of star
+    // Gateway system indicators — small purple rings offset top-right of
+    // the star. Per-system offset clears the star's actual display
+    // radius (which scales with connection count up to 1.6×) and, on CX
+    // systems, the diamond marker — its top-right edge sits at
+    // CX_DIAMOND_RADIUS/√2 ≈ 28.3 from centre on the 45° ray.
     this.gatewayIndicators = new Container();
     this.gatewayIndicators.eventMode = "none";
     for (const system of systems) {
       if (!isGatewaySystem(system.id)) continue;
+      const connCount = system.connectionIds.length;
+      const sizeScale = connCount >= 5 ? 1.6 : connCount >= 3 ? 1.3 : 1;
+      const starRadius = STAR_RADIUS * sizeScale;
+      const hasCx = getCxForSystem(system.id) !== null;
+      const obstacleRadius = hasCx ? CX_DIAMOND_RADIUS / Math.SQRT2 : starRadius;
+      const offset = (obstacleRadius + GATEWAY_INDICATOR_RADIUS + GATEWAY_INDICATOR_GAP) / Math.SQRT2;
+
       const indicator = new Graphics();
       indicator.circle(0, 0, GATEWAY_INDICATOR_RADIUS);
       indicator.stroke({ width: GATEWAY_INDICATOR_STROKE, color: GATEWAY_COLOUR, alpha: GATEWAY_INDICATOR_ALPHA });
-      indicator.x = system.worldX + GATEWAY_INDICATOR_OFFSET;
-      indicator.y = system.worldY - GATEWAY_INDICATOR_OFFSET;
+      indicator.x = system.worldX + offset;
+      indicator.y = system.worldY - offset;
       this.gatewayIndicators.addChild(indicator);
     }
 
