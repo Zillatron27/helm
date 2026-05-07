@@ -107,7 +107,7 @@
  * min-width: 0 on grid items + nowrap on buttons keeps headers single-line. */
 .sidebar-table-header {
   display: grid;
-  grid-template-columns: 1fr 50px 70px 80px 60px;
+  grid-template-columns: 1fr 50px 70px 100px 60px;
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
@@ -161,7 +161,7 @@
 
 .sidebar-row {
   display: grid;
-  grid-template-columns: 1fr 50px 70px 80px 60px;
+  grid-template-columns: 1fr 50px 70px 100px 60px;
   align-items: center;
   gap: 6px;
   padding: 8px 12px;

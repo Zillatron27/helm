@@ -518,29 +518,20 @@ export class MapRenderer {
   }
 
   panToPlanet(systemId: string, planetId: string): void {
-    // Enter system view, then select the planet after transition + data load
+    // Enter system view; selection is set after the camera transition
+    // settles. PanelManager handles the "selected planet, data not yet
+    // loaded" case by rendering a loading panel and triggering the
+    // FIO fetch itself, so we don't need to await the load here.
     setFocusedSystem(systemId);
     setViewLevel("system");
 
-    const system = getSystemById(systemId);
-    if (!system) return;
+    if (!getSystemById(systemId)) return;
 
-    // Wait for transition to complete, then ensure planets are loaded and select
-    const selectAfterLoad = (): void => {
-      const cached = getPlanetsForSystem(system.naturalId);
-      if (cached) {
+    setTimeout(() => {
+      if (getFocusedSystemId() === systemId && getViewLevel() === "system") {
         setSelectedEntity({ type: "planet", id: planetId });
-      } else {
-        loadPlanetsForSystem(system.naturalId).then(() => {
-          if (getFocusedSystemId() === systemId && getViewLevel() === "system") {
-            setSelectedEntity({ type: "planet", id: planetId });
-          }
-        });
       }
-    };
-
-    // TRANSITION_MS for camera + 100ms buffer for system view fade-in
-    setTimeout(selectAfterLoad, TRANSITION_MS + 100);
+    }, TRANSITION_MS + 100);
   }
 
   frameEmpire(): void {

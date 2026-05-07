@@ -23,6 +23,7 @@ import {
 import {
   getMatchingPlanetsInSystem,
   getCogcProgramPlanets,
+  getPlanetDisplayName,
 } from "../../data/resourceIndex.js";
 import { getCxDistances } from "../../data/cxDistances.js";
 import { findRoute } from "../../data/pathfinding.js";
@@ -31,6 +32,8 @@ import { getNearestCxPrice } from "../../data/exchangePrices.js";
 import { getGovernor } from "../../data/settledPlanets.js";
 import { loadPlanetInfrastructure, getPlanetInfrastructure } from "../../data/infrastructure.js";
 import type { MapRenderer } from "../../renderer/MapRenderer.js";
+import { createMiniLoader } from "../loader/LoaderAnimation.js";
+import { getTheme } from "../theme.js";
 
 export class PanelManager {
   private containerEl: HTMLElement;
@@ -107,6 +110,18 @@ export class PanelManager {
       const planet = planets?.find((p) => p.id === entity.id || p.naturalId === entity.id);
       if (planet) {
         this.showPlanetPanel(planet);
+      } else {
+        // Planet selected but its system's data isn't cached yet — render
+        // a loading panel with whatever identifier we have so the user
+        // sees the panel respond immediately. Trigger the load and
+        // re-render with full data when it lands.
+        this.showPlanetLoadingPanel(entity.id, system.naturalId);
+        loadPlanetsForSystem(system.naturalId).then((loaded) => {
+          const current = getSelectedEntity();
+          if (current?.type !== "planet" || current.id !== entity.id) return;
+          const p = loaded.find((p) => p.id === entity.id || p.naturalId === entity.id);
+          if (p) this.showPlanetPanel(p);
+        });
       }
     }
   }
@@ -475,6 +490,47 @@ export class PanelManager {
     // Only show zoom button if at galaxy level
     if (getViewLevel() === "system") return "";
     return `<button class="panel-button" data-action="zoom">Zoom to ${esc(system.name)}</button>`;
+  }
+
+  /**
+   * Lightweight panel shown while a system's planet data is being
+   * fetched. The header stays the same shape as the loaded panel
+   * (title + subtitle + close) so the visual transition is just a
+   * body swap, not a full panel rebuild. The mini orbital spinner
+   * matches the UX of the search-button and resource-picker spinners.
+   */
+  private showPlanetLoadingPanel(planetIdOrNatural: string, systemNaturalId: string): void {
+    // We may have a planet name from the resource index even when the
+    // full planet record isn't loaded yet — check before falling back
+    // to the natural id.
+    const cachedName = getPlanetDisplayName(planetIdOrNatural);
+    const title = cachedName || planetIdOrNatural;
+
+    const html = `
+      <div class="panel-header">
+        <h2 class="panel-title">${esc(title)}</h2>
+        <div class="panel-subtitle">${esc(systemNaturalId)}</div>
+        <button class="panel-close" aria-label="Close panel">&times;</button>
+      </div>
+      <div class="panel-body">
+        <div class="panel-loading panel-loading-with-spinner" data-planet-loader></div>
+      </div>
+    `;
+    this.setContent(html, () => {
+      this.open();
+      this.panelEl.querySelector(".panel-close")?.addEventListener("click", () => {
+        setSelectedEntity(null);
+      });
+      const mount = this.panelEl.querySelector("[data-planet-loader]") as HTMLElement | null;
+      if (mount) {
+        const spinner = createMiniLoader(getTheme());
+        spinner.style.marginRight = "10px";
+        mount.appendChild(spinner);
+        const label = document.createElement("span");
+        label.textContent = "Loading planet data…";
+        mount.appendChild(label);
+      }
+    });
   }
 
   private showPlanetPanel(planet: Planet): void {

@@ -77,8 +77,12 @@ export class ResultsSidebar {
       this.cxCodes = getAllCxStations()
         .map((cx) => cx.ComexCode)
         .sort();
-      // Default = no CX selected; CX DIST column is blank until the user
-      // picks one. Factor sort is the natural default.
+      // Default = first CX (AI1 alphabetically). Pre-selecting one makes
+      // the CX DIST column populated on first paint instead of blank,
+      // which reads more clearly than empty cells.
+      if (!this.cxTarget && this.cxCodes.length > 0) {
+        this.cxTarget = this.cxCodes[0]!;
+      }
       this.renderCxToggle();
     };
 
