@@ -19,6 +19,7 @@ import {
   getSystemsWithAnyResource,
   getPlanetsWithAnyResource,
   getSystemsWithCogcProgram,
+  getCogcProgramPlanets,
   isResourceIndexReady,
 } from "./resourceIndex.js";
 
@@ -45,4 +46,13 @@ export function getCogcSystemMatches(): Set<string> | null {
   const matches = getSystemsWithCogcProgram(cat);
   if (matches.size === 0) return null;
   return matches;
+}
+
+export function getCogcPlanetMatches(): Set<string> | null {
+  const cat = getCogcFilter();
+  if (!cat) return null;
+  if (!isResourceIndexReady()) return null;
+  const planets = getCogcProgramPlanets(cat);
+  if (planets.length === 0) return null;
+  return new Set(planets.map((p) => p.planetNaturalId));
 }

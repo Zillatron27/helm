@@ -7,7 +7,7 @@ import { ResourcePicker } from "./ui/resource/ResourcePicker.js";
 import { setupControls } from "./ui/controls.js";
 import { onStateChange, getGatewaysVisible, setGatewaysVisible, getSettledVisible, getResourceFilters, getCogcFilter, getEmpireDim, setEmpireDim, onResourceFilterChange, onCogcFilterChange, getBridgeSnapshot, onBridgeSnapshotChange } from "./ui/state.js";
 import { isResourceIndexReady, onResourceIndexReady, getSystemsWithAnyResource } from "./data/resourceIndex.js";
-import { getResourceSystemMatches, getResourcePlanetMatches, getCogcSystemMatches } from "./data/filterMatches.js";
+import { getResourceSystemMatches, getResourcePlanetMatches, getCogcSystemMatches, getCogcPlanetMatches } from "./data/filterMatches.js";
 import { getEmpireSystemMatches, getEmpirePlanetMatches, onEmpireIndexChange } from "./data/empireIndex.js";
 import { yieldToMain } from "./util/yieldToMain.js";
 import { initTheme, getTheme } from "./ui/theme.js";
@@ -213,6 +213,7 @@ async function boot(): Promise<void> {
       ]);
       const planetBright = intersectNonNull([
         getResourcePlanetMatches(),
+        getCogcPlanetMatches(),
         getEmpirePlanetMatches(),
       ]);
       if (!setsEqualNullable(galaxyBright, lastGalaxyBright)) {
