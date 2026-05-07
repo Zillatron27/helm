@@ -78,6 +78,10 @@ const HALO_ARC_SPAN = Math.PI * 0.7; // each arc covers 70% of a semicircle
 const HALO_PULSE_FREQUENCY = 1.0;
 const HALO_PULSE_AMPLITUDE = 0.2;
 
+// Alpha for non-matching planets when a filter (resource / COGC / empire)
+// is active. Used by both filter types via setDimmedPlanets.
+const PLANET_DIM_ALPHA = 0.25;
+
 // Empire planet ring — drawn around user-owned planets whenever the bridge
 // snapshot is present. Sits inside the selection halo (HALO_GAP = 6) so
 // a selected empire planet nests cleanly: planet → empire ring → halo.
@@ -554,7 +558,7 @@ export class SystemLayer {
       return;
     }
     for (const [naturalId, pc] of this.planetContainers) {
-      pc.alpha = ids.has(naturalId) ? 1 : 0.2;
+      pc.alpha = ids.has(naturalId) ? 1 : PLANET_DIM_ALPHA;
     }
   }
 
