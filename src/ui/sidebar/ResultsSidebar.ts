@@ -1,11 +1,4 @@
-import {
-  getResourceFilters,
-  setSelectedEntity,
-  setFocusedSystem,
-  setViewLevel,
-  getViewLevel,
-  onResourceFilterChange,
-} from "../state.js";
+import { getResourceFilters, onResourceFilterChange } from "../state.js";
 import {
   getResourceContributions,
   getPlanetDisplayName,
@@ -24,7 +17,6 @@ type SortDir = "asc" | "desc";
 interface Row {
   planetName: string;
   planetNaturalId: string;
-  planetId: string; // resolved later if available; fallback to natural id
   systemId: string;
   systemName: string;
   systemNaturalId: string;
@@ -33,11 +25,7 @@ interface Row {
   bases: number;
   // Distance to each CX (by ComexCode). -1 = unreachable.
   cxJumps: Map<string, { jumps: number; viaGateway: boolean; label: string }>;
-  // Pre-computed nearest CX (or null if unreachable from any).
-  nearestCx: { code: string; label: string; jumps: number; viaGateway: boolean } | null;
 }
-
-const CX_TARGET_NEAREST = "__nearest__";
 
 export class ResultsSidebar {
   private el: HTMLElement;
@@ -47,7 +35,9 @@ export class ResultsSidebar {
   private bodyEl: HTMLElement;
   private renderer: MapRenderer | null = null;
 
-  private cxTarget: string = CX_TARGET_NEAREST;
+  // First CX code alphabetically once stations load — typically AI1.
+  // Initialised in init() so it survives a full filter refresh cycle.
+  private cxTarget: string = "";
   private sortKey: SortKey = "factor";
   private sortDir: SortDir = "desc";
   private rows: Row[] = [];
@@ -87,6 +77,11 @@ export class ResultsSidebar {
       this.cxCodes = getAllCxStations()
         .map((cx) => cx.ComexCode)
         .sort();
+      // Default target = first available CX (AI1 typically) — there is no
+      // "Nearest" mode, since per-row mixed labels confused readers.
+      if (!this.cxTarget && this.cxCodes.length > 0) {
+        this.cxTarget = this.cxCodes[0]!;
+      }
       this.renderCxToggle();
     };
 
@@ -124,9 +119,9 @@ export class ResultsSidebar {
   private buildRows(materialIds: readonly string[]): Row[] {
     const contributions = getResourceContributions(materialIds);
 
-    // Cache per-system CX distances so we don't recompute for every row.
+    // Cache per-system CX distances so we don't recompute for every row
+    // (a system with N matching planets calls getCxDistances once).
     const cxBySystem = new Map<string, Map<string, { jumps: number; viaGateway: boolean; label: string }>>();
-    const nearestBySystem = new Map<string, Row["nearestCx"]>();
 
     const rows: Row[] = [];
     for (const c of contributions) {
@@ -134,36 +129,24 @@ export class ResultsSidebar {
       if (!sys) continue;
 
       let cxJumps = cxBySystem.get(c.systemId);
-      let nearestCx: Row["nearestCx"] = nearestBySystem.get(c.systemId) ?? null;
       if (!cxJumps) {
         cxJumps = new Map();
-        const entries = getCxDistances(c.systemId); // already sorted asc by jumps, unreachable last
-        for (const e of entries) {
+        for (const e of getCxDistances(c.systemId)) {
           cxJumps.set(e.code, { jumps: e.jumps, viaGateway: e.viaGateway, label: e.label });
         }
         cxBySystem.set(c.systemId, cxJumps);
-        // First reachable entry = nearest.
-        const reachable = entries.find((e) => e.jumps >= 0);
-        nearestCx = reachable
-          ? { code: reachable.code, label: reachable.label, jumps: reachable.jumps, viaGateway: reachable.viaGateway }
-          : null;
-        nearestBySystem.set(c.systemId, nearestCx);
       }
-
-      const tkr = getMaterialTicker(c.materialId);
 
       rows.push({
         planetName: getPlanetDisplayName(c.planetNaturalId),
         planetNaturalId: c.planetNaturalId,
-        planetId: c.planetNaturalId, // panToPlanet expects FIO planet id; we don't have it here
         systemId: c.systemId,
         systemName: sys.name,
         systemNaturalId: sys.naturalId,
-        ticker: tkr,
+        ticker: getMaterialTicker(c.materialId),
         factor: c.factor,
         bases: getPlanetBaseCount(c.planetNaturalId),
         cxJumps,
-        nearestCx,
       });
     }
     return rows;
@@ -187,13 +170,9 @@ export class ResultsSidebar {
   }
 
   private renderCxToggle(): void {
-    const buttons: string[] = [];
-    buttons.push(this.cxButton(CX_TARGET_NEAREST, "Nearest"));
-    for (const code of this.cxCodes) {
-      buttons.push(this.cxButton(code, code));
-    }
+    const buttons = this.cxCodes.map((code) => this.cxButton(code, code));
     this.cxToggleEl.innerHTML = `
-      <span class="sidebar-cx-label">CX</span>
+      <span class="sidebar-cx-label">CX DIST</span>
       <div class="sidebar-cx-buttons">${buttons.join("")}</div>
     `;
 
@@ -248,11 +227,27 @@ export class ResultsSidebar {
 
   private renderBody(): void {
     const sorted = [...this.rows].sort((a, b) => this.compare(a, b));
+
+    // Factor heat-map: red (worst) → yellow → green (best), relative to the
+    // current row set. Recomputed every render so it tracks the active filter.
+    let minF = Infinity;
+    let maxF = -Infinity;
+    for (const r of sorted) {
+      if (r.factor < minF) minF = r.factor;
+      if (r.factor > maxF) maxF = r.factor;
+    }
+    const range = maxF - minF;
+
     const html = sorted
       .map((r) => {
         const cxText = this.cxCellHtml(r);
         const pct = Math.round(r.factor * 100);
         const basesText = r.bases > 0 ? String(r.bases) : "";
+
+        const t = range > 0 ? (r.factor - minF) / range : 0.5; // 0 = worst, 1 = best
+        const hue = Math.round(t * 120); // 0 = red, 60 = yellow, 120 = green
+        const factorStyle = `style="color: hsl(${hue}, 70%, 60%)"`;
+
         return `
           <div class="sidebar-row" data-system-id="${esc(r.systemId)}" data-planet-natural="${esc(r.planetNaturalId)}">
             <div class="col-planet">
@@ -260,7 +255,7 @@ export class ResultsSidebar {
               <span class="sidebar-planet-system">${esc(r.systemNaturalId)} · ${esc(r.systemName)}</span>
             </div>
             <div class="col-ticker">${esc(r.ticker)}</div>
-            <div class="col-factor">${pct}%</div>
+            <div class="col-factor" ${factorStyle}>${pct}%</div>
             <div class="col-cx">${cxText}</div>
             <div class="col-bases">${esc(basesText)}</div>
           </div>
@@ -272,7 +267,8 @@ export class ResultsSidebar {
     this.bodyEl.querySelectorAll(".sidebar-row").forEach((row) => {
       row.addEventListener("click", () => {
         const sysId = (row as HTMLElement).dataset["systemId"]!;
-        this.navigateToSystem(sysId);
+        const planetNat = (row as HTMLElement).dataset["planetNatural"]!;
+        this.navigateToPlanet(sysId, planetNat);
       });
     });
   }
@@ -301,43 +297,22 @@ export class ResultsSidebar {
   }
 
   private cxCellHtml(r: Row): string {
-    const unreachable = `<span class="sidebar-cx-unreachable">—</span>`;
-    if (this.cxTarget === CX_TARGET_NEAREST) {
-      if (!r.nearestCx) return unreachable;
-      const gw = r.nearestCx.viaGateway ? " ⬡" : "";
-      return `${esc(r.nearestCx.label)} ${r.nearestCx.jumps}j${gw}`;
-    }
     const e = r.cxJumps.get(this.cxTarget);
-    if (!e || e.jumps < 0) return unreachable;
-    const gw = e.viaGateway ? " ⬡" : "";
-    return `${esc(e.label)} ${e.jumps}j${gw}`;
+    if (!e || e.jumps < 0) return `<span class="sidebar-cx-unreachable">—</span>`;
+    return `${e.jumps}`;
   }
 
   private cxJumpsForSort(r: Row): number {
-    if (this.cxTarget === CX_TARGET_NEAREST) {
-      return r.nearestCx ? r.nearestCx.jumps : Infinity;
-    }
     const e = r.cxJumps.get(this.cxTarget);
     return e && e.jumps >= 0 ? e.jumps : Infinity;
   }
 
-  private navigateToSystem(systemId: string): void {
+  private navigateToPlanet(systemId: string, planetNaturalId: string): void {
     if (!this.renderer) return;
-    const view = getViewLevel();
-    if (view === "system") {
-      // Zoom out first so the pan happens on the galaxy view, matching
-      // PanelManager.navigateToSystem's pattern.
-      setSelectedEntity(null);
-      setFocusedSystem(null);
-      setViewLevel("galaxy");
-      setTimeout(() => {
-        this.renderer?.panToSystem(systemId);
-        setSelectedEntity({ type: "system", id: systemId });
-      }, 850);
-    } else {
-      this.renderer.panToSystem(systemId);
-      setSelectedEntity({ type: "system", id: systemId });
-    }
+    // panToPlanet handles the galaxy → system zoom and selects the planet
+    // after the planet data loads. PanelManager accepts naturalId or UUID
+    // for the selected planet, so we don't need to look up the FIO id.
+    this.renderer.panToPlanet(systemId, planetNaturalId);
   }
 
   show(): void {
