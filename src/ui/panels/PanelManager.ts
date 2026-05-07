@@ -22,7 +22,6 @@ import {
 } from "../../data/cache.js";
 import {
   getMatchingPlanetsInSystem,
-  getSystemsWithAllResources,
   getCogcProgramPlanets,
 } from "../../data/resourceIndex.js";
 import { getCxDistances } from "../../data/cxDistances.js";
@@ -173,89 +172,69 @@ export class PanelManager {
     if (materialIds.length === 0) return;
     const isMulti = materialIds.length > 1;
 
-    // Resolve display info per material (for the header badges + breakdown rows).
+    // Resolve display info per material (for the header badges + row tickers).
     const materials = materialIds.map((id) => {
       const ticker = getMaterialTicker(id);
       const material = getMaterialByTicker(ticker);
       return { id, ticker, name: formatCamelCase(material?.Name ?? ticker) };
     });
 
-    // System bottleneck: min over selected materials of best-in-system
-    // factor. Useful header context — tells the user which resource is
-    // the limiting factor for a chain anchored here.
-    const allSystemMatches = getSystemsWithAllResources(materialIds);
-    const thisSystemMatch = allSystemMatches.find((m) => m.systemId === system.id);
-    const systemBottleneckPct = thisSystemMatch
-      ? Math.round(thisSystemMatch.bestFactor * 100)
-      : null;
-
-    // Planets in this system that contribute any of the selected
-    // materials — pre-sorted by their max factor so the strongest
-    // contributors come first.
+    // Flatten planets-in-system into one row per (planet, material) the
+    // planet contributes — under OR semantics that's the natural
+    // ranking unit. A planet with both ALO and HAL appears twice; that
+    // matches the "show me top yields anywhere" use case.
     const planetRows = getMatchingPlanetsInSystem(system.id, materialIds);
     const cachedPlanets = getPlanetsForSystem(system.naturalId);
 
-    const planetRowsHtml = planetRows.map((row) => {
+    type Row = {
+      planetName: string;
+      planetId: string;
+      ticker: string;
+      factor: number;
+    };
+    const rows: Row[] = [];
+    for (const row of planetRows) {
       const cached = cachedPlanets?.find((p) => p.naturalId === row.planetNaturalId);
-      const name = cached?.name || row.planetNaturalId;
+      const planetName = cached?.name || row.planetNaturalId;
       const planetId = cached?.id || row.planetNaturalId;
-      const planetMax = Math.max(...Array.from(row.factors.values()), 0);
-      const planetMaxPct = Math.round(planetMax * 100);
-
-      if (!isMulti) {
-        // Single material — keep the existing compact row.
-        const ticker = materials[0]!.ticker;
-        const f = row.factors.get(materials[0]!.id) ?? 0;
-        const pct = Math.round(f * 100);
-        const price = getNearestCxPrice(ticker, system.id);
-        const priceText = price && price.ask !== null
-          ? `<span class="panel-resource-price">${Math.round(price.ask)} ${esc(price.currency)}</span>`
-          : "";
-        return `
-          <div class="panel-resource-filter-row">
-            <a class="panel-planet-link" data-planet-id="${esc(planetId)}" data-planet-system="${esc(system.id)}">${esc(name)}</a>
-            <div class="panel-resource-bar">
-              <div class="panel-resource-bar-fill" style="width: ${pct}%"></div>
-            </div>
-            <span class="panel-resource-pct">${pct}%</span>
-            ${priceText}
-          </div>
-        `;
-      }
-
-      // Multi: row's bar shows the planet's MAX contribution; breakdown
-      // shows per-material factors as cells. Missing materials render
-      // as a dash so the user sees which resources the planet covers.
-      const breakdown = materials.map((m) => {
+      for (const m of materials) {
         const f = row.factors.get(m.id);
-        if (f === undefined) {
-          return `<span class="panel-resource-pct panel-resource-pct-absent">${esc(m.ticker)} —</span>`;
-        }
-        const pct = Math.round(f * 100);
-        return `<span class="panel-resource-pct">${esc(m.ticker)} ${pct}%</span>`;
-      }).join("");
+        if (f === undefined) continue;
+        rows.push({ planetName, planetId, ticker: m.ticker, factor: f });
+      }
+    }
+    rows.sort((a, b) => b.factor - a.factor);
 
+    const planetRowsHtml = rows.map((r) => {
+      const pct = Math.round(r.factor * 100);
+      const price = getNearestCxPrice(r.ticker, system.id);
+      const priceText = price && price.ask !== null
+        ? `<span class="panel-resource-price">${Math.round(price.ask)} ${esc(price.currency)}</span>`
+        : "";
+      const tickerCell = isMulti
+        ? `<span class="panel-resource-ticker">${esc(r.ticker)}</span>`
+        : "";
       return `
-        <div class="panel-resource-filter-row panel-resource-filter-row-multi">
-          <a class="panel-planet-link" data-planet-id="${esc(planetId)}" data-planet-system="${esc(system.id)}">${esc(name)}</a>
-          <div class="panel-resource-bar" title="Best contribution from this planet">
-            <div class="panel-resource-bar-fill" style="width: ${planetMaxPct}%"></div>
+        <div class="panel-resource-filter-row">
+          <a class="panel-planet-link" data-planet-id="${esc(r.planetId)}" data-planet-system="${esc(system.id)}">${esc(r.planetName)}</a>
+          ${tickerCell}
+          <div class="panel-resource-bar">
+            <div class="panel-resource-bar-fill" style="width: ${pct}%"></div>
           </div>
-          <div class="panel-resource-breakdown">${breakdown}</div>
+          <span class="panel-resource-pct">${pct}%</span>
+          ${priceText}
         </div>
       `;
     }).join("");
 
     const tickerList = materials.map((m) => m.ticker).join(" + ");
-    const noMatches = planetRows.length === 0
+    const noMatches = rows.length === 0
       ? `<div class="panel-loading">No ${esc(tickerList)} in this system</div>`
       : "";
 
     const sectionTitle = isMulti
-      ? (systemBottleneckPct !== null
-          ? `${esc(tickerList)} — system bottleneck ${systemBottleneckPct}% (${planetRows.length} planets)`
-          : `${esc(tickerList)} (${planetRows.length} planets)`)
-      : `${esc(materials[0]!.name)} (${planetRows.length})`;
+      ? `${esc(tickerList)} (${rows.length})`
+      : `${esc(materials[0]!.name)} (${rows.length})`;
 
     const headerBadges = materials
       .map((m) => `<span class="panel-badge panel-badge-resource">${esc(m.ticker)}</span>`)

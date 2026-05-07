@@ -211,39 +211,6 @@
   flex-shrink: 0;
 }
 
-/* Multi-resource AND view: bar shows the bottleneck factor; per-resource
- * breakdown wraps below the planet name on narrower panels. */
-.panel-resource-filter-row-multi {
-  flex-wrap: wrap;
-}
-
-.panel-resource-breakdown {
-  display: flex;
-  gap: 8px;
-  flex-basis: 100%;
-  padding-left: 4px;
-  margin-top: 2px;
-}
-
-.panel-resource-breakdown .panel-resource-pct {
-  min-width: 0;
-  text-align: left;
-}
-
-/* The bottlenecking resource is the one limiting the planet's score —
- * accent it so the user can see what's holding the planet back. */
-.panel-resource-pct-bottleneck {
-  color: #00ccaa;
-  font-weight: 600;
-}
-
-/* Per-planet cell where the planet doesn't have that material — shown
- * as a dash so the user can see which slots the planet does/doesn't
- * cover at a glance. */
-.panel-resource-pct-absent {
-  opacity: 0.4;
-}
-
 /* Resource badge in panel header */
 .panel-badge-resource {
   background: rgba(0, 204, 170, 0.15);

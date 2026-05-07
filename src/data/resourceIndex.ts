@@ -132,77 +132,60 @@ export function getPlanetsWithResource(materialId: string): PlanetResourceMatch[
 }
 
 /**
- * Per-system AND match: a system qualifies when every selected
- * material is present on at least one of its planets (not necessarily
- * the same planet — the production-chain use case is "I want a system
- * with both ALO and HAL anywhere I can build bases on").
+ * Per-system OR match: a system qualifies when at least one selected
+ * material is present on at least one of its planets. Use case: scout
+ * for any of these resources — empire scouting / base-site shopping.
  *
- * Bottleneck = min over selected materials of (best factor that
- * material reaches anywhere in the system). It's the limiting
- * resource for a chain that wants the highest-yield base for each.
+ * bestFactor = max factor across any selected material on any planet
+ * in the system (the system's best yield for any picked resource).
+ * planetCount = distinct planets in the system contributing any
+ * selected material.
  *
  * Output shape matches single-resource ResourceMatch so the
- * concentration-dot pipeline can consume single- or multi-resource
- * input uniformly. With 1 selected material this degenerates to the
- * single-material case (best factor = best planet factor in system).
+ * concentration-dot pipeline consumes single- or multi-resource input
+ * uniformly. With 1 selected material this degenerates to the
+ * single-material case.
  */
-export function getSystemsWithAllResources(materialIds: readonly string[]): ResourceMatch[] {
+export function getSystemsWithAnyResource(materialIds: readonly string[]): ResourceMatch[] {
   if (materialIds.length === 0) return [];
 
-  // Per material → systemId → best factor in that system.
-  const perMaterial: Map<string, Map<string, number>> = new Map();
+  // systemId → { bestFactor, planetIds (for distinct count) }
+  const accum = new Map<string, { bestFactor: number; planets: Set<string> }>();
   for (const matId of materialIds) {
     const list = planetIndex.get(matId);
-    if (!list || list.length === 0) return []; // any material absent → AND empty
-    const sysMap = new Map<string, number>();
+    if (!list) continue;
     for (const p of list) {
-      const existing = sysMap.get(p.systemId);
-      if (existing === undefined || p.factor > existing) sysMap.set(p.systemId, p.factor);
+      const entry = accum.get(p.systemId);
+      if (entry) {
+        if (p.factor > entry.bestFactor) entry.bestFactor = p.factor;
+        entry.planets.add(p.planetNaturalId);
+      } else {
+        accum.set(p.systemId, { bestFactor: p.factor, planets: new Set([p.planetNaturalId]) });
+      }
     }
-    perMaterial.set(matId, sysMap);
   }
 
-  // System qualifies when it appears in every per-material map.
-  const seedMap = perMaterial.get(materialIds[0]!)!;
   const out: ResourceMatch[] = [];
-  for (const sysId of seedMap.keys()) {
-    let bottleneck = Infinity;
-    let qualifies = true;
-    for (const matId of materialIds) {
-      const f = perMaterial.get(matId)!.get(sysId);
-      if (f === undefined) { qualifies = false; break; }
-      if (f < bottleneck) bottleneck = f;
-    }
-    if (!qualifies) continue;
-    // planetCount is the per-system planet count for the FIRST material,
-    // kept for parity with single-resource ResourceMatch — not really
-    // meaningful in multi mode, but only used as supplemental info.
-    const planetCount = systemIndex.get(materialIds[0]!)?.find((m) => m.systemId === sysId)?.planetCount ?? 1;
-    out.push({ systemId: sysId, bestFactor: bottleneck, planetCount });
+  for (const [systemId, data] of accum) {
+    out.push({ systemId, bestFactor: data.bestFactor, planetCount: data.planets.size });
   }
   out.sort((a, b) => b.bestFactor - a.bestFactor);
   return out;
 }
 
 /**
- * Planet IDs to include in the bright set for the AND filter — every
- * planet in a qualifying system that contributes any of the selected
- * materials. (Planets in qualifying systems that have none of the
- * selected materials are dimmed; non-qualifying systems are dimmed
- * entirely.)
+ * Every planet (by naturalId) that contributes at least one of the
+ * selected materials. Bright set for the OR filter — planets in
+ * matching systems that have none of the selected materials are
+ * dimmed alongside non-matching systems.
  */
-export function getQualifyingPlanetIds(materialIds: readonly string[]): Set<string> {
+export function getPlanetsWithAnyResource(materialIds: readonly string[]): Set<string> {
   if (materialIds.length === 0) return new Set();
-  const matches = getSystemsWithAllResources(materialIds);
-  if (matches.length === 0) return new Set();
-  const qualifyingSystems = new Set(matches.map((m) => m.systemId));
   const out = new Set<string>();
   for (const matId of materialIds) {
     const list = planetIndex.get(matId);
     if (!list) continue;
-    for (const p of list) {
-      if (qualifyingSystems.has(p.systemId)) out.add(p.planetNaturalId);
-    }
+    for (const p of list) out.add(p.planetNaturalId);
   }
   return out;
 }
@@ -216,8 +199,7 @@ export interface PlanetFactorRow {
 
 /**
  * For a given system, list every planet that has at least one of the
- * selected materials, with each planet's per-material factor (or
- * absent in the map if the planet doesn't have that material).
+ * selected materials, with each planet's per-material factor.
  */
 export function getMatchingPlanetsInSystem(
   systemId: string,
