@@ -1,6 +1,9 @@
-import type { FioSystem, FioPlanet, FioPlanetSummary, FioCxStation, FioMaterial, FioExchangeAll, FioSettledPlanet, FioInfrastructurePlanet } from "../types/index.js";
+import type { FioSystem, FioPlanet, FioPlanetSummary, FioCxStation, FioMaterial, FioExchangeAll, FioSettledPlanet, FioInfrastructurePlanet, FioGateway } from "../types/index.js";
 
 const FIO_BASE = "https://rest.fnar.net";
+// FIO V2 (api.fnar.net) is a separate deployment from V1 (rest.fnar.net).
+// Currently only the gateway endpoint lives here; everything else is V1.
+const FIO_V2_BASE = "https://api.fnar.net";
 
 export async function fetchSystems(): Promise<FioSystem[]> {
   const response = await fetch(`${FIO_BASE}/systemstars`);
@@ -194,6 +197,18 @@ export async function fetchPlanetSites(): Promise<FioPlanetSiteCount[]> {
   }
 
   return data as FioPlanetSiteCount[];
+}
+
+export async function fetchGateways(): Promise<FioGateway[]> {
+  const response = await fetch(`${FIO_V2_BASE}/gateway`);
+  if (!response.ok) {
+    throw new Error(`FIO gateway API error: ${response.status} ${response.statusText}`);
+  }
+  const data: unknown = await response.json();
+  if (!Array.isArray(data)) {
+    throw new Error("FIO gateway API returned invalid data");
+  }
+  return data as FioGateway[];
 }
 
 export async function fetchMaterials(): Promise<FioMaterial[]> {

@@ -448,14 +448,33 @@ export class SystemLayer {
       const ringX = startX + gi * GATEWAY_RING_SPACING;
 
       // Ring — stroke-only circle
+      const established = gw.linkStatus === "ESTABLISHED";
+
       const ring = new Graphics();
-      ring.circle(0, 0, GATEWAY_RING_RADIUS);
-      ring.stroke({ width: GATEWAY_RING_STROKE, color: GATEWAY_COLOUR, alpha: GATEWAY_RING_ALPHA });
+      if (established) {
+        ring.circle(0, 0, GATEWAY_RING_RADIUS);
+        ring.stroke({ width: GATEWAY_RING_STROKE, color: GATEWAY_COLOUR, alpha: GATEWAY_RING_ALPHA });
+      } else {
+        // Dotted ring for under-construction / unlinked gateways. Pixi v8
+        // has no native dashed stroke — draw arc segments with gaps.
+        const segs = 12;
+        const arcSpan = (Math.PI * 2) / segs;
+        const dashFraction = 0.45;
+        for (let s = 0; s < segs; s++) {
+          const start = s * arcSpan;
+          const end = start + arcSpan * dashFraction;
+          ring.moveTo(Math.cos(start) * GATEWAY_RING_RADIUS, Math.sin(start) * GATEWAY_RING_RADIUS);
+          ring.arc(0, 0, GATEWAY_RING_RADIUS, start, end);
+          ring.stroke({ width: GATEWAY_RING_STROKE, color: GATEWAY_COLOUR, alpha: GATEWAY_RING_ALPHA });
+        }
+      }
       ring.x = ringX;
       ring.y = ringY;
 
-      // Direction line toward destination system
-      const destSys = getSystemById(gw.destinationSystemId);
+      // Direction line toward destination system (established only).
+      const destSys = established && gw.destinationSystemId
+        ? getSystemById(gw.destinationSystemId)
+        : null;
       if (destSys) {
         const dx = destSys.worldX - system.worldX;
         const dy = destSys.worldY - system.worldY;
@@ -480,8 +499,10 @@ export class SystemLayer {
       ring.cursor = "pointer";
       ring.hitArea = new Circle(0, 0, GATEWAY_RING_RADIUS + 6);
 
-      const destName = destSys?.name ?? gw.destinationSystemNaturalId;
-      const labelText = `\u2192 ${destName} (${gw.destinationSystemNaturalId})`;
+      const destName = destSys?.name ?? gw.destinationSystemNaturalId ?? "Unknown";
+      const labelText = established
+        ? `\u2192 ${destName} (${gw.destinationSystemNaturalId ?? "?"})`
+        : `${gw.name} (under construction)`;
 
       ring.on("pointerover", () => {
         this.showGatewayLabel(ringX, ringY - GATEWAY_RING_RADIUS - 4, labelText);

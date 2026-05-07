@@ -178,13 +178,22 @@ export interface Route {
 
 // Gateway types
 
-export interface GatewayJsonEntry {
-  name: string;
-  fromPlanet: string;
-  fromSystem: string;
-  toPlanet: string;
-  toSystem: string;
+/**
+ * FIO V2 /gateway response — full Gateway model is large; we only
+ * read the identity, location, and link fields. Other fields (upkeep,
+ * phases, contractors, fuel, traffic) are ignored.
+ */
+export interface FioGateway {
+  GatewayId: string;
+  Name: string;
+  NaturalId: string;
+  LocationNaturalId: string; // planet the gateway sits on
+  OperationalState: "UNDER_CONSTRUCTION" | "OPERATIONAL" | "UPKEEP_MISSING";
+  OutgoingLink: string | null; // GatewayId of partner gateway
+  LinkStatus: "UNLINKED" | "ESTABLISHED";
 }
+
+export type GatewayLinkStatus = "ESTABLISHED" | "UNLINKED";
 
 export interface GatewayConnection {
   fromSystemId: string;
@@ -192,12 +201,18 @@ export interface GatewayConnection {
   name: string;
 }
 
+/**
+ * Per-planet gateway endpoint for system view. ESTABLISHED gateways
+ * carry full destination info; UNLINKED ones (under construction or
+ * operational-but-unpaired) have no destination yet.
+ */
 export interface GatewayEndpoint {
   planetNaturalId: string;
-  destinationPlanetNaturalId: string;
-  destinationSystemNaturalId: string;
-  destinationSystemId: string;
+  linkStatus: GatewayLinkStatus;
   name: string;
+  destinationPlanetNaturalId?: string;
+  destinationSystemNaturalId?: string;
+  destinationSystemId?: string;
 }
 
 // CX distance precomputed result

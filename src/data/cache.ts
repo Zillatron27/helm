@@ -3,19 +3,18 @@ import type {
   FioPlanet,
   FioCxStation,
   FioMaterial,
+  FioGateway,
   StarSystem,
   JumpConnection,
   SpectralType,
   WorldBounds,
   Planet,
   SectorHex,
-  GatewayJsonEntry,
   GatewayConnection,
   GatewayEndpoint,
 } from "../types/index.js";
-import { fetchSystems, fetchSystemPlanets, fetchCxStations, fetchMaterials } from "./fio.js";
+import { fetchSystems, fetchSystemPlanets, fetchCxStations, fetchMaterials, fetchGateways } from "./fio.js";
 import { getTheme } from "../ui/theme.js";
-import gatewayData from "./gateways.json" with { type: "json" };
 
 const WORLD_SCALE = 4;
 const VALID_SPECTRAL: Set<string> = new Set(["O", "B", "A", "F", "G", "K", "M"]);
@@ -272,66 +271,105 @@ function processPlanets(raw: FioPlanet[]): Planet[] {
   });
 }
 
-function processGateways(): void {
+/**
+ * Build galaxy connections, per-planet endpoints, and gateway-system
+ * set from FIO V2 /gateway records.
+ *
+ * - ESTABLISHED gateways: emit a per-planet endpoint with destination
+ *   info, and contribute one entry to galaxy connections (deduplicated
+ *   per system pair). These are the only ones that affect pathfinding
+ *   adjacency and the galaxy-view purple system-indicators / arcs.
+ * - UNLINKED gateways (UNDER_CONSTRUCTION or built-but-unpaired): emit
+ *   a per-planet endpoint with no destination so system view can show
+ *   them as in-progress markers. Galaxy view ignores them.
+ */
+function processGateways(rawGateways: FioGateway[]): void {
   // Build NaturalId → system lookup
   for (const s of systems) {
     systemByNaturalId.set(s.naturalId, s);
   }
 
-  const entries = gatewayData.gateways as GatewayJsonEntry[];
+  const byId = new Map<string, FioGateway>();
+  for (const gw of rawGateways) byId.set(gw.GatewayId, gw);
 
-  // Deduplicated system-to-system pairs for galaxy view
   const pairSet = new Set<string>();
   const connections: GatewayConnection[] = [];
 
-  for (const entry of entries) {
-    const fromSys = systemByNaturalId.get(entry.fromSystem);
-    const toSys = systemByNaturalId.get(entry.toSystem);
-    if (!fromSys || !toSys) {
-      console.warn(`Gateway: could not resolve systems for "${entry.name}"`);
+  for (const gw of rawGateways) {
+    const planetSysNaturalId = gw.LocationNaturalId.replace(/[a-z]+$/, "");
+    const sys = systemByNaturalId.get(planetSysNaturalId);
+    if (!sys) {
+      console.warn(`Gateway ${gw.NaturalId}: could not resolve system for ${gw.LocationNaturalId}`);
       continue;
     }
 
-    // Galaxy-level: deduplicated system pairs
-    const [a, b] = fromSys.id < toSys.id ? [fromSys.id, toSys.id] : [toSys.id, fromSys.id];
-    const pairKey = `${a}:${b}`;
-    if (!pairSet.has(pairKey)) {
-      pairSet.add(pairKey);
-      connections.push({ fromSystemId: fromSys.id, toSystemId: toSys.id, name: entry.name });
+    if (gw.LinkStatus === "ESTABLISHED" && gw.OutgoingLink) {
+      const partner = byId.get(gw.OutgoingLink);
+      if (!partner) {
+        console.warn(`Gateway ${gw.NaturalId}: partner ${gw.OutgoingLink} not in dataset`);
+        continue;
+      }
+      const partnerSysNaturalId = partner.LocationNaturalId.replace(/[a-z]+$/, "");
+      const partnerSys = systemByNaturalId.get(partnerSysNaturalId);
+      if (!partnerSys) {
+        console.warn(`Gateway ${gw.NaturalId}: could not resolve partner system for ${partner.LocationNaturalId}`);
+        continue;
+      }
+
+      // Galaxy-level: deduplicated system pairs
+      const [a, b] = sys.id < partnerSys.id ? [sys.id, partnerSys.id] : [partnerSys.id, sys.id];
+      const pairKey = `${a}:${b}`;
+      if (!pairSet.has(pairKey)) {
+        pairSet.add(pairKey);
+        connections.push({ fromSystemId: sys.id, toSystemId: partnerSys.id, name: gw.Name });
+      }
+
+      gatewaySystemIds.add(sys.id);
+
+      const endpoint: GatewayEndpoint = {
+        planetNaturalId: gw.LocationNaturalId,
+        linkStatus: "ESTABLISHED",
+        name: gw.Name,
+        destinationPlanetNaturalId: partner.LocationNaturalId,
+        destinationSystemNaturalId: partnerSysNaturalId,
+        destinationSystemId: partnerSys.id,
+      };
+      const list = gatewaysByPlanet.get(gw.LocationNaturalId);
+      if (list) list.push(endpoint); else gatewaysByPlanet.set(gw.LocationNaturalId, [endpoint]);
+    } else {
+      // UNLINKED — under construction or operational-but-unpaired.
+      // System view shows these as dotted rings; galaxy view ignores.
+      const endpoint: GatewayEndpoint = {
+        planetNaturalId: gw.LocationNaturalId,
+        linkStatus: "UNLINKED",
+        name: gw.Name,
+      };
+      const list = gatewaysByPlanet.get(gw.LocationNaturalId);
+      if (list) list.push(endpoint); else gatewaysByPlanet.set(gw.LocationNaturalId, [endpoint]);
     }
-
-    // Track gateway systems
-    gatewaySystemIds.add(fromSys.id);
-    gatewaySystemIds.add(toSys.id);
-
-    // System-level: per-planet endpoints (both directions)
-    const fromEndpoint: GatewayEndpoint = {
-      planetNaturalId: entry.fromPlanet,
-      destinationPlanetNaturalId: entry.toPlanet,
-      destinationSystemNaturalId: entry.toSystem,
-      destinationSystemId: toSys.id,
-      name: entry.name,
-    };
-    const toEndpoint: GatewayEndpoint = {
-      planetNaturalId: entry.toPlanet,
-      destinationPlanetNaturalId: entry.fromPlanet,
-      destinationSystemNaturalId: entry.fromSystem,
-      destinationSystemId: fromSys.id,
-      name: entry.name,
-    };
-
-    const fromList = gatewaysByPlanet.get(entry.fromPlanet);
-    if (fromList) { fromList.push(fromEndpoint); } else { gatewaysByPlanet.set(entry.fromPlanet, [fromEndpoint]); }
-    const toList = gatewaysByPlanet.get(entry.toPlanet);
-    if (toList) { toList.push(toEndpoint); } else { gatewaysByPlanet.set(entry.toPlanet, [toEndpoint]); }
   }
 
   galaxyGatewayConnections = connections;
-  console.log(`Loaded ${connections.length} gateway connections, ${gatewaySystemIds.size} gateway systems`);
+  console.log(
+    `Loaded ${rawGateways.length} gateways from FIO: ${connections.length} established pairs, ${gatewaysByPlanet.size} planets with gateways`,
+  );
 }
 
 export async function loadSystemData(): Promise<void> {
-  const raw = await fetchSystems();
+  // Fetch systems and gateways in parallel — they're on different
+  // hosts (V1 rest.fnar.net vs V2 api.fnar.net) and don't depend on
+  // each other for fetching. processGateways() depends on systems
+  // being processed first so we await both before continuing.
+  const [raw, rawGateways] = await Promise.all([
+    fetchSystems(),
+    fetchGateways().catch((err): FioGateway[] => {
+      // Soft-fail gateways — without them, jump arcs and planet rings
+      // disappear, but the rest of the map renders fine. Don't bring
+      // the whole app down because V2 is flaky or down.
+      console.error("Gateway fetch failed; rendering without gateway data:", err);
+      return [];
+    }),
+  ]);
   const result = processSystems(raw);
   systems = result.systems;
   connections = result.connections;
@@ -339,7 +377,7 @@ export async function loadSystemData(): Promise<void> {
   worldBounds = result.bounds;
   loaded = true;
 
-  processGateways();
+  processGateways(rawGateways);
 
   // Build merged adjacency index: jump connections + gateway connections
   for (const s of systems) {
