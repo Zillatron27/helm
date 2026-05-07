@@ -6,12 +6,11 @@ import {
   onResourceIndexReady,
 } from "../../data/resourceIndex.js";
 import { getCxDistances } from "../../data/cxDistances.js";
-import { getPlanetBaseCount } from "../../data/siteCounts.js";
 import { getSystemById, getMaterialTicker, getMaterialByTicker, getAllCxStations } from "../../data/cache.js";
 import type { MapRenderer } from "../../renderer/MapRenderer.js";
 import "./sidebar.css";
 
-type SortKey = "planet" | "ticker" | "factor" | "cx" | "bases";
+type SortKey = "planet" | "ticker" | "factor" | "cx";
 type SortDir = "asc" | "desc";
 
 interface Row {
@@ -22,7 +21,6 @@ interface Row {
   systemNaturalId: string;
   ticker: string;
   factor: number;
-  bases: number;
   // Distance to each CX (by ComexCode). -1 = unreachable.
   cxJumps: Map<string, { jumps: number; viaGateway: boolean; label: string }>;
 }
@@ -146,7 +144,6 @@ export class ResultsSidebar {
         systemNaturalId: sys.naturalId,
         ticker: getMaterialTicker(c.materialId),
         factor: c.factor,
-        bases: getPlanetBaseCount(c.planetNaturalId),
         cxJumps,
       });
     }
@@ -201,7 +198,6 @@ export class ResultsSidebar {
       { key: "ticker", label: "Mat", cls: "col-ticker" },
       { key: "factor", label: "Factor", cls: "col-factor" },
       { key: "cx", label: "CX DIST", cls: "col-cx" },
-      { key: "bases", label: "Bases", cls: "col-bases" },
     ];
     this.headerRowEl.innerHTML = cols
       .map((c) => {
@@ -250,7 +246,6 @@ export class ResultsSidebar {
       .map((r) => {
         const cxText = this.cxCellHtml(r);
         const pct = Math.round(r.factor * 100);
-        const basesText = r.bases > 0 ? String(r.bases) : "";
 
         const t = range > 0 ? (r.factor - minF) / range : 0.5; // 0 = worst, 1 = best
         const hue = Math.round(t * 120); // 0 = red, 60 = yellow, 120 = green
@@ -271,7 +266,6 @@ export class ResultsSidebar {
             <div class="col-ticker">${esc(r.ticker)}</div>
             <div class="col-factor" ${factorStyle}>${pct}%</div>
             <div class="col-cx">${cxText}</div>
-            <div class="col-bases">${esc(basesText)}</div>
           </div>
         `;
       })
@@ -296,8 +290,6 @@ export class ResultsSidebar {
         return a.ticker.localeCompare(b.ticker) * dir;
       case "factor":
         return (a.factor - b.factor) * dir;
-      case "bases":
-        return (a.bases - b.bases) * dir;
       case "cx": {
         const aj = this.cxJumpsForSort(a);
         const bj = this.cxJumpsForSort(b);

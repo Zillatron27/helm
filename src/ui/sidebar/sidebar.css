@@ -107,7 +107,7 @@
  * min-width: 0 on grid items + nowrap on buttons keeps headers single-line. */
 .sidebar-table-header {
   display: grid;
-  grid-template-columns: 1fr 50px 70px 100px 60px;
+  grid-template-columns: 1fr 60px 90px 120px;
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
@@ -134,7 +134,6 @@
 
 .sidebar-col.col-factor,
 .sidebar-col.col-cx,
-.sidebar-col.col-bases,
 .sidebar-col.col-ticker {
   text-align: right;
 }
@@ -161,7 +160,7 @@
 
 .sidebar-row {
   display: grid;
-  grid-template-columns: 1fr 50px 70px 100px 60px;
+  grid-template-columns: 1fr 60px 90px 120px;
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
@@ -209,11 +208,6 @@
 }
 
 .sidebar-row .col-cx {
-  color: var(--text-secondary);
-  text-align: right;
-}
-
-.sidebar-row .col-bases {
   color: var(--text-secondary);
   text-align: right;
 }
