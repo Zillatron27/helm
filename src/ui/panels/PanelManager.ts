@@ -426,7 +426,7 @@ export class PanelManager {
       return `
         <div class="panel-section">
           <h3 class="panel-section-title">Planets</h3>
-          <div class="panel-loading">Loading planets...</div>
+          <div class="panel-loading panel-loading-with-spinner" data-loading-spinner>Loading planets…</div>
         </div>
       `;
     }
@@ -513,7 +513,7 @@ export class PanelManager {
         <button class="panel-close" aria-label="Close panel">&times;</button>
       </div>
       <div class="panel-body">
-        <div class="panel-loading panel-loading-with-spinner" data-planet-loader></div>
+        <div class="panel-loading panel-loading-with-spinner" data-loading-spinner>Loading planet data…</div>
       </div>
     `;
     this.setContent(html, () => {
@@ -521,15 +521,6 @@ export class PanelManager {
       this.panelEl.querySelector(".panel-close")?.addEventListener("click", () => {
         setSelectedEntity(null);
       });
-      const mount = this.panelEl.querySelector("[data-planet-loader]") as HTMLElement | null;
-      if (mount) {
-        const spinner = createMiniLoader(getTheme());
-        spinner.style.marginRight = "10px";
-        mount.appendChild(spinner);
-        const label = document.createElement("span");
-        label.textContent = "Loading planet data…";
-        mount.appendChild(label);
-      }
     });
   }
 
@@ -767,12 +758,32 @@ export class PanelManager {
           this.panelEl.style.transition = "";
           this.panelEl.style.opacity = "";
         }, 150);
+        this.mountLoadingSpinners();
         onReady?.();
       }, 120);
     } else {
       this.panelEl.innerHTML = html;
+      this.mountLoadingSpinners();
       onReady?.();
     }
+  }
+
+  /**
+   * Find every element marked with `data-loading-spinner` and prepend
+   * a mini orbital spinner. Lets any loading-state HTML get the
+   * spinner treatment with no per-caller wiring — the markup just
+   * needs to set the data attribute and include the label as text
+   * content. Works on every path through setContent.
+   */
+  private mountLoadingSpinners(): void {
+    const targets = this.panelEl.querySelectorAll("[data-loading-spinner]");
+    if (targets.length === 0) return;
+    const theme = getTheme();
+    targets.forEach((target) => {
+      const spinner = createMiniLoader(theme);
+      spinner.style.marginRight = "10px";
+      target.insertBefore(spinner, target.firstChild);
+    });
   }
 
   private open(): void {
