@@ -8,7 +8,7 @@
   left: 16px;
   top: 16px;
   bottom: 16px;
-  width: 360px;
+  width: 440px;
   max-height: calc(100vh - 32px);
   background: rgba(var(--bg-secondary-rgb), 0.92);
   backdrop-filter: blur(12px);
@@ -50,9 +50,9 @@
 }
 
 .sidebar-subtitle {
-  font-size: 11px;
+  font-size: 16px;
   color: var(--text-secondary);
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
 /* CX target toggle row */
@@ -65,10 +65,11 @@
 }
 
 .sidebar-cx-label {
-  font-size: 10px;
+  font-size: 14px;
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 1px;
+  white-space: nowrap;
 }
 
 .sidebar-cx-buttons {
@@ -83,9 +84,9 @@
   border: 1px solid rgba(var(--accent-rgb), 0.2);
   color: var(--text-secondary);
   border-radius: 4px;
-  padding: 4px 6px;
+  padding: 5px 6px;
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 14px;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
@@ -101,28 +102,34 @@
   color: var(--accent);
 }
 
-/* Table header (sortable column buttons) */
+/* Table header (sortable column buttons).
+ * Column widths sized for 14px text + sort chevron without wrapping.
+ * min-width: 0 on grid items + nowrap on buttons keeps headers single-line. */
 .sidebar-table-header {
   display: grid;
-  grid-template-columns: 1fr 40px 50px 70px 40px;
+  grid-template-columns: 1fr 50px 70px 80px 60px;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  padding: 8px 12px;
   border-bottom: 1px solid rgba(var(--accent-rgb), 0.15);
   background: rgba(var(--bg-tertiary-rgb), 0.3);
 }
 
 .sidebar-col {
+  min-width: 0;
   background: transparent;
   border: 0;
   color: var(--text-secondary);
   font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-size: 14px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   cursor: pointer;
   padding: 2px 0;
   text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sidebar-col.col-factor,
@@ -154,11 +161,11 @@
 
 .sidebar-row {
   display: grid;
-  grid-template-columns: 1fr 40px 50px 70px 40px;
+  grid-template-columns: 1fr 50px 70px 80px 60px;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
-  font-size: 11px;
+  padding: 8px 12px;
+  font-size: 16px;
   cursor: pointer;
   border-bottom: 1px solid rgba(var(--accent-rgb), 0.05);
   transition: background 0.1s ease;
@@ -184,7 +191,7 @@
 
 .sidebar-planet-system {
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: 14px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -219,7 +226,7 @@
   padding: 24px 16px;
   text-align: center;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 16px;
 }
 
 /* Mobile / narrow viewport: collapse the sidebar to a small overlay or

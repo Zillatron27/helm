@@ -77,11 +77,8 @@ export class ResultsSidebar {
       this.cxCodes = getAllCxStations()
         .map((cx) => cx.ComexCode)
         .sort();
-      // Default target = first available CX (AI1 typically) — there is no
-      // "Nearest" mode, since per-row mixed labels confused readers.
-      if (!this.cxTarget && this.cxCodes.length > 0) {
-        this.cxTarget = this.cxCodes[0]!;
-      }
+      // Default = no CX selected; CX DIST column is blank until the user
+      // picks one. Factor sort is the natural default.
       this.renderCxToggle();
     };
 
@@ -199,7 +196,7 @@ export class ResultsSidebar {
       { key: "planet", label: "Planet", cls: "col-planet" },
       { key: "ticker", label: "Mat", cls: "col-ticker" },
       { key: "factor", label: "Factor", cls: "col-factor" },
-      { key: "cx", label: "CX", cls: "col-cx" },
+      { key: "cx", label: "CX DIST", cls: "col-cx" },
       { key: "bases", label: "Bases", cls: "col-bases" },
     ];
     this.headerRowEl.innerHTML = cols
@@ -212,6 +209,13 @@ export class ResultsSidebar {
     this.headerRowEl.querySelectorAll("[data-sort]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const key = (btn as HTMLElement).dataset["sort"] as SortKey;
+        // Sorting by CX with no target is a no-op (no scalar to compare).
+        // Auto-pick the first CX so the click feels intentional rather
+        // than swallowed.
+        if (key === "cx" && !this.cxTarget && this.cxCodes.length > 0) {
+          this.cxTarget = this.cxCodes[0]!;
+          this.renderCxToggle();
+        }
         if (key === this.sortKey) {
           this.sortDir = this.sortDir === "asc" ? "desc" : "asc";
         } else {
@@ -248,11 +252,17 @@ export class ResultsSidebar {
         const hue = Math.round(t * 120); // 0 = red, 60 = yellow, 120 = green
         const factorStyle = `style="color: hsl(${hue}, 70%, 60%)"`;
 
+        // System line: show name when present (and distinct from natId);
+        // otherwise the natural id alone. Never both — they're redundant
+        // when the user's about to click straight through to the planet.
+        const systemLabel = r.systemName && r.systemName !== r.systemNaturalId
+          ? r.systemName
+          : r.systemNaturalId;
         return `
           <div class="sidebar-row" data-system-id="${esc(r.systemId)}" data-planet-natural="${esc(r.planetNaturalId)}">
             <div class="col-planet">
               <span class="sidebar-planet-name">${esc(r.planetName)}</span>
-              <span class="sidebar-planet-system">${esc(r.systemNaturalId)} · ${esc(r.systemName)}</span>
+              <span class="sidebar-planet-system">${esc(systemLabel)}</span>
             </div>
             <div class="col-ticker">${esc(r.ticker)}</div>
             <div class="col-factor" ${factorStyle}>${pct}%</div>
@@ -297,6 +307,7 @@ export class ResultsSidebar {
   }
 
   private cxCellHtml(r: Row): string {
+    if (!this.cxTarget) return ""; // No CX picked — column reads blank.
     const e = r.cxJumps.get(this.cxTarget);
     if (!e || e.jumps < 0) return `<span class="sidebar-cx-unreachable">—</span>`;
     return `${e.jumps}`;
