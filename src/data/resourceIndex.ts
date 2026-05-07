@@ -16,6 +16,11 @@ const cogcIndex: Map<string, CogcMatch[]> = new Map();
 // Reverse lookup: planetNaturalId → active COGC program
 const planetCogcLookup: Map<string, { category: string; endsAt: number }> = new Map();
 
+// Planet display name lookup: planetNaturalId → PlanetName (or naturalId
+// if no specific name). Used by the results sidebar for rows across the
+// universe — planets aren't lazy-loaded per system there.
+const planetNameByNaturalId: Map<string, string> = new Map();
+
 let ready = false;
 const readyCallbacks: Array<() => void> = [];
 
@@ -42,6 +47,12 @@ export async function initResourceIndex(): Promise<void> {
     // The FIO full planet data has SystemId as a UUID
     const systemId = planet.SystemId;
     if (!systemId) continue;
+
+    // Cache the display name for sidebar rows; FIO falls back to natural
+    // id when no specific name is set, which is what we want as default.
+    if (planet.PlanetName) {
+      planetNameByNaturalId.set(planet.PlanetNaturalId, planet.PlanetName);
+    }
 
     for (const resource of planet.Resources) {
       const matId = resource.MaterialId;
@@ -173,6 +184,38 @@ export function getSystemsWithAnyResource(materialIds: readonly string[]): Resou
   return out;
 }
 
+/** A single (planet, material) contribution row. */
+export interface PlanetMaterialMatch {
+  planetNaturalId: string;
+  systemId: string;
+  materialId: string;
+  factor: number;
+}
+
+/**
+ * Flat list of every (planet, material) contribution across the
+ * universe for the selected materials. A planet with multiple
+ * selected materials appears once per material. Used by the results
+ * sidebar — same shape as the multi-resource panel rows but global,
+ * not per-system.
+ */
+export function getResourceContributions(materialIds: readonly string[]): PlanetMaterialMatch[] {
+  const out: PlanetMaterialMatch[] = [];
+  for (const matId of materialIds) {
+    const list = planetIndex.get(matId);
+    if (!list) continue;
+    for (const p of list) {
+      out.push({
+        planetNaturalId: p.planetNaturalId,
+        systemId: p.systemId,
+        materialId: matId,
+        factor: p.factor,
+      });
+    }
+  }
+  return out;
+}
+
 /**
  * Every planet (by naturalId) that contributes at least one of the
  * selected materials. Bright set for the OR filter — planets in
@@ -237,6 +280,10 @@ function maxFactor(factors: Map<string, number>): number {
 
 export function getExtractableResourceMaterialIds(): Set<string> {
   return extractableMaterialIds;
+}
+
+export function getPlanetDisplayName(planetNaturalId: string): string {
+  return planetNameByNaturalId.get(planetNaturalId) ?? planetNaturalId;
 }
 
 export function getCogcProgramPlanets(category: string): CogcMatch[] {

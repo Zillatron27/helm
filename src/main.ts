@@ -4,6 +4,7 @@ import { SearchBar } from "./ui/search/SearchBar.js";
 import { RoutePanel } from "./ui/search/RoutePanel.js";
 import { SettingsPanel } from "./ui/SettingsPanel.js";
 import { ResourcePicker } from "./ui/resource/ResourcePicker.js";
+import { ResultsSidebar } from "./ui/sidebar/ResultsSidebar.js";
 import { setupControls } from "./ui/controls.js";
 import { onStateChange, getGatewaysVisible, setGatewaysVisible, getSettledVisible, getResourceFilters, getCogcFilter, getEmpireDim, setEmpireDim, onResourceFilterChange, onCogcFilterChange, getBridgeSnapshot, onBridgeSnapshotChange } from "./ui/state.js";
 import { isResourceIndexReady, onResourceIndexReady, getSystemsWithAnyResource } from "./data/resourceIndex.js";
@@ -128,6 +129,10 @@ async function boot(): Promise<void> {
     toolbar.appendChild(hudToolbarSlot);
 
     document.body.appendChild(toolbar);
+
+    // Results sidebar — left edge, visible while resource filter is active.
+    const resultsSidebar = new ResultsSidebar();
+    resultsSidebar.init(renderer);
 
     // Version indicator
     const versionEl = document.createElement("div");
