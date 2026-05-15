@@ -16,3 +16,6 @@ Thumbs.db
 # Claude Code
 CLAUDE.md
 .claude/
+
+# OpenWolf runtime state (syncable files live in project-context)
+.wolf/
