@@ -18,10 +18,64 @@ import { PROTOCOL_VERSION, checkProtocolCompatibility } from "./protocol.js";
 import { setBridgeSnapshot, getBridgeSnapshot } from "../ui/state.js";
 import type {
   BridgeSnapshot,
+  BridgeEntityType,
   HelmExtensionHelloMessage,
   HelmInitMessage,
   HelmUpdateMessage,
 } from "./bridge-types.js";
+
+// The array-typed fields of BridgeSnapshot — identical to the set of valid
+// BridgeUpdate.entityType values (BridgeEntityType is keyof the snapshot's
+// array fields). Consumers iterate these with for...of, so a non-array here
+// is the crash vector we must guard at the boundary. Typed as
+// readonly BridgeEntityType[] so a renamed/removed field fails to compile.
+const BRIDGE_ARRAY_FIELDS: readonly BridgeEntityType[] = [
+  "sites",
+  "ships",
+  "flights",
+  "storage",
+  "production",
+  "workforce",
+  "contracts",
+  "balances",
+  "screens",
+  "warehouses",
+  "siteBurns",
+];
+
+// Boundary validation for the helm-init payload. The postMessage body is
+// hostile input (a same-origin or APEX-origin sender could send anything),
+// so we verify iteration-safety before publishing: every array field is an
+// array, and the required container/scalar fields have the right kind.
+// Individual item fields are NOT deep-validated — consumers already
+// null-guard them (e.g. `if (site.systemNaturalId)`), so the proportionate
+// check here is shape, not contents (mirrors fio.ts's response validation).
+function isValidSnapshot(value: unknown): value is BridgeSnapshot {
+  if (!value || typeof value !== "object") return false;
+  const s = value as Record<string, unknown>;
+  for (const field of BRIDGE_ARRAY_FIELDS) {
+    if (!Array.isArray(s[field])) return false;
+  }
+  if (typeof s["timestamp"] !== "number") return false;
+  if (!s["screenAssignments"] || typeof s["screenAssignments"] !== "object") return false;
+  if (!s["burnThresholds"] || typeof s["burnThresholds"] !== "object") return false;
+  return true;
+}
+
+// Boundary validation for a helm-update payload. entityType must be one of
+// the known array fields — this also stops a malicious entityType (e.g.
+// "companyName") from clobbering a scalar snapshot field with array data
+// during the merge in handleUpdate.
+function isValidUpdate(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const u = value as Record<string, unknown>;
+  const entityType = u["entityType"];
+  if (typeof entityType !== "string") return false;
+  if (!(BRIDGE_ARRAY_FIELDS as readonly string[]).includes(entityType)) return false;
+  if (!Array.isArray(u["data"])) return false;
+  if (typeof u["timestamp"] !== "number") return false;
+  return true;
+}
 
 const APEX_ORIGINS = ["https://apex.prosperousuniverse.com"];
 
@@ -180,6 +234,13 @@ function sendAck(tier: 2 | 3): void {
 }
 
 function handleInit(msg: HelmInitMessage): void {
+  if (!isValidSnapshot(msg.snapshot)) {
+    console.error(
+      "[Helm Bridge] received malformed helm-init snapshot; ignoring",
+      msg.snapshot,
+    );
+    return;
+  }
   console.log("[Helm Bridge] received helm-init", msg.snapshot);
   setBridgeSnapshot(msg.snapshot);
 }
@@ -189,6 +250,13 @@ function handleUpdate(msg: HelmUpdateMessage): void {
   if (!current) {
     console.warn(
       "[Helm Bridge] received helm-update before helm-init; ignoring",
+    );
+    return;
+  }
+  if (!isValidUpdate(msg.update)) {
+    console.error(
+      "[Helm Bridge] received malformed helm-update; ignoring",
+      msg.update,
     );
     return;
   }
