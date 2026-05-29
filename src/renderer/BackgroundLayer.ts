@@ -22,16 +22,8 @@ const MID_TIERS = [
   { fraction: 0.1, alpha: 0.5, radius: 18 },
 ];
 
-// Subtle colour tints for mid-layer variety
-const WARM_TINT = 0x443322;
-const COOL_TINT = 0x223344;
-
 // Nebula cloud parameters
 const NEBULA_CLOUD_COUNT = 12;
-const NEBULA_COLOURS = [
-  0xaa44aa, 0x4488cc, 0x44aaaa, 0xcc6644,
-  0x6644cc, 0xcc8833, 0x4466aa, 0x8844aa,
-];
 
 function canvasTexture(size: number, draw: (ctx: CanvasRenderingContext2D, s: number) => void): Texture {
   const canvas = document.createElement("canvas");
@@ -126,7 +118,7 @@ export class BackgroundLayer {
       const cx = (nebulaRand() - 0.5) * nebulaSpreadX;
       const cy = (nebulaRand() - 0.5) * nebulaSpreadY;
       const baseRadius = 1200 + nebulaRand() * 1800;
-      const colour = NEBULA_COLOURS[Math.floor(nebulaRand() * NEBULA_COLOURS.length)]!;
+      const colour = theme.nebula.clouds[Math.floor(nebulaRand() * theme.nebula.clouds.length)]!;
 
       const blobCount = 4 + Math.floor(nebulaRand() * 3);
       for (let j = 0; j < blobCount; j++) {
@@ -156,8 +148,8 @@ export class BackgroundLayer {
       const count = Math.round(MID_STAR_COUNT * tier.fraction);
       for (let i = 0; i < count; i++) {
         const tintRoll = midRand();
-        const colour = tintRoll < 0.10 ? WARM_TINT
-          : tintRoll < 0.15 ? COOL_TINT
+        const colour = tintRoll < 0.10 ? theme.nebula.warm
+          : tintRoll < 0.15 ? theme.nebula.cool
           : theme.fieldStar;
 
         const star = new Sprite(starTexture);

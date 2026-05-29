@@ -107,12 +107,16 @@ export function applyCssProperties(tokens: ThemeTokens): void {
 
   root.setProperty("--border", computeBorder(tokens.bgTertiary, tokens.textSecondary));
 
-  // Positive/negative colours — colorblind theme uses blue/orange
-  if (activePresetId === "colorblind") {
-    root.setProperty("--color-positive", "#0088ff");
-    root.setProperty("--color-negative", "#ff8833");
-  } else {
-    root.setProperty("--color-positive", "#32cd32");
-    root.setProperty("--color-negative", "#cd5c5c");
-  }
+  // Functional / category colours — every preset defines these, so the
+  // colorblind preset gets CVD-safe values here rather than via a branch.
+  root.setProperty("--gateway", hexToCssHex(tokens.gateway));
+  root.setProperty("--settled", hexToCssHex(tokens.settled));
+  root.setProperty("--resource", hexToCssHex(tokens.resource));
+  root.setProperty("--cogc", hexToCssHex(tokens.cogc));
+  root.setProperty("--system-halo", hexToCssHex(tokens.systemHalo));
+  root.setProperty("--planet-badge-rocky", hexToCssHex(tokens.planetRocky[0]!));
+  root.setProperty("--planet-badge-gas", hexToCssHex(tokens.planetGas[0]!));
+
+  root.setProperty("--color-positive", hexToCssHex(tokens.positive));
+  root.setProperty("--color-negative", hexToCssHex(tokens.negative));
 }

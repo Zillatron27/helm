@@ -29,15 +29,12 @@ const LINE_BASE = 0.5;
 const LINE_MIN = 0.3;
 const LINE_MAX = 4.0;
 
-const ROUTE_COLOUR = 0xff8c00;
-const ROUTE_GATEWAY_COLOUR = 0xffdd00;
 const ROUTE_BASE = 2.5;
 const ROUTE_MIN = 1.5;
 const ROUTE_MAX = 8.0;
 const ROUTE_ALPHA = 0.9;
 
 // Connection highlight visual parameters
-const HIGHLIGHT_COLOUR = 0xff8c00;
 const HIGHLIGHT_BASE = 2.0;
 const HIGHLIGHT_MIN = 1.0;
 const HIGHLIGHT_MAX = 6.0;
@@ -76,8 +73,6 @@ const LABEL_FONT_SIZE = 18;
 const LABEL_TARGET_SCREEN_SIZE = 14;
 const LABEL_SCALE_MIN = 0.7;
 const LABEL_SCALE_MAX = 4.0;
-const LABEL_COLOUR = 0xaaaaaa;
-const LABEL_EMPHASIS_COLOUR = 0xe0e0e0;
 const LABEL_OFFSET_Y = 26;
 const LABEL_SHOW_SCALE = 0.4;
 const LABEL_FADE_RANGE = 0.1;
@@ -92,10 +87,8 @@ const CX_LABEL_SCALE_MAX = 3.0;
 const GLOW_RADIUS_MULT = 2.5;
 const GLOW_ALPHA = 0.25;
 const GLOW_DIM_FACTOR = 0.15;
-const GLOW_HOVER_BOOST = 2.0;
 
 // Gateway visual parameters
-const GATEWAY_COLOUR = 0xbb77ff;
 const GATEWAY_INDICATOR_RADIUS = 7;
 const GATEWAY_INDICATOR_STROKE = 1.5;
 const GATEWAY_INDICATOR_ALPHA = 0.8;
@@ -111,19 +104,16 @@ const GATEWAY_ARC_HEIGHT_MAX = 200;
 // fixed gap outside the star edge regardless of star size, mirroring the
 // system-view halo's relationship to a planet (HALO_GAP in SystemLayer).
 const SYSTEM_HALO_GAP = 6;
-const SYSTEM_HALO_COLOUR = 0x3399ff;
 const SYSTEM_HALO_ALPHA = 0.7;
 const SYSTEM_HALO_STROKE = 2.0;
 const SYSTEM_HALO_ARC_SPAN = Math.PI * 0.7;
 
 // Resource filter concentration indicators
-const RESOURCE_COLOUR = 0x00ccaa;
 const RESOURCE_DOT_MAX_RADIUS = 20;
 const RESOURCE_DOT_MIN_RADIUS = 4;
 const RESOURCE_DOT_ALPHA = 0.7;
 
 // Settled system ring indicators
-const SETTLED_COLOUR = 0xc4a35a;
 const SETTLED_RING_ALPHA = 0.345;
 const SETTLED_RING_STROKE = 1.0;
 const SETTLED_RING_RADIUS_MULT = 3.2;
@@ -350,7 +340,7 @@ export class GalaxyLayer {
     const ambientLabelStyle = new TextStyle({
       fontFamily: "'IBM Plex Mono', monospace",
       fontSize: LABEL_FONT_SIZE,
-      fill: LABEL_COLOUR,
+      fill: getTheme().label,
     });
 
     for (const system of systems) {
@@ -509,7 +499,7 @@ export class GalaxyLayer {
 
       const indicator = new Graphics();
       indicator.circle(0, 0, GATEWAY_INDICATOR_RADIUS);
-      indicator.stroke({ width: GATEWAY_INDICATOR_STROKE, color: GATEWAY_COLOUR, alpha: GATEWAY_INDICATOR_ALPHA });
+      indicator.stroke({ width: GATEWAY_INDICATOR_STROKE, color: getTheme().gateway, alpha: GATEWAY_INDICATOR_ALPHA });
       indicator.x = system.worldX + offset;
       indicator.y = system.worldY - offset;
       this.gatewayIndicators.addChild(indicator);
@@ -594,7 +584,7 @@ export class GalaxyLayer {
       hasJumps = true;
     }
     if (hasJumps) {
-      this.routeOverlay.stroke({ width, color: ROUTE_COLOUR, alpha: ROUTE_ALPHA });
+      this.routeOverlay.stroke({ width, color: getTheme().route, alpha: ROUTE_ALPHA });
     }
 
     // Gateway segments — yellow bezier arcs
@@ -621,7 +611,7 @@ export class GalaxyLayer {
       hasGateways = true;
     }
     if (hasGateways) {
-      this.routeOverlay.stroke({ width, color: ROUTE_GATEWAY_COLOUR, alpha: ROUTE_ALPHA });
+      this.routeOverlay.stroke({ width, color: getTheme().routeGateway, alpha: ROUTE_ALPHA });
     }
 
     this.lastRouteScale = this.currentViewportScale;
@@ -652,9 +642,9 @@ export class GalaxyLayer {
     this.selectionHalo.x = system.worldX;
     this.selectionHalo.y = system.worldY;
     this.selectionHalo.arc(0, 0, haloRadius, -SYSTEM_HALO_ARC_SPAN / 2, SYSTEM_HALO_ARC_SPAN / 2);
-    this.selectionHalo.stroke({ width: SYSTEM_HALO_STROKE, color: SYSTEM_HALO_COLOUR, alpha: SYSTEM_HALO_ALPHA });
+    this.selectionHalo.stroke({ width: SYSTEM_HALO_STROKE, color: getTheme().systemHalo, alpha: SYSTEM_HALO_ALPHA });
     this.selectionHalo.arc(0, 0, haloRadius, Math.PI - SYSTEM_HALO_ARC_SPAN / 2, Math.PI + SYSTEM_HALO_ARC_SPAN / 2);
-    this.selectionHalo.stroke({ width: SYSTEM_HALO_STROKE, color: SYSTEM_HALO_COLOUR, alpha: SYSTEM_HALO_ALPHA });
+    this.selectionHalo.stroke({ width: SYSTEM_HALO_STROKE, color: getTheme().systemHalo, alpha: SYSTEM_HALO_ALPHA });
     this.selectionHalo.visible = true;
   }
 
@@ -704,7 +694,7 @@ export class GalaxyLayer {
 
     this.highlightLayer.stroke({
       width: scaledWidth(HIGHLIGHT_BASE, HIGHLIGHT_MIN, HIGHLIGHT_MAX, this.currentViewportScale),
-      color: HIGHLIGHT_COLOUR,
+      color: getTheme().highlight,
       alpha: HIGHLIGHT_ALPHA,
     });
     // Fade in highlight connections
@@ -729,9 +719,8 @@ export class GalaxyLayer {
     }
     for (const [id, glow] of this.glowGraphics) {
       let target: number;
-      if (id === hovered) {
-        target = Math.min(GLOW_HOVER_BOOST, 1);
-      } else if (connectedIds.has(id)) {
+      // hovered is always in connectedIds (added above), so it falls through here.
+      if (connectedIds.has(id)) {
         target = 1;
       } else if (hl && !hl.has(id)) {
         target = GLOW_ALPHA * DIM_HIGHLIGHT_ALPHA;
@@ -775,7 +764,7 @@ export class GalaxyLayer {
       // Static base ring — subtle thin circle
       const ring = new Graphics();
       ring.circle(0, 0, ringRadius);
-      ring.stroke({ width: SETTLED_RING_STROKE, color: SETTLED_COLOUR, alpha: SETTLED_RING_ALPHA });
+      ring.stroke({ width: SETTLED_RING_STROKE, color: getTheme().settled, alpha: SETTLED_RING_ALPHA });
       ring.x = system.worldX;
       ring.y = system.worldY;
       this.settledRingsStatic.addChild(ring);
@@ -785,7 +774,7 @@ export class GalaxyLayer {
       glow.anchor.set(0.5);
       glow.width = SETTLED_GLOW_SIZE;
       glow.height = SETTLED_GLOW_SIZE;
-      glow.tint = SETTLED_COLOUR;
+      glow.tint = getTheme().settled;
       glow.alpha = SETTLED_GLOW_ALPHA;
       this.settledRingsAnimated.addChild(glow);
 
@@ -1098,7 +1087,7 @@ export class GalaxyLayer {
 
     for (const [id, label] of this.ambientLabelMap) {
       if (connectedIds.has(id)) {
-        label.style.fill = LABEL_EMPHASIS_COLOUR;
+        label.style.fill = getTheme().labelEmphasis;
         this.tweens.to(label, "alpha", 1.0, 0.2);
         this.emphasisedLabelIds.add(id);
       } else {
@@ -1112,7 +1101,7 @@ export class GalaxyLayer {
     for (const id of this.emphasisedLabelIds) {
       const label = this.ambientLabelMap.get(id);
       if (label) {
-        label.style.fill = LABEL_COLOUR;
+        label.style.fill = getTheme().label;
       }
     }
     this.emphasisedLabelIds.clear();
@@ -1175,7 +1164,7 @@ export class GalaxyLayer {
       this.gatewayArcs.moveTo(from.worldX, from.worldY);
       this.gatewayArcs.quadraticCurveTo(midX, midY - arcHeight, to.worldX, to.worldY);
     }
-    this.gatewayArcs.stroke({ width, color: GATEWAY_COLOUR, alpha: GATEWAY_ARC_ALPHA });
+    this.gatewayArcs.stroke({ width, color: getTheme().gateway, alpha: GATEWAY_ARC_ALPHA });
   }
 
   /** Redraw route overlay if zoom changed significantly. */
@@ -1375,13 +1364,13 @@ export class GalaxyLayer {
       for (const draw of dimArcs) draw();
       this.gatewayArcs.stroke({
         width: gwWidth,
-        color: GATEWAY_COLOUR,
+        color: getTheme().gateway,
         alpha: GATEWAY_ARC_ALPHA * DIM_HIGHLIGHT_ALPHA,
       });
     }
     if (brightArcs.length > 0) {
       for (const draw of brightArcs) draw();
-      this.gatewayArcs.stroke({ width: gwWidth, color: GATEWAY_COLOUR, alpha: GATEWAY_ARC_ALPHA });
+      this.gatewayArcs.stroke({ width: gwWidth, color: getTheme().gateway, alpha: GATEWAY_ARC_ALPHA });
     }
 
     this.lastGatewayArcScale = scale;
@@ -1414,7 +1403,7 @@ export class GalaxyLayer {
       const radius = RESOURCE_DOT_MIN_RADIUS + m.bestFactor * (RESOURCE_DOT_MAX_RADIUS - RESOURCE_DOT_MIN_RADIUS);
       const dot = new Graphics();
       dot.circle(0, 0, radius);
-      dot.fill({ color: RESOURCE_COLOUR, alpha: RESOURCE_DOT_ALPHA });
+      dot.fill({ color: getTheme().resource, alpha: RESOURCE_DOT_ALPHA });
       dot.x = system.worldX;
       dot.y = system.worldY;
       this.resourceIndicators.addChild(dot);
@@ -1450,7 +1439,7 @@ export class GalaxyLayer {
       const radius = RESOURCE_DOT_MIN_RADIUS + m.bestFactor * (RESOURCE_DOT_MAX_RADIUS - RESOURCE_DOT_MIN_RADIUS);
       const dot = new Graphics();
       dot.circle(0, 0, radius);
-      dot.fill({ color: RESOURCE_COLOUR, alpha: RESOURCE_DOT_ALPHA });
+      dot.fill({ color: getTheme().resource, alpha: RESOURCE_DOT_ALPHA });
       dot.x = system.worldX;
       dot.y = system.worldY;
       this.resourceIndicators.addChild(dot);

@@ -50,13 +50,13 @@
 
 /* Gateway toggle — on state (default): purple neon */
 .toolbar-btn-gateway-on {
-  border-color: #bb77ff;
-  color: #bb77ff;
+  border-color: var(--gateway);
+  color: var(--gateway);
 }
 
 .toolbar-btn-gateway-on:hover {
-  border-color: #bb77ff;
-  color: #bb77ff;
+  border-color: var(--gateway);
+  color: var(--gateway);
 }
 
 /* Gateway toggle — off state: subdued */
@@ -217,18 +217,18 @@
 }
 
 .search-result-type-system {
-  background: #1a2a1a;
-  color: #32cd32;
+  background: color-mix(in srgb, var(--system-halo) 18%, var(--bg-secondary));
+  color: var(--system-halo);
 }
 
 .search-result-type-planet {
-  background: #2a2218;
-  color: #c4a26b;
+  background: color-mix(in srgb, var(--settled) 18%, var(--bg-secondary));
+  color: var(--settled);
 }
 
 .search-result-type-cogc {
-  background: #1a1a2a;
-  color: #7799ff;
+  background: color-mix(in srgb, var(--cogc) 18%, var(--bg-secondary));
+  color: var(--cogc);
 }
 
 /* Route panel content */

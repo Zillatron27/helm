@@ -77,7 +77,7 @@
 
 .panel-close:hover {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.05);
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
 }
 
 .panel-body {
@@ -119,13 +119,13 @@
 }
 
 .panel-badge-rocky {
-  background: rgba(42, 34, 24, 0.8);
-  color: #c4a26b;
+  background: color-mix(in srgb, var(--planet-badge-rocky) 22%, var(--bg-secondary));
+  color: var(--planet-badge-rocky);
 }
 
 .panel-badge-gas {
-  background: rgba(26, 26, 46, 0.8);
-  color: #8b8ecc;
+  background: color-mix(in srgb, var(--planet-badge-gas) 22%, var(--bg-secondary));
+  color: var(--planet-badge-gas);
 }
 
 /* Data rows */
@@ -262,8 +262,8 @@
 }
 
 .panel-flag-active {
-  background: rgba(26, 42, 26, 0.8);
-  color: #32cd32;
+  background: color-mix(in srgb, var(--color-positive) 20%, var(--bg-secondary));
+  color: var(--color-positive);
 }
 
 /* CX Distance badges */
@@ -306,7 +306,7 @@
 }
 
 .panel-cx-gateway .panel-cx-code {
-  color: #9966cc;
+  color: var(--gateway);
 }
 
 /* Resource price annotation */

@@ -372,4 +372,28 @@ export interface ThemeTokens {
   hexStroke: number;
   planetRocky: number[];
   planetGas: number[];
+
+  // Map feature / overlay colours
+  route: number; // plotted route line
+  routeGateway: number; // route segment that traverses a gateway
+  highlight: number; // hover/selection connection highlight
+  gateway: number; // gateway markers, arcs, and indicators
+  settled: number; // settled-territory rings and indicators
+  resource: number; // has-resource dots
+  cogc: number; // COGC category (search chip / indicators)
+  systemHalo: number; // system selection halo (also the "system" search chip)
+
+  // Labels
+  label: number; // system labels
+  labelEmphasis: number; // emphasised (selected/connected) labels
+
+  // UI status semantics
+  positive: number;
+  negative: number;
+
+  // Data-driven planet cloud tints (procedural planet textures)
+  planetCloud: { hot: number; cold: number; fertile: number; neutral: number };
+
+  // Decorative background nebula
+  nebula: { warm: number; cool: number; clouds: number[] };
 }

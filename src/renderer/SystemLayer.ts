@@ -60,7 +60,6 @@ const CLOUD_DRIFT_SPEED_MAX = 0.8;
 const CLOUD_DRIFT_RADIUS = 0.5; // fraction of displayRadius
 
 // Gateway ring visual parameters
-const GATEWAY_COLOUR = 0xbb77ff;
 const GATEWAY_RING_RADIUS = 5;
 const GATEWAY_RING_STROKE = 1.0;
 const GATEWAY_RING_ALPHA = 0.9;
@@ -70,7 +69,6 @@ const GATEWAY_LINE_LENGTH = 60;
 const GATEWAY_LINE_SEGMENTS = 4;
 
 // Selection halo — Elite Dangerous-style blue arc
-const HALO_COLOUR = 0x3399ff;
 const HALO_ALPHA = 0.7;
 const HALO_STROKE = 2.0;
 const HALO_GAP = 6; // gap between planet edge and halo
@@ -427,11 +425,11 @@ export class SystemLayer {
     // Draw two arcs — left and right, with gaps at top and bottom
     // Right arc: from -HALO_ARC_SPAN/2 to +HALO_ARC_SPAN/2
     this.selectionHalo.arc(pos.x, pos.y, haloRadius, -HALO_ARC_SPAN / 2, HALO_ARC_SPAN / 2);
-    this.selectionHalo.stroke({ width: HALO_STROKE, color: HALO_COLOUR, alpha: HALO_ALPHA });
+    this.selectionHalo.stroke({ width: HALO_STROKE, color: getTheme().systemHalo, alpha: HALO_ALPHA });
 
     // Left arc: from PI - HALO_ARC_SPAN/2 to PI + HALO_ARC_SPAN/2
     this.selectionHalo.arc(pos.x, pos.y, haloRadius, Math.PI - HALO_ARC_SPAN / 2, Math.PI + HALO_ARC_SPAN / 2);
-    this.selectionHalo.stroke({ width: HALO_STROKE, color: HALO_COLOUR, alpha: HALO_ALPHA });
+    this.selectionHalo.stroke({ width: HALO_STROKE, color: getTheme().systemHalo, alpha: HALO_ALPHA });
   }
 
   private renderGatewayRings(
@@ -457,7 +455,7 @@ export class SystemLayer {
       const ring = new Graphics();
       if (established) {
         ring.circle(0, 0, GATEWAY_RING_RADIUS);
-        ring.stroke({ width: GATEWAY_RING_STROKE, color: GATEWAY_COLOUR, alpha: GATEWAY_RING_ALPHA });
+        ring.stroke({ width: GATEWAY_RING_STROKE, color: getTheme().gateway, alpha: GATEWAY_RING_ALPHA });
       } else {
         // Dotted ring for under-construction / unlinked gateways. Pixi v8
         // has no native dashed stroke — draw arc segments with gaps.
@@ -469,7 +467,7 @@ export class SystemLayer {
           const end = start + arcSpan * dashFraction;
           ring.moveTo(Math.cos(start) * GATEWAY_RING_RADIUS, Math.sin(start) * GATEWAY_RING_RADIUS);
           ring.arc(0, 0, GATEWAY_RING_RADIUS, start, end);
-          ring.stroke({ width: GATEWAY_RING_STROKE, color: GATEWAY_COLOUR, alpha: GATEWAY_RING_ALPHA });
+          ring.stroke({ width: GATEWAY_RING_STROKE, color: getTheme().gateway, alpha: GATEWAY_RING_ALPHA });
         }
       }
       ring.x = ringX;
@@ -493,7 +491,7 @@ export class SystemLayer {
             const alpha = GATEWAY_RING_ALPHA * (1 - si / GATEWAY_LINE_SEGMENTS) * 0.5;
             ring.moveTo(dirX * segStart, dirY * segStart);
             ring.lineTo(dirX * segEnd, dirY * segEnd);
-            ring.stroke({ width: 0.8, color: GATEWAY_COLOUR, alpha });
+            ring.stroke({ width: 0.8, color: getTheme().gateway, alpha });
           }
         }
       }
@@ -526,7 +524,7 @@ export class SystemLayer {
       style: {
         fontFamily: "IBM Plex Mono, monospace",
         fontSize: 15,
-        fill: GATEWAY_COLOUR,
+        fill: getTheme().gateway,
       },
     });
     label.anchor.set(0.5, 1);

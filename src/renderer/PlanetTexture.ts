@@ -1,5 +1,6 @@
 import { CanvasSource, Texture } from "pixi.js";
 import type { Planet } from "../types/index.js";
+import { getTheme } from "../ui/theme.js";
 
 const textureCache: Map<string, Texture> = new Map();
 
@@ -227,10 +228,11 @@ export function getCloudTexture(): Texture {
 
 export function getCloudTint(planet: Planet): number {
   if (planet.surface) {
-    if (planet.temperature > 75) return 0xff8844; // molten orange
-    if (planet.temperature < -25) return 0x88bbff; // bright icy blue
-    if (planet.fertility > 0.3) return 0x66dd88; // vivid green
-    return 0xccaa88; // dusty gold
+    const cloud = getTheme().planetCloud;
+    if (planet.temperature > 75) return cloud.hot;
+    if (planet.temperature < -25) return cloud.cold;
+    if (planet.fertility > 0.3) return cloud.fertile;
+    return cloud.neutral;
   }
   // Gas: contrasting lighter/shifted version of planet colour
   const r = Math.min(255, ((planet.colour >> 16) & 0xff) + 100);

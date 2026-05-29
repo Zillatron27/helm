@@ -29,6 +29,24 @@ const crtTheme: ThemeTokens = {
   hexStroke: 0x226622,
   planetRocky: [0x2a5a2a, 0x3a6a2a, 0x4a5a3a, 0x3a4a3a, 0x5a6a4a],
   planetGas: [0x2a4a3a, 0x1a5a4a, 0x3a5a5a, 0x2a6a4a, 0x1a4a5a],
+  route: 0xff8c00,
+  routeGateway: 0xffdd00,
+  highlight: 0xff8c00,
+  gateway: 0xbb77ff,
+  settled: 0xc4a35a,
+  resource: 0x00ccaa,
+  cogc: 0x7799ff,
+  systemHalo: 0x3399ff,
+  label: 0xaaaaaa,
+  labelEmphasis: 0xe0e0e0,
+  positive: 0x32cd32,
+  negative: 0xcd5c5c,
+  planetCloud: { hot: 0xff8844, cold: 0x88bbff, fertile: 0x66dd88, neutral: 0xccaa88 },
+  nebula: {
+    warm: 0x443322,
+    cool: 0x223344,
+    clouds: [0xaa44aa, 0x4488cc, 0x44aaaa, 0xcc6644, 0x6644cc, 0xcc8833, 0x4466aa, 0x8844aa],
+  },
 };
 
 const prunClassicTheme: ThemeTokens = {
@@ -54,6 +72,24 @@ const prunClassicTheme: ThemeTokens = {
   hexStroke: 0x4a6080,
   planetRocky: [0x6a6050, 0x5a7060, 0x7a7060, 0x606060, 0x806a50],
   planetGas: [0x4a5a7a, 0x3a4a6a, 0x5a6a8a, 0x4a5a6a, 0x3a5a7a],
+  route: 0xff8c00,
+  routeGateway: 0xffdd00,
+  highlight: 0xff8c00,
+  gateway: 0xbb77ff,
+  settled: 0xc4a35a,
+  resource: 0x00ccaa,
+  cogc: 0x7799ff,
+  systemHalo: 0x3399ff,
+  label: 0xaaaaaa,
+  labelEmphasis: 0xe0e0e0,
+  positive: 0x32cd32,
+  negative: 0xcd5c5c,
+  planetCloud: { hot: 0xff8844, cold: 0x88bbff, fertile: 0x66dd88, neutral: 0xccaa88 },
+  nebula: {
+    warm: 0x443322,
+    cool: 0x223344,
+    clouds: [0xaa44aa, 0x4488cc, 0x44aaaa, 0xcc6644, 0x6644cc, 0xcc8833, 0x4466aa, 0x8844aa],
+  },
 };
 
 const vividTheme: ThemeTokens = {
@@ -78,6 +114,24 @@ const vividTheme: ThemeTokens = {
   hexStroke: 0x4444aa,
   planetRocky: [0xaa7744, 0x66aa55, 0xbbaa66, 0x888888, 0xcc8855],
   planetGas: [0x7755dd, 0x4488ff, 0x9977ff, 0x6699dd, 0xaa88cc],
+  route: 0xff8c00,
+  routeGateway: 0xffdd00,
+  highlight: 0xff8c00,
+  gateway: 0xbb77ff,
+  settled: 0xc4a35a,
+  resource: 0x00ccaa,
+  cogc: 0x7799ff,
+  systemHalo: 0x3399ff,
+  label: 0xaaaaaa,
+  labelEmphasis: 0xe0e0e0,
+  positive: 0x32cd32,
+  negative: 0xcd5c5c,
+  planetCloud: { hot: 0xff8844, cold: 0x88bbff, fertile: 0x66dd88, neutral: 0xccaa88 },
+  nebula: {
+    warm: 0x443322,
+    cool: 0x223344,
+    clouds: [0xaa44aa, 0x4488cc, 0x44aaaa, 0xcc6644, 0x6644cc, 0xcc8833, 0x4466aa, 0x8844aa],
+  },
 };
 
 const colorblindTheme: ThemeTokens = {
@@ -102,6 +156,27 @@ const colorblindTheme: ThemeTokens = {
   hexStroke: 0x4a7ab0,
   planetRocky: [0x9a8a6a, 0x6a8a9a, 0xaa9a7a, 0x7a7a7a, 0xba8a6a],
   planetGas: [0x5a6aaa, 0x3a5aaa, 0x6a7abb, 0x4a6a9a, 0x7a7aaa],
+  // CVD-safe overlay palette (Okabe-Ito). First pass — tunable. The search
+  // chips (systemHalo / settled / cogc) must stay mutually distinct since
+  // they appear side by side in results.
+  route: 0xe69f00, // orange
+  routeGateway: 0xf0e442, // yellow
+  highlight: 0x56b4e9, // sky blue
+  gateway: 0xcc79a7, // reddish purple
+  settled: 0xd55e00, // vermillion
+  resource: 0x009e73, // bluish green
+  cogc: 0xf0e442, // yellow (chip context — distinct from systemHalo/settled)
+  systemHalo: 0x56b4e9, // sky blue
+  label: 0xaaaaaa,
+  labelEmphasis: 0xe0e0e0,
+  positive: 0x0088ff,
+  negative: 0xff8833,
+  planetCloud: { hot: 0xe69f00, cold: 0x56b4e9, fertile: 0x009e73, neutral: 0xccaa88 },
+  nebula: {
+    warm: 0x332211,
+    cool: 0x112233,
+    clouds: [0x4466aa, 0x335577, 0x446688, 0x5566aa, 0x224466, 0x447799, 0x335588, 0x556699],
+  },
 };
 
 export const themePresets: ThemePreset[] = [
