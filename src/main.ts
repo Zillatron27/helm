@@ -330,7 +330,7 @@ async function boot(): Promise<void> {
 
     const detail = document.createElement("div");
     detail.style.color = "#666666";
-    title.style.fontSize = "14px";
+    detail.style.fontSize = "14px";
     detail.style.maxWidth = "600px";
     detail.style.textAlign = "center";
     detail.textContent = err instanceof Error ? err.message : String(err);
