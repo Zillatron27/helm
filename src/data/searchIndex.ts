@@ -1,5 +1,6 @@
 import type { StarSystem, FioPlanetSummary, SearchEntry } from "../types/index.js";
 import { isResourceIndexReady, getActiveCogcCategories } from "./resourceIndex.js";
+import { derivePlanetDisplayName } from "./planetNames.js";
 
 let entries: SearchEntry[] = [];
 const naturalIdToUuid: Map<string, string> = new Map();
@@ -32,9 +33,11 @@ export function buildSearchIndex(
   entries = [];
   naturalIdToUuid.clear();
 
-  // Build reverse map: naturalId → UUID
+  // Build reverse maps: naturalId → UUID, naturalId → display name
+  const naturalIdToName: Map<string, string> = new Map();
   for (const s of systems) {
     naturalIdToUuid.set(s.naturalId, s.id);
+    naturalIdToName.set(s.naturalId, s.name);
   }
 
   // Add system entries
@@ -56,10 +59,15 @@ export function buildSearchIndex(
     const sysUuid = naturalIdToUuid.get(sysNatId);
     if (!sysUuid) continue;
 
+    const sysName = naturalIdToName.get(sysNatId);
+    const name = sysName
+      ? derivePlanetDisplayName(p.PlanetNaturalId, p.PlanetName, sysNatId, sysName)
+      : p.PlanetName;
+
     entries.push({
       type: "planet",
       id: p.PlanetNaturalId,
-      name: p.PlanetName,
+      name,
       naturalId: p.PlanetNaturalId,
       systemId: sysUuid,
     });

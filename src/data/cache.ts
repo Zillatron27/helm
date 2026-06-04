@@ -15,6 +15,7 @@ import type {
 } from "../types/index.js";
 import { fetchSystems, fetchSystemPlanets, fetchCxStations, fetchMaterials, fetchGateways } from "./fio.js";
 import { getTheme } from "../ui/theme.js";
+import { derivePlanetDisplayName } from "./planetNames.js";
 
 const WORLD_SCALE = 4;
 const VALID_SPECTRAL: Set<string> = new Set(["O", "B", "A", "F", "G", "K", "M"]);
@@ -236,9 +237,14 @@ function processPlanets(raw: FioPlanet[]): Planet[] {
       colour = theme.planetGas[colourIndex] ?? theme.planetGas[0]!;
     }
 
+    const system = systemById.get(p.SystemId);
+    const name = system
+      ? derivePlanetDisplayName(p.PlanetNaturalId, p.PlanetName, system.naturalId, system.name)
+      : p.PlanetName;
+
     return {
       id: p.PlanetId,
-      name: p.PlanetName,
+      name,
       naturalId: p.PlanetNaturalId,
       systemId: p.SystemId,
       surface: p.Surface,

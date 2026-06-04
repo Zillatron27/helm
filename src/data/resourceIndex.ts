@@ -1,5 +1,7 @@
 import type { ResourceMatch, PlanetResourceMatch, CogcMatch } from "../types/index.js";
 import { fetchAllPlanetsFull } from "./fio.js";
+import { getSystemById } from "./cache.js";
+import { derivePlanetDisplayName } from "./planetNames.js";
 
 // Precomputed index: MaterialId → systems containing that resource
 const systemIndex: Map<string, ResourceMatch[]> = new Map();
@@ -48,10 +50,17 @@ export async function initResourceIndex(): Promise<void> {
     const systemId = planet.SystemId;
     if (!systemId) continue;
 
-    // Cache the display name for sidebar rows; FIO falls back to natural
-    // id when no specific name is set, which is what we want as default.
+    // Cache the display name for sidebar rows. Unnamed planets in named
+    // systems get the derived "Metis b" form; everything else falls back
+    // to FIO's PlanetName (which is the raw naturalId when truly unnamed).
     if (planet.PlanetName) {
-      planetNameByNaturalId.set(planet.PlanetNaturalId, planet.PlanetName);
+      const system = getSystemById(systemId);
+      planetNameByNaturalId.set(
+        planet.PlanetNaturalId,
+        system
+          ? derivePlanetDisplayName(planet.PlanetNaturalId, planet.PlanetName, system.naturalId, system.name)
+          : planet.PlanetName,
+      );
     }
 
     for (const resource of planet.Resources) {
