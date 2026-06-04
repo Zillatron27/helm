@@ -7,7 +7,7 @@
  * See helm-extension-bridge-protocol.md §7 for version semantics.
  */
 
-export const PROTOCOL_VERSION = "v1.0.0";
+export const PROTOCOL_VERSION = "v1.1.0";
 
 export interface ParsedVersion {
   major: number;

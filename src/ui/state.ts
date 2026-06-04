@@ -183,6 +183,21 @@ export function setBridgeSnapshot(snapshot: BridgeSnapshot | null): void {
   notifyBridgeSnapshotListeners();
 }
 
+/**
+ * PrUn licence tier from the current bridge snapshot, or null when no
+ * extension is connected / the field is absent (older protocol). Normalised
+ * at the read boundary so a malformed value can't masquerade as a tier.
+ */
+export function getLicence(): string | null {
+  const level = bridgeSnapshot?.subscriptionLevel;
+  return typeof level === "string" ? level : null;
+}
+
+/** True only when the connected account holds a PRO licence. */
+export function hasPro(): boolean {
+  return getLicence() === "PRO";
+}
+
 export function onBridgeSnapshotChange(listener: StateListener): void {
   bridgeSnapshotListeners.add(listener);
 }

@@ -176,6 +176,9 @@ export interface BridgeSnapshot {
   burnThresholds: BurnThresholds;
   companyName: string | null;
   primaryCurrency: string | null;
+  // PrUn licence tier from the USER_DATA packet ("PRO" when Pro-licensed),
+  // null when unknown/free. Used to feature-gate PRO-only behaviour.
+  subscriptionLevel: string | null;
   warehouses: WarehouseLocation[];
   siteBurns: BridgeSiteBurnSummary[];
   rprunDetected: boolean;
@@ -194,6 +197,7 @@ export type BridgeEntityType = keyof Omit<
   | "burnThresholds"
   | "companyName"
   | "primaryCurrency"
+  | "subscriptionLevel"
   | "rprunDetected"
   | "rprunFeaturesDisabled"
 >;

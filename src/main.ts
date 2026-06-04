@@ -6,7 +6,7 @@ import { SettingsPanel } from "./ui/SettingsPanel.js";
 import { ResourcePicker } from "./ui/resource/ResourcePicker.js";
 import { ResultsSidebar } from "./ui/sidebar/ResultsSidebar.js";
 import { setupControls } from "./ui/controls.js";
-import { onStateChange, getGatewaysVisible, setGatewaysVisible, getSettledVisible, getResourceFilters, getCogcFilter, getEmpireDim, setEmpireDim, onResourceFilterChange, onCogcFilterChange, getBridgeSnapshot, onBridgeSnapshotChange } from "./ui/state.js";
+import { onStateChange, getGatewaysVisible, setGatewaysVisible, getSettledVisible, getResourceFilters, getCogcFilter, getEmpireDim, setEmpireDim, onResourceFilterChange, onCogcFilterChange, getBridgeSnapshot, onBridgeSnapshotChange, getLicence, hasPro } from "./ui/state.js";
 import { isResourceIndexReady, onResourceIndexReady, getSystemsWithAnyResource } from "./data/resourceIndex.js";
 import { getResourceSystemMatches, getResourcePlanetMatches, getCogcSystemMatches, getCogcPlanetMatches } from "./data/filterMatches.js";
 import { getEmpireSystemMatches, getEmpirePlanetMatches, onEmpireIndexChange } from "./data/empireIndex.js";
@@ -56,6 +56,8 @@ async function boot(): Promise<void> {
   (window as unknown as { __helm: unknown }).__helm = {
     getBridgeSnapshot,
     onBridgeSnapshotChange,
+    getLicence,
+    hasPro,
   };
 
   try {
