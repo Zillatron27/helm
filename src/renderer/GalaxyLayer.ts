@@ -141,6 +141,14 @@ const EMPIRE_RING_ALPHA = 0.7;
 const SHIP_STACK_OFFSET_FROM_RING = 6;
 const SHIP_STACK_ALPHA = 1.0;
 
+// Empire warehouse marker — a box glyph on CX systems where the user holds
+// warehouse space (snapshot.warehouses[]). Distinct from the CX diamond: a
+// small filled square sits just outside the diamond's left vertex. Passive,
+// like the empire base rings.
+const WAREHOUSE_MARKER_SIZE = 11;
+const WAREHOUSE_MARKER_ALPHA = 0.9;
+const WAREHOUSE_MARKER_OFFSET_X = -(CX_DIAMOND_RADIUS + 14);
+
 let glowTexture: Texture | null = null;
 function getGlowTexture(): Texture {
   if (glowTexture) return glowTexture;
@@ -231,6 +239,10 @@ export class GalaxyLayer {
 
   // Empire base rings — owned-system markers from bridge snapshot
   private empireBaseRings: Container;
+
+  // Empire warehouse markers — box glyphs on CX systems where the user holds
+  // warehouse space (passive, from bridge snapshot).
+  private empireWarehouseMarkers: Container;
 
   // Empire ship stacks — per-system docked-ship indicators from snapshot
   private empireShipStacks: Container;
@@ -342,6 +354,11 @@ export class GalaxyLayer {
     // the ship stacks. Added to the scene graph in the final-ordering block.
     this.empireInFlightShips = new Container();
     this.empireInFlightShips.eventMode = "passive";
+
+    // Empire warehouse markers — passive box glyphs, added in the final-
+    // ordering block alongside the other CX-level overlays.
+    this.empireWarehouseMarkers = new Container();
+    this.empireWarehouseMarkers.eventMode = "none";
 
     // Hover particles — above glows, below labels and stars
     this.starParticles = new StarParticles();
@@ -532,6 +549,7 @@ export class GalaxyLayer {
     this.container.addChild(this.gatewayIndicators);
     this.container.addChild(this.empireShipStacks);
     this.container.addChild(this.empireInFlightShips);
+    this.container.addChild(this.empireWarehouseMarkers);
     this.container.addChild(this.selectionHalo);
     this.container.addChild(this.routeOverlay);
   }
@@ -1025,6 +1043,47 @@ export class GalaxyLayer {
     }
   }
 
+  /**
+   * Rebuild empire warehouse markers — a box glyph on every CX system where
+   * the user holds warehouse space (snapshot.warehouses[]). Passive, like the
+   * base rings, and distinct from the CX diamond so "I store here" reads
+   * separately from "this is a CX". (#22 — the W inventory-launcher menu is
+   * deferred to #24 buffer bridging.)
+   */
+  rebuildEmpireWarehouses(): void {
+    this.empireWarehouseMarkers.removeChildren();
+
+    const snapshot = getBridgeSnapshot();
+    if (!snapshot || snapshot.warehouses.length === 0) return;
+
+    const accent = getTheme().accent;
+    const half = WAREHOUSE_MARKER_SIZE / 2;
+
+    // One marker per system even if several warehouses share it.
+    const seen = new Set<string>();
+    for (const wh of snapshot.warehouses) {
+      if (seen.has(wh.systemNaturalId)) continue;
+      seen.add(wh.systemNaturalId);
+
+      const uuid = getSystemUuidByNaturalId(wh.systemNaturalId);
+      if (!uuid) continue;
+      const system = this.systemLookup.get(uuid);
+      if (!system) continue;
+
+      const box = new Graphics();
+      box.rect(-half, -half, WAREHOUSE_MARKER_SIZE, WAREHOUSE_MARKER_SIZE);
+      box.fill({ color: accent, alpha: WAREHOUSE_MARKER_ALPHA * 0.3 });
+      box.stroke({ width: 1.5, color: accent, alpha: WAREHOUSE_MARKER_ALPHA });
+      // Crossbar so it reads as a crate/warehouse, not a plain square.
+      box.moveTo(-half, 0);
+      box.lineTo(half, 0);
+      box.stroke({ width: 1, color: accent, alpha: WAREHOUSE_MARKER_ALPHA });
+      box.x = system.worldX + WAREHOUSE_MARKER_OFFSET_X;
+      box.y = system.worldY;
+      this.empireWarehouseMarkers.addChild(box);
+    }
+  }
+
   dimExcept(systemId: string, tw?: TweenManager): void {
     this.isDimmedForSystemView = true;
     this.twinkleActive = false;
@@ -1052,6 +1111,7 @@ export class GalaxyLayer {
       tw.to(this.empireBaseRings, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
       tw.to(this.empireShipStacks, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
       tw.to(this.empireInFlightShips, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
+      tw.to(this.empireWarehouseMarkers, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
       // Fade out ambient labels then hide
       tw.to(this.ambientLabels, "alpha", 0, 0.3);
     } else {
@@ -1067,6 +1127,7 @@ export class GalaxyLayer {
       this.empireBaseRings.alpha = SYSTEM_VIEW_LINES_ALPHA;
       this.empireShipStacks.alpha = SYSTEM_VIEW_LINES_ALPHA;
       this.empireInFlightShips.alpha = SYSTEM_VIEW_LINES_ALPHA;
+      this.empireWarehouseMarkers.alpha = SYSTEM_VIEW_LINES_ALPHA;
       this.ambientLabels.visible = false;
     }
 
@@ -1108,6 +1169,7 @@ export class GalaxyLayer {
       tw.to(this.empireBaseRings, "alpha", containerAlpha, dur);
       tw.to(this.empireShipStacks, "alpha", containerAlpha, dur);
       tw.to(this.empireInFlightShips, "alpha", containerAlpha, dur);
+      tw.to(this.empireWarehouseMarkers, "alpha", containerAlpha, dur);
     } else {
       this.baseConnections.alpha = containerAlpha;
       this.routeOverlay.alpha = containerAlpha;
@@ -1121,6 +1183,7 @@ export class GalaxyLayer {
       this.empireBaseRings.alpha = containerAlpha;
       this.empireShipStacks.alpha = containerAlpha;
       this.empireInFlightShips.alpha = containerAlpha;
+      this.empireWarehouseMarkers.alpha = containerAlpha;
     }
 
     // Per-star alpha: respect highlight filter when active

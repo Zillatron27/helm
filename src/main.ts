@@ -109,6 +109,12 @@ async function boot(): Promise<void> {
                 renderer.frameRoute([uuid], true);
               }, 2500);
             }
+          } else if (params.has("wh")) {
+            // Instant-frame on the first warehouse's CX system so the passive
+            // warehouse marker (#22) is visible for a static screenshot.
+            const whNat = injected.warehouses[0]?.systemNaturalId;
+            const uuid = whNat ? getSystemUuidByNaturalId(whNat) : null;
+            if (uuid) setTimeout(() => renderer.frameRoute([uuid], true), 200);
           } else if (params.has("lens")) {
             // Let the snapshot propagate (empire index build + overlay rebuild)
             // before framing the now-known empire bbox.
@@ -296,6 +302,7 @@ async function boot(): Promise<void> {
       renderer.rebuildEmpireRings();
       renderer.rebuildEmpireShipStacks();
       renderer.rebuildEmpireInFlightShips();
+      renderer.rebuildEmpireWarehouses();
     };
 
     renderer.onAfterRebuild(() => {
