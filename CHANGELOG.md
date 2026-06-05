@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.0-rc.6 — feature/hud
+
+### Fixed
+
+- **Empire lens no longer dims the whole galaxy on first load (stale-index race).** `initBridge()` runs before `createMap()`, so a buffered bridge snapshot can be processed before `buildSearchIndex()` exists. The empire index resolves each site's system natural id to a UUID via that index, so an early snapshot resolved to an **empty** empire set — and since it only recomputes on the next snapshot change, it stayed empty. With the empire lens persisted on, the empty set intersected to nothing and dimmed every system, while ships (which don't depend on the empire set) still rendered — reading as a failure state with no loading indication. `boot()` now calls `refreshEmpireIndex()` once `createMap()` resolves (search index guaranteed built), so the empire set, base rings, and dim composition are correct on first load. Reproduced and verified A/B by replaying a snapshot through the inline bootstrap buffer before the index builds.
+
 ## 0.11.0-rc.5 — feature/hud
 
 Corrects the CX-naming behaviour from rc.4, which was too broad.

@@ -54,6 +54,18 @@ function recompute(): void {
 recompute();
 onBridgeSnapshotChange(recompute);
 
+/**
+ * Force a recompute. `recompute` resolves each site's system natural id to a
+ * UUID via the search index, so a snapshot that arrives BEFORE that index is
+ * built (the bridge handshake can land mid `createMap()`, before
+ * `buildSearchIndex`) resolves to an empty empire set and stays stale until the
+ * next snapshot change — dimming the whole galaxy while ships still render.
+ * boot() calls this once the index is ready so the empire set is correct.
+ */
+export function refreshEmpireIndex(): void {
+  recompute();
+}
+
 export function getEmpireSystemMatches(): Set<string> | null {
   if (!getEmpireDim() || getBridgeSnapshot() === null) return null;
   return empireSystemIds;

@@ -10,7 +10,7 @@ import { onStateChange, getGatewaysVisible, setGatewaysVisible, getSettledVisibl
 import { getSystemUuidByNaturalId } from "./data/searchIndex.js";
 import { isResourceIndexReady, onResourceIndexReady, getSystemsWithAnyResource } from "./data/resourceIndex.js";
 import { getResourceSystemMatches, getResourcePlanetMatches, getCogcSystemMatches, getCogcPlanetMatches } from "./data/filterMatches.js";
-import { getEmpireSystemMatches, getEmpirePlanetMatches, onEmpireIndexChange } from "./data/empireIndex.js";
+import { getEmpireSystemMatches, getEmpirePlanetMatches, onEmpireIndexChange, refreshEmpireIndex } from "./data/empireIndex.js";
 import { yieldToMain } from "./util/yieldToMain.js";
 import { initTheme, getTheme } from "./ui/theme.js";
 import { createLoader } from "./ui/loader/LoaderAnimation.js";
@@ -76,6 +76,13 @@ async function boot(): Promise<void> {
   try {
     const helm = await createMap(container);
     const { renderer, panelManager } = helm;
+
+    // The bridge handshake can deliver a snapshot before createMap() builds the
+    // search index, leaving the empire index resolved to an empty set (it maps
+    // site system natural ids → UUIDs, which needs that index). Recompute now
+    // that the index exists, so the empire-dim composition and base rings below
+    // read a correct empire set on first load instead of dimming everything.
+    refreshEmpireIndex();
 
     // Cross-fade: loader fades out over the now-visible map
     loading.style.transition = "opacity 0.6s ease";
