@@ -946,7 +946,10 @@ export class GalaxyLayer {
       // background content over the foreground panel.
       stack.eventMode = "static";
       stack.cursor = "default";
-      const tooltip = formatDockedShipTooltip(ships, { systemNaturalId: sysNid });
+      // Galaxy aggregate is a whole-system rollup (planet- and CX-docked ships
+      // both counted), so label it by the system natural id — NOT the CX code,
+      // which would wrongly imply every ship is at the exchange.
+      const tooltip = formatDockedShipTooltip(ships, { locationLabel: sysNid });
       stack.on("pointerover", (e) => {
         if (this.isDimmedForSystemView) return;
         showMapTooltip(e.globalX, e.globalY, tooltip);

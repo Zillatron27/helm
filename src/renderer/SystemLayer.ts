@@ -2,7 +2,7 @@ import { CanvasSource, Container, Graphics, Sprite, Text, Texture, Circle } from
 import type { StarSystem, Planet } from "../types/index.js";
 import { getTheme, getSpectralColour } from "../ui/theme.js";
 import { setSelectedEntity, getSelectedEntity, onStateChange, onBridgeSnapshotChange, getBridgeSnapshot } from "../ui/state.js";
-import { getGatewaysForPlanet, getSystemById } from "../data/cache.js";
+import { getGatewaysForPlanet, getSystemById, cxSystemLabel } from "../data/cache.js";
 import { getEmpirePlanetIds, onEmpireIndexChange } from "../data/empireIndex.js";
 import type { GatewayEndpoint } from "../types/index.js";
 import type { ShipSummary, FlightSummary } from "../data/bridge-types.js";
@@ -710,7 +710,12 @@ export class SystemLayer {
       stack.eventMode = "static";
       stack.cursor = "default";
 
-      const tooltip = formatDockedShipTooltip(cxDockedShips, { systemNaturalId: systemNid });
+      // These ships are docked at the CX itself (no planet), so label them by
+      // the CX code when the system hosts one — cxSystemLabel falls back to the
+      // system id otherwise.
+      const tooltip = formatDockedShipTooltip(cxDockedShips, {
+        locationLabel: cxSystemLabel(systemNid),
+      });
       stack.on("pointerover", (e) => {
         showMapTooltip(e.globalX, e.globalY, tooltip);
       });

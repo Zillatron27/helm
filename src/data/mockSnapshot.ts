@@ -327,6 +327,49 @@ export function buildMockSnapshot(now: number = Date.now()): BridgeSnapshot {
         currentSegmentIndex: 0,
       });
     }
+
+    // A ship bound for a commodity exchange: destination system is a CX system
+    // with NO destination planet, so the in-flight panel must label it by the
+    // CX code (e.g. "ANT"), not the host system id. Exercises the CX-only
+    // override in flightDestinationLabel deterministically.
+    const cxStation = getAllCxStations()[0];
+    if (cxStation) {
+      const m = 60_000;
+      ships.push({
+        shipId: "mock-ship-cxbound",
+        name: "Exchange Courier",
+        registration: "AA-005",
+        blueprintNaturalId: "BP-AA-005",
+        condition: 0.9,
+        status: "OPERATIONAL",
+        locationSystemNaturalId: null,
+        locationPlanetNaturalId: null,
+        cargo: null,
+        fuel: null,
+      });
+      flights.push({
+        flightId: "mock-flight-cxbound",
+        shipId: "mock-ship-cxbound",
+        originSystemNaturalId: hub.naturalId,
+        destinationSystemNaturalId: cxStation.SystemNaturalId,
+        originPlanetNaturalId: hubPlanet.natId,
+        destinationPlanetNaturalId: null,
+        departureTimestamp: now - 3 * m,
+        arrivalTimestamp: now + 7 * m,
+        segments: [
+          {
+            type: "TRANSIT",
+            originSystemNaturalId: hub.naturalId,
+            destinationSystemNaturalId: cxStation.SystemNaturalId,
+            originPlanetNaturalId: null,
+            destinationPlanetNaturalId: null,
+            departureTimestamp: now - 3 * m,
+            arrivalTimestamp: now + 7 * m,
+          },
+        ],
+        currentSegmentIndex: 0,
+      });
+    }
   }
 
   // Warehouses at the first couple of real CX stations (#22 indicator).

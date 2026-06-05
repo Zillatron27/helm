@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.0-rc.5 — feature/hud
+
+Corrects the CX-naming behaviour from rc.4, which was too broad.
+
+### Fixed
+
+- **CX code applies only to the CX itself, never to its system's planets.** rc.4 labelled any reference to a CX-hosting system by the CX code — wrong, because CX systems (e.g. ZV-307, which hosts ANT) commonly hold several populated planets. The flight-destination label now discriminates: flying to a **planet** shows the planet's display name (derived name, or natural id as a code fallback) regardless of system; flying to the **CX** (no destination planet, destination system hosts a CX) shows the CX code; otherwise the system natural id. Docked headers split the same way — the system-view CX-docked stack (ships at the exchange) reads as the CX code, while the galaxy per-system aggregate (a rollup that mixes planet- and CX-docked ships) reads as the system id. `formatDockedShipTooltip` now takes an explicit `locationLabel` so the call site decides, keeping the CX override out of system-level rollups.
+
 ## 0.11.0-rc.4 — feature/hud
 
 Three empire-overlay polish fixes from in-game testing.
