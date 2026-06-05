@@ -11,7 +11,7 @@ import { showMapTooltip, hideMapTooltip } from "../ui/MapTooltip.js";
 import { buildChevronStack, CHEVRON_GLYPH_SIZE } from "./ChevronStack.js";
 import { buildShipGlyph } from "./ShipGlyph.js";
 import { formatDockedShipTooltip, formatInFlightShipTooltip } from "../data/shipTooltip.js";
-import { activeSegment, lerp } from "../data/flightInterp.js";
+import { activeSegment, lerp, inFlightShipIds } from "../data/flightInterp.js";
 
 const CENTRAL_STAR_RADIUS = 30;
 const GLOW_RADIUS = 110;
@@ -630,8 +630,9 @@ export class SystemLayer {
     const snapshot = getBridgeSnapshot();
     const systemNid = this.currentSystem.naturalId;
     if (snapshot) {
+      const inFlight = inFlightShipIds(snapshot.flights);
       for (const ship of snapshot.ships) {
-        if (ship.status === "IN_FLIGHT") continue;
+        if (inFlight.has(ship.shipId)) continue;
         if (ship.locationPlanetNaturalId === null) {
           if (ship.locationSystemNaturalId === systemNid) cxDockedShips.push(ship);
           continue;
@@ -755,8 +756,9 @@ export class SystemLayer {
     const container = new Container();
     container.eventMode = "passive";
 
+    // In flight iff a current flight exists for the ship (see inFlightShipIds);
+    // the flightByShip lookup is the gate. Docked ships have no flight entry.
     for (const ship of snapshot.ships) {
-      if (ship.status !== "IN_FLIGHT") continue;
       const flight = flightByShip.get(ship.shipId);
       if (!flight) continue;
       const touchesSystem = flight.segments.some(

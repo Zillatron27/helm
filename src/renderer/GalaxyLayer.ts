@@ -15,7 +15,7 @@ import { buildChevronStack, CHEVRON_GLYPH_SIZE } from "./ChevronStack.js";
 import { buildShipGlyph } from "./ShipGlyph.js";
 import { showMapTooltip, hideMapTooltip } from "../ui/MapTooltip.js";
 import { formatDockedShipTooltip, formatInFlightShipTooltip } from "../data/shipTooltip.js";
-import { activeSegment, lerp } from "../data/flightInterp.js";
+import { activeSegment, lerp, inFlightShipIds } from "../data/flightInterp.js";
 import type { ShipSummary, FlightSummary } from "../data/bridge-types.js";
 import { StarParticles } from "./StarParticles.js";
 import { TweenManager } from "./Tween.js";
@@ -888,7 +888,7 @@ export class GalaxyLayer {
   /**
    * Rebuild per-system docked-ship stacks from the current bridge
    * snapshot. A system contributes to the count for any docked ship
-   * inside it (planet-docked or CX-docked, status !== IN_FLIGHT).
+   * inside it (planet-docked or CX-docked — i.e. with no current flight).
    * Glyph count: 1 for a single ship, 3 for 2+. Stack anchors just
    * outside the empire ring footprint (or star edge when the system
    * isn't empire-owned).
@@ -903,9 +903,10 @@ export class GalaxyLayer {
     // (a different rule from system view, which can't render them
     // without a CX grid — this aggregate-level signal still wants to
     // tell the player "ships are present in this system").
+    const inFlight = inFlightShipIds(snapshot.flights);
     const shipsPerSystem = new Map<string, ShipSummary[]>();
     for (const ship of snapshot.ships) {
-      if (ship.status === "IN_FLIGHT") continue;
+      if (inFlight.has(ship.shipId)) continue;
       const sysNid = ship.locationSystemNaturalId;
       if (!sysNid) continue;
       const list = shipsPerSystem.get(sysNid);
@@ -963,7 +964,7 @@ export class GalaxyLayer {
 
   /**
    * Rebuild the in-flight ship glyph set from the current snapshot (Cap 4).
-   * One dart glyph per IN_FLIGHT ship that has a matching flight. Positions
+   * One dart glyph per ship that has a current flight. Positions
    * are set per frame by updateInFlightShips(); glyphs start hidden until the
    * first tick places them.
    */
@@ -979,8 +980,10 @@ export class GalaxyLayer {
 
     const accent = getTheme().accent;
 
+    // A ship is in flight iff PrUn is tracking a current flight for it — the
+    // flightByShip lookup IS the gate (see inFlightShipIds). The ships array
+    // carries every ship; those without a flight are docked, skipped here.
     for (const ship of snapshot.ships) {
-      if (ship.status !== "IN_FLIGHT") continue;
       const flight = flightByShip.get(ship.shipId);
       if (!flight) continue;
 
@@ -1062,11 +1065,22 @@ export class GalaxyLayer {
     // One marker per system even if several warehouses share it.
     const seen = new Set<string>();
     for (const wh of snapshot.warehouses) {
+      // Only CX (station) warehouses get a marker. PrUn warehouse addresses are
+      // either [SYSTEM, STATION] (a commodity exchange) or [SYSTEM, PLANET] (a
+      // base) — the bridge only carries a stationNaturalId for the former, so a
+      // null one means a planetary/base warehouse, which must NOT be marked
+      // (the glyph anchors beside the CX diamond and would otherwise float
+      // next to every base). Checked before `seen` so a base warehouse doesn't
+      // claim the slot away from a real CX warehouse in the same system.
+      if (wh.stationNaturalId === null) continue;
       if (seen.has(wh.systemNaturalId)) continue;
       seen.add(wh.systemNaturalId);
 
       const uuid = getSystemUuidByNaturalId(wh.systemNaturalId);
       if (!uuid) continue;
+      // Defensive: no CX diamond in this system (FIO CX data incomplete) means
+      // nothing to anchor the marker to — skip rather than draw it floating.
+      if (!getCxForSystem(uuid)) continue;
       const system = this.systemLookup.get(uuid);
       if (!system) continue;
 

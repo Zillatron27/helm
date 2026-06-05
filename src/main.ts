@@ -110,9 +110,13 @@ async function boot(): Promise<void> {
               }, 2500);
             }
           } else if (params.has("wh")) {
-            // Instant-frame on the first warehouse's CX system so the passive
-            // warehouse marker (#22) is visible for a static screenshot.
-            const whNat = injected.warehouses[0]?.systemNaturalId;
+            // Instant-frame on the first CX warehouse's system so the passive
+            // warehouse marker (#22) is visible for a static screenshot. Only
+            // station (CX) warehouses draw a marker — a base warehouse
+            // (stationNaturalId === null) has none, so frame past those.
+            const whNat = injected.warehouses.find(
+              (w) => w.stationNaturalId !== null,
+            )?.systemNaturalId;
             const uuid = whNat ? getSystemUuidByNaturalId(whNat) : null;
             if (uuid) setTimeout(() => renderer.frameRoute([uuid], true), 200);
           } else if (params.has("lens")) {

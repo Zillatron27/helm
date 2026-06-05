@@ -134,7 +134,11 @@ export function buildMockSnapshot(now: number = Date.now()): BridgeSnapshot {
       });
     });
 
-    // Docked ship at the hub's planet (system-view per-planet chevron).
+    // Docked ship at the hub's planet (system-view per-planet chevron). A
+    // docked ship has no flight entry — that absence (not the status string)
+    // is what marks it stationary. `status` is carried verbatim from PrUn and
+    // is NOT load-bearing here (not used for gating or display); the value is
+    // illustrative only.
     const hubPlanet = firstPlanet(hub);
     ships.push({
       shipId: "mock-ship-docked",
@@ -142,14 +146,29 @@ export function buildMockSnapshot(now: number = Date.now()): BridgeSnapshot {
       registration: "AA-001",
       blueprintNaturalId: "BP-AA-001",
       condition: 0.92,
-      status: "DOCKED",
+      status: "OPERATIONAL",
       locationSystemNaturalId: hub.naturalId,
       locationPlanetNaturalId: hubPlanet.natId,
       cargo: null,
       fuel: null,
     });
 
-    // Two in-flight ships exercise both views (Cap 4):
+    // A planetary/base warehouse (address [SYSTEM, PLANET] ⇒ no station, so
+    // stationNaturalId is null). This must NOT draw a warehouse marker — it
+    // exercises the #22 CX-only filter so a regression that marks every base
+    // shows up immediately under ?mock.
+    warehouses.push({
+      warehouseId: "mock-wh-base",
+      storeId: "mock-store-base",
+      systemNaturalId: hub.naturalId,
+      stationNaturalId: null,
+    });
+
+    // Two in-flight ships exercise both views (Cap 4). They are marked
+    // in-flight purely by having a flights[] entry — NOT by a status string
+    // (PrUn has no literal "IN_FLIGHT" status; the bug behind these not
+    // rendering was gating on one). Their `status` is left as a non-flight
+    // value on purpose, so the mock proves the gate reads flights, not status.
     //  - "Far Strider" is mid-TRANSIT on a real hub→neighbour jump edge, so
     //    its galaxy glyph rides the actual jump line. Its active segment is
     //    cross-system, so it correctly shows nothing in any system view.
@@ -167,7 +186,7 @@ export function buildMockSnapshot(now: number = Date.now()): BridgeSnapshot {
         registration: "AA-002",
         blueprintNaturalId: "BP-AA-002",
         condition: 0.81,
-        status: "IN_FLIGHT",
+        status: "OPERATIONAL",
         locationSystemNaturalId: null,
         locationPlanetNaturalId: null,
         cargo: null,
@@ -223,7 +242,7 @@ export function buildMockSnapshot(now: number = Date.now()): BridgeSnapshot {
         registration: "AA-003",
         blueprintNaturalId: "BP-AA-003",
         condition: 0.88,
-        status: "IN_FLIGHT",
+        status: "OPERATIONAL",
         locationSystemNaturalId: null,
         locationPlanetNaturalId: null,
         cargo: null,

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.0-rc.3 — feature/hud
+
+Two empire-overlay rendering fixes surfaced during in-game testing. Both were masked by the dev mock fabricating data that matched the broken code paths.
+
+### Fixed
+
+- **In-flight ship glyphs now render** (galaxy + system view). All four ship-gating sites discriminated flight via `ship.status === "IN_FLIGHT"`, but that is **not a real PrUn `ShipSummary.status` value** — PrUn/FIO signal flight via `FlightId` (null when stationary) and split fleets into `PlayerShipsInFlight` / `PlayerStationaryShips`; the status code is never compared to a string. On live data the in-flight gate was always true → every dart skipped (docked chevrons rendered because their gate accidentally let everything through). A ship is now treated as in-flight iff it has a matching entry in `snapshot.flights[]` (= `FlightId != null`), via the new `inFlightShipIds()` single source of truth in `src/data/flightInterp.ts`. The mock fabricated `status: "IN_FLIGHT"`, which is the only reason this passed headless verification — it now marks in-flight ships purely by a `flights[]` entry.
+- **Warehouse marker is CX-only again** (#22). The indicator drew for every `snapshot.warehouses[]` entry, so base/planetary warehouses got a marker floating beside every base. PrUn warehouse addresses are either `[SYSTEM, STATION]` (a commodity exchange) or `[SYSTEM, PLANET]` (a base), and the bridge only carries a `stationNaturalId` for the former — so base warehouses arrive with `stationNaturalId: null`. The marker now renders only for station/CX warehouses (and only where a CX diamond exists to anchor beside).
+
 ## 0.11.0-rc.2 — feature/hud
 
 Bugfix on rc.1 surfaced during embedded testing.

@@ -46,3 +46,18 @@ export function activeSegment(
 export function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
+
+/**
+ * Ship IDs the snapshot considers in-flight — the single source of truth for
+ * "is this ship flying?".
+ *
+ * A ship is in flight exactly when PrUn is tracking a current flight for it
+ * (`Ship.flightId !== null`), which the bridge surfaces as a matching entry in
+ * `flights[]` keyed by shipId. The coarse `ShipSummary.status` code is NOT a
+ * reliable signal: PrUn's internal values don't include a literal "IN_FLIGHT"
+ * (FIO splits ships into PlayerShipsInFlight / PlayerStationaryShips by
+ * FlightId, never by a status string), so we never gate on it.
+ */
+export function inFlightShipIds(flights: FlightSummary[]): Set<string> {
+  return new Set(flights.map((f) => f.shipId));
+}
