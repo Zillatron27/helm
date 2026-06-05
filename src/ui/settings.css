@@ -31,6 +31,12 @@
   background: rgba(var(--bg-tertiary-rgb), 0.6);
 }
 
+/* Keyboard focus ring on theme options (#17). */
+.settings-theme-option:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .settings-theme-option-active {
   border-color: var(--accent);
 }
