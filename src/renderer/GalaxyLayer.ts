@@ -1537,10 +1537,15 @@ export class GalaxyLayer {
     const gwConns = getGalaxyGatewayConnections();
     const gwWidth = scaledWidth(GATEWAY_ARC_BASE, GATEWAY_ARC_MIN, GATEWAY_ARC_MAX, scale);
 
+    // Gateway arcs are navigational chrome with their own visibility toggle
+    // (G key / toolbar), so the empire highlight filter must NOT dim them —
+    // doing so left non-empire arcs near-invisible on load until a uniform
+    // zoom-redraw clobbered the dim ("partial render, zoom-in fixes it").
+    // Draw uniformly at full alpha here too, matching redrawGatewayArcs, so
+    // the arcs render the same in both redraw paths and simply follow the
+    // toggle. Their container `visible` is the single source of on/off.
     this.gatewayArcs.clear();
-    const brightArcs: Array<() => void> = [];
-    const dimArcs: Array<() => void> = [];
-
+    let anyArc = false;
     for (const gw of gwConns) {
       const from = this.systemLookup.get(gw.fromSystemId);
       const to = this.systemLookup.get(gw.toSystemId);
@@ -1553,28 +1558,11 @@ export class GalaxyLayer {
       const dist = Math.sqrt(dx * dx + dy * dy);
       const arcHeight = Math.min(dist * GATEWAY_ARC_HEIGHT_FACTOR, GATEWAY_ARC_HEIGHT_MAX);
 
-      const drawArc = () => {
-        this.gatewayArcs.moveTo(from.worldX, from.worldY);
-        this.gatewayArcs.quadraticCurveTo(midX, midY - arcHeight, to.worldX, to.worldY);
-      };
-
-      if (hl.has(gw.fromSystemId) && hl.has(gw.toSystemId)) {
-        brightArcs.push(drawArc);
-      } else {
-        dimArcs.push(drawArc);
-      }
+      this.gatewayArcs.moveTo(from.worldX, from.worldY);
+      this.gatewayArcs.quadraticCurveTo(midX, midY - arcHeight, to.worldX, to.worldY);
+      anyArc = true;
     }
-
-    if (dimArcs.length > 0) {
-      for (const draw of dimArcs) draw();
-      this.gatewayArcs.stroke({
-        width: gwWidth,
-        color: getTheme().gateway,
-        alpha: GATEWAY_ARC_ALPHA * DIM_HIGHLIGHT_ALPHA,
-      });
-    }
-    if (brightArcs.length > 0) {
-      for (const draw of brightArcs) draw();
+    if (anyArc) {
       this.gatewayArcs.stroke({ width: gwWidth, color: getTheme().gateway, alpha: GATEWAY_ARC_ALPHA });
     }
 
