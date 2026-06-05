@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.0-rc.2 — feature/hud
+
+Bugfix on rc.1 surfaced during embedded testing.
+
+### Fixed
+
+- **Gateway arcs respect their visibility toggle, not the empire lens.** With a highlight filter active (empire lens), the highlight redraw (`redrawWithHighlight`) dimmed gateway arcs to ~0.072 alpha (0.6 × 0.12) while the uniform zoom-path redraw (`redrawGatewayArcs`) drew them at full alpha — so non-empire arcs rendered near-invisible on load and a >20% zoom clobbered the dim back to visible ("partial render, zoom-in fixes it, zoom-out doesn't" — the asymmetry being the ±20% redraw threshold). Gateway arcs are navigational chrome with their own `G` toggle, so the lens must not dim them: both redraw paths now draw them uniformly at full alpha, and the container's `visible` is the single on/off source. (Gateway indicators were already exempt.)
+
 ## 0.11.0-rc.1 — feature/hud
 
 Phase 3 HUD chassis + Helm Extension bridge reception + the **complete empire read-only overlay**: dim lens (Cap 1), base markers (Cap 2), docked-ship indicators (Cap 3), in-flight ships (Cap 4), and the warehouse indicator. Ship status now reads in PrUn's flight-phase vocabulary. Multi-resource filter (issue #6) — multi-select with OR semantics. HUD chrome polish (focus rings, panel clamping) and the gateway fade-race fix. Release candidate — feature-complete read-only overlay, deployed to the preview alias for testers.
