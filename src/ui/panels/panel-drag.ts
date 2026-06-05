@@ -22,23 +22,38 @@ export interface DragOptions {
   onDragEnd?(x: number, y: number): void;
 }
 
+// Keep at least this much of the panel reachable on each axis before we'll
+// pull it back. Below this, the panel is effectively unreachable.
+const MIN_REACHABLE = 48;
+
 /**
  * Ensures a panel + body fit within the viewport.
  * Adjusts body height if the panel extends past the bottom edge.
- * Clamps panel position to stay within visible area.
+ *
+ * Position is left where the user put it unless the panel would be (nearly)
+ * fully off-screen — clamping a still-mostly-visible panel on every open made
+ * panels jump after a viewport-size change (#18). The header is the drag
+ * handle, so the top edge is held within the viewport to keep it grabbable.
  */
 export function constrainToViewport(panelEl: HTMLElement, bodyEl: HTMLElement): void {
   const rect = panelEl.getBoundingClientRect();
+  const w = panelEl.offsetWidth;
+  const h = panelEl.offsetHeight;
 
+  // Horizontal: only pull back if almost entirely off one side.
+  if (rect.right < MIN_REACHABLE) {
+    panelEl.style.left = `${EDGE_MARGIN}px`;
+  } else if (rect.left > window.innerWidth - MIN_REACHABLE) {
+    panelEl.style.left = `${Math.max(EDGE_MARGIN, window.innerWidth - w - EDGE_MARGIN)}px`;
+  }
+
+  // Vertical: the header sits at the top, so keep it on-screen — pull down if
+  // it's above the viewport, pull up only if the panel has dropped nearly all
+  // the way below it.
   if (rect.top < EDGE_MARGIN) {
     panelEl.style.top = `${EDGE_MARGIN}px`;
-  }
-  if (rect.left < EDGE_MARGIN) {
-    panelEl.style.left = `${EDGE_MARGIN}px`;
-  }
-  const maxLeft = window.innerWidth - panelEl.offsetWidth - EDGE_MARGIN;
-  if (rect.left > maxLeft) {
-    panelEl.style.left = `${Math.max(EDGE_MARGIN, maxLeft)}px`;
+  } else if (rect.top > window.innerHeight - MIN_REACHABLE) {
+    panelEl.style.top = `${Math.max(EDGE_MARGIN, window.innerHeight - h - EDGE_MARGIN)}px`;
   }
 
   const freshRect = panelEl.getBoundingClientRect();
