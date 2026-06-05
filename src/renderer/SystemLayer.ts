@@ -5,11 +5,13 @@ import { setSelectedEntity, getSelectedEntity, onStateChange, onBridgeSnapshotCh
 import { getGatewaysForPlanet, getSystemById } from "../data/cache.js";
 import { getEmpirePlanetIds, onEmpireIndexChange } from "../data/empireIndex.js";
 import type { GatewayEndpoint } from "../types/index.js";
-import type { ShipSummary } from "../data/bridge-types.js";
+import type { ShipSummary, FlightSummary } from "../data/bridge-types.js";
 import { generatePlanetTexture, generateStarTexture, getCloudTexture, getCloudTint } from "./PlanetTexture.js";
 import { showMapTooltip, hideMapTooltip } from "../ui/MapTooltip.js";
 import { buildChevronStack, CHEVRON_GLYPH_SIZE } from "./ChevronStack.js";
-import { formatDockedShipTooltip } from "../data/shipTooltip.js";
+import { buildShipGlyph } from "./ShipGlyph.js";
+import { formatDockedShipTooltip, formatInFlightShipTooltip } from "../data/shipTooltip.js";
+import { activeSegment, lerp } from "../data/flightInterp.js";
 
 const CENTRAL_STAR_RADIUS = 30;
 const GLOW_RADIUS = 110;
@@ -96,6 +98,11 @@ const EMPIRE_PLANET_RING_ALPHA = 0.7;
 const SHIP_STACK_OFFSET_FROM_RING = 6;
 const SHIP_STACK_ALPHA = 1.0;
 
+// In-flight ship (Cap 4, system view) — a ship departing/arriving at one of
+// this system's planets animates between the planet and a point this far
+// radially outward from the star (the "system edge"). Transiting ships hide.
+const SYSTEM_EDGE_MARGIN = 110;
+
 interface PlanetCloud {
   sprite: Sprite;
   mask: Graphics;
@@ -141,6 +148,15 @@ export class SystemLayer {
   private currentPlanets: Planet[] = [];
   private empireOverlayContainer: Container | null = null;
 
+  // In-flight ship glyphs (Cap 4) — rebuilt on snapshot change, repositioned
+  // every frame by updateInFlightShips().
+  private empireInFlightContainer: Container | null = null;
+  private inFlightEntries: {
+    glyph: Graphics;
+    ship: ShipSummary;
+    flight: FlightSummary;
+  }[] = [];
+
   // Bridge API: click interceptor (set by MapRenderer)
   planetClickInterceptor: ((naturalId: string, screenX: number, screenY: number) => boolean) | null = null;
 
@@ -170,6 +186,7 @@ export class SystemLayer {
     const reapplyOverlay = (): void => {
       if (!this.container.visible || !this.currentSystem) return;
       this.applyEmpireOverlay();
+      this.rebuildInFlightShips();
     };
     onBridgeSnapshotChange(reapplyOverlay);
     onEmpireIndexChange(reapplyOverlay);
@@ -351,6 +368,7 @@ export class SystemLayer {
     this.currentSystem = system;
     this.currentPlanets = planets;
     this.applyEmpireOverlay();
+    this.rebuildInFlightShips();
 
     this.container.visible = true;
   }
@@ -377,6 +395,9 @@ export class SystemLayer {
       const pulse = Math.sin(elapsed * HALO_PULSE_FREQUENCY * Math.PI * 2);
       this.selectionHalo.alpha = HALO_ALPHA + HALO_PULSE_AMPLITUDE * pulse;
     }
+
+    // Reposition in-flight ships (Cap 4) against wall-clock time.
+    this.updateInFlightShips(Date.now());
 
     if (this.ambientParticles.length === 0) return;
 
@@ -571,6 +592,8 @@ export class SystemLayer {
     this.selectionHalo.clear();
     this.gatewayHoverLabel = null;
     this.empireOverlayContainer = null;
+    this.empireInFlightContainer = null;
+    this.inFlightEntries = [];
     // Any open ship tooltip is for a stack we're about to destroy.
     hideMapTooltip();
   }
@@ -703,6 +726,125 @@ export class SystemLayer {
     this.container.addChild(this.selectionHalo);
 
     this.empireOverlayContainer = overlay;
+  }
+
+  /**
+   * Build the in-flight ship glyph set for this system (Cap 4, system view).
+   * Includes any in-flight ship whose flight has a segment touching one of
+   * this system's planets — the per-frame update then shows it only while the
+   * *active* segment is at this system (departing or arriving), hiding it
+   * during the cross-system transit legs. Rebuilt on show + snapshot/index
+   * change, mirroring applyEmpireOverlay's lifecycle.
+   */
+  private rebuildInFlightShips(): void {
+    if (this.empireInFlightContainer) {
+      this.container.removeChild(this.empireInFlightContainer);
+      this.empireInFlightContainer.destroy({ children: true });
+      this.empireInFlightContainer = null;
+    }
+    this.inFlightEntries = [];
+    if (!this.currentSystem) return;
+
+    const snapshot = getBridgeSnapshot();
+    if (!snapshot || snapshot.ships.length === 0) return;
+
+    const flightByShip = new Map<string, FlightSummary>();
+    for (const f of snapshot.flights) flightByShip.set(f.shipId, f);
+
+    const accent = getTheme().accent;
+    const container = new Container();
+    container.eventMode = "passive";
+
+    for (const ship of snapshot.ships) {
+      if (ship.status !== "IN_FLIGHT") continue;
+      const flight = flightByShip.get(ship.shipId);
+      if (!flight) continue;
+      const touchesSystem = flight.segments.some(
+        (s) =>
+          (s.originPlanetNaturalId !== null &&
+            this.planetPositions.has(s.originPlanetNaturalId)) ||
+          (s.destinationPlanetNaturalId !== null &&
+            this.planetPositions.has(s.destinationPlanetNaturalId)),
+      );
+      if (!touchesSystem) continue;
+
+      const glyph = buildShipGlyph(accent, SHIP_STACK_ALPHA);
+      glyph.eventMode = "static";
+      glyph.cursor = "default";
+      glyph.visible = false;
+      glyph.on("pointerover", (e) => {
+        showMapTooltip(
+          e.globalX,
+          e.globalY,
+          formatInFlightShipTooltip(ship, flight, Date.now()),
+        );
+      });
+      glyph.on("pointerout", () => hideMapTooltip());
+      container.addChild(glyph);
+      this.inFlightEntries.push({ glyph, ship, flight });
+    }
+
+    // Below the selection halo so the halo stays on top.
+    this.container.removeChild(this.selectionHalo);
+    this.container.addChild(container);
+    this.container.addChild(this.selectionHalo);
+    this.empireInFlightContainer = container;
+  }
+
+  /**
+   * Reposition in-flight glyphs for wall-clock `now`. A glyph shows only while
+   * its active segment has a planet endpoint in this system: departing ships
+   * (origin planet here) animate planet→edge, arriving ships (destination
+   * planet here) animate edge→planet, where "edge" is a point radially outward
+   * from the central star through the planet. Other segments hide the glyph.
+   */
+  private updateInFlightShips(now: number): void {
+    if (this.inFlightEntries.length === 0) return;
+
+    for (const { glyph, flight } of this.inFlightEntries) {
+      const active = activeSegment(flight, now);
+      if (!active) {
+        glyph.visible = false;
+        continue;
+      }
+      const seg = active.segment;
+      const originHere = seg.originPlanetNaturalId
+        ? this.planetPositions.get(seg.originPlanetNaturalId)
+        : undefined;
+      const destHere = seg.destinationPlanetNaturalId
+        ? this.planetPositions.get(seg.destinationPlanetNaturalId)
+        : undefined;
+
+      let planetPos: { x: number; y: number };
+      let leaving: boolean;
+      if (originHere) {
+        planetPos = originHere;
+        leaving = true;
+      } else if (destHere) {
+        planetPos = destHere;
+        leaving = false;
+      } else {
+        glyph.visible = false;
+        continue;
+      }
+
+      // Edge point: radially outward from the star (origin) through the planet.
+      const r = Math.hypot(planetPos.x, planetPos.y) || 1;
+      const edgeX = planetPos.x + (planetPos.x / r) * SYSTEM_EDGE_MARGIN;
+      const edgeY = planetPos.y + (planetPos.y / r) * SYSTEM_EDGE_MARGIN;
+
+      const ax = leaving ? planetPos.x : edgeX;
+      const ay = leaving ? planetPos.y : edgeY;
+      const bx = leaving ? edgeX : planetPos.x;
+      const by = leaving ? edgeY : planetPos.y;
+
+      glyph.x = lerp(ax, bx, active.t);
+      glyph.y = lerp(ay, by, active.t);
+      const dx = bx - ax;
+      const dy = by - ay;
+      if (dx !== 0 || dy !== 0) glyph.rotation = Math.atan2(dy, dx);
+      glyph.visible = true;
+    }
   }
 
 }

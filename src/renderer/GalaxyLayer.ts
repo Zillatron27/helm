@@ -12,9 +12,11 @@ import { getEmpireSystemIds } from "../data/empireIndex.js";
 import { getBridgeSnapshot } from "../ui/state.js";
 import { getSystemUuidByNaturalId } from "../data/searchIndex.js";
 import { buildChevronStack, CHEVRON_GLYPH_SIZE } from "./ChevronStack.js";
+import { buildShipGlyph } from "./ShipGlyph.js";
 import { showMapTooltip, hideMapTooltip } from "../ui/MapTooltip.js";
-import { formatDockedShipTooltip } from "../data/shipTooltip.js";
-import type { ShipSummary } from "../data/bridge-types.js";
+import { formatDockedShipTooltip, formatInFlightShipTooltip } from "../data/shipTooltip.js";
+import { activeSegment, lerp } from "../data/flightInterp.js";
+import type { ShipSummary, FlightSummary } from "../data/bridge-types.js";
 import { StarParticles } from "./StarParticles.js";
 import { TweenManager } from "./Tween.js";
 import { yieldToMain } from "../util/yieldToMain.js";
@@ -233,6 +235,15 @@ export class GalaxyLayer {
   // Empire ship stacks — per-system docked-ship indicators from snapshot
   private empireShipStacks: Container;
 
+  // Empire in-flight ships — per-ship moving glyphs (Cap 4). Rebuilt on
+  // snapshot change, repositioned every frame by updateInFlightShips().
+  private empireInFlightShips: Container;
+  private inFlightEntries: {
+    glyph: Graphics;
+    ship: ShipSummary;
+    flight: FlightSummary;
+  }[] = [];
+
   // Generation counter — async concentration runs bail when superseded.
   private resourceConcentrationGen = 0;
 
@@ -326,6 +337,11 @@ export class GalaxyLayer {
     // stars, and Pixi hit-tests last-added-first).
     this.empireShipStacks = new Container();
     this.empireShipStacks.eventMode = "passive";
+
+    // Empire in-flight ship glyphs — same passive/static hit-test pattern as
+    // the ship stacks. Added to the scene graph in the final-ordering block.
+    this.empireInFlightShips = new Container();
+    this.empireInFlightShips.eventMode = "passive";
 
     // Hover particles — above glows, below labels and stars
     this.starParticles = new StarParticles();
@@ -515,6 +531,7 @@ export class GalaxyLayer {
     this.container.addChild(this.cxMarkers);
     this.container.addChild(this.gatewayIndicators);
     this.container.addChild(this.empireShipStacks);
+    this.container.addChild(this.empireInFlightShips);
     this.container.addChild(this.selectionHalo);
     this.container.addChild(this.routeOverlay);
   }
@@ -919,6 +936,95 @@ export class GalaxyLayer {
     }
   }
 
+  /** Resolve a system by natural ID via the search index → UUID lookup. */
+  private systemByNaturalId(naturalId: string): StarSystem | undefined {
+    const uuid = getSystemUuidByNaturalId(naturalId);
+    if (!uuid) return undefined;
+    return this.systemLookup.get(uuid);
+  }
+
+  /**
+   * Rebuild the in-flight ship glyph set from the current snapshot (Cap 4).
+   * One dart glyph per IN_FLIGHT ship that has a matching flight. Positions
+   * are set per frame by updateInFlightShips(); glyphs start hidden until the
+   * first tick places them.
+   */
+  rebuildEmpireInFlightShips(): void {
+    this.empireInFlightShips.removeChildren();
+    this.inFlightEntries = [];
+
+    const snapshot = getBridgeSnapshot();
+    if (!snapshot || snapshot.ships.length === 0) return;
+
+    const flightByShip = new Map<string, FlightSummary>();
+    for (const f of snapshot.flights) flightByShip.set(f.shipId, f);
+
+    const accent = getTheme().accent;
+
+    for (const ship of snapshot.ships) {
+      if (ship.status !== "IN_FLIGHT") continue;
+      const flight = flightByShip.get(ship.shipId);
+      if (!flight) continue;
+
+      const glyph = buildShipGlyph(accent, SHIP_STACK_ALPHA);
+      glyph.eventMode = "static";
+      glyph.cursor = "default";
+      glyph.visible = false;
+      // ETA + phase are time-dependent, so compute the tooltip at hover time.
+      glyph.on("pointerover", (e) => {
+        if (this.isDimmedForSystemView) return;
+        showMapTooltip(
+          e.globalX,
+          e.globalY,
+          formatInFlightShipTooltip(ship, flight, Date.now()),
+        );
+      });
+      glyph.on("pointerout", () => hideMapTooltip());
+
+      this.empireInFlightShips.addChild(glyph);
+      this.inFlightEntries.push({ glyph, ship, flight });
+    }
+  }
+
+  /**
+   * Reposition in-flight glyphs for wall-clock `now`. Galaxy-scale: interpolate
+   * along the current segment's origin→destination *system* line, rotating the
+   * dart to its heading. Segments whose endpoints don't both resolve (e.g. a
+   * same-system manoeuvre) collapse to the resolvable endpoint; fully
+   * unresolvable segments hide the glyph rather than drawing it at the origin.
+   */
+  updateInFlightShips(now: number): void {
+    if (this.inFlightEntries.length === 0) return;
+
+    for (const { glyph, flight } of this.inFlightEntries) {
+      const active = activeSegment(flight, now);
+      if (!active) {
+        glyph.visible = false;
+        continue;
+      }
+      const seg = active.segment;
+      const from = seg.originSystemNaturalId
+        ? this.systemByNaturalId(seg.originSystemNaturalId)
+        : undefined;
+      const to = seg.destinationSystemNaturalId
+        ? this.systemByNaturalId(seg.destinationSystemNaturalId)
+        : undefined;
+      const a = from ?? to;
+      const b = to ?? from;
+      if (!a || !b) {
+        glyph.visible = false;
+        continue;
+      }
+
+      glyph.x = lerp(a.worldX, b.worldX, active.t);
+      glyph.y = lerp(a.worldY, b.worldY, active.t);
+      const dx = b.worldX - a.worldX;
+      const dy = b.worldY - a.worldY;
+      if (dx !== 0 || dy !== 0) glyph.rotation = Math.atan2(dy, dx);
+      glyph.visible = true;
+    }
+  }
+
   dimExcept(systemId: string, tw?: TweenManager): void {
     this.isDimmedForSystemView = true;
     this.twinkleActive = false;
@@ -945,6 +1051,7 @@ export class GalaxyLayer {
       tw.to(this.resourceIndicators, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
       tw.to(this.empireBaseRings, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
       tw.to(this.empireShipStacks, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
+      tw.to(this.empireInFlightShips, "alpha", SYSTEM_VIEW_LINES_ALPHA, dur);
       // Fade out ambient labels then hide
       tw.to(this.ambientLabels, "alpha", 0, 0.3);
     } else {
@@ -959,6 +1066,7 @@ export class GalaxyLayer {
       this.resourceIndicators.alpha = SYSTEM_VIEW_LINES_ALPHA;
       this.empireBaseRings.alpha = SYSTEM_VIEW_LINES_ALPHA;
       this.empireShipStacks.alpha = SYSTEM_VIEW_LINES_ALPHA;
+      this.empireInFlightShips.alpha = SYSTEM_VIEW_LINES_ALPHA;
       this.ambientLabels.visible = false;
     }
 
@@ -999,6 +1107,7 @@ export class GalaxyLayer {
       tw.to(this.resourceIndicators, "alpha", resourceAlpha, dur);
       tw.to(this.empireBaseRings, "alpha", containerAlpha, dur);
       tw.to(this.empireShipStacks, "alpha", containerAlpha, dur);
+      tw.to(this.empireInFlightShips, "alpha", containerAlpha, dur);
     } else {
       this.baseConnections.alpha = containerAlpha;
       this.routeOverlay.alpha = containerAlpha;
@@ -1011,6 +1120,7 @@ export class GalaxyLayer {
       this.resourceIndicators.alpha = resourceAlpha;
       this.empireBaseRings.alpha = containerAlpha;
       this.empireShipStacks.alpha = containerAlpha;
+      this.empireInFlightShips.alpha = containerAlpha;
     }
 
     // Per-star alpha: respect highlight filter when active

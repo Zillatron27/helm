@@ -166,6 +166,7 @@ export class MapRenderer {
         this.galaxy?.updateCxPulse(this.elapsedTime);
         this.galaxy?.updateTwinkle(this.elapsedTime);
         this.galaxy?.updateSettledRings(this.elapsedTime);
+        this.galaxy?.updateInFlightShips(Date.now());
       } else {
         this.systemLayer?.update(dt, this.elapsedTime);
       }
@@ -534,13 +535,13 @@ export class MapRenderer {
     }, TRANSITION_MS + 100);
   }
 
-  frameEmpire(): void {
+  frameEmpire(instant = false): void {
     const set = getEmpireSystemMatches();
     if (!set || set.size === 0) return;
-    this.frameRoute(Array.from(set));
+    this.frameRoute(Array.from(set), instant);
   }
 
-  frameRoute(systemIds: string[]): void {
+  frameRoute(systemIds: string[], instant = false): void {
     const viewport = this.viewport;
     if (!viewport || systemIds.length === 0) return;
 
@@ -571,6 +572,14 @@ export class MapRenderer {
     const scaleX = window.innerWidth / (routeWidth + padding * 2);
     const scaleY = window.innerHeight / (routeHeight + padding * 2);
     const targetScale = Math.min(scaleX, scaleY, MAX_ZOOM);
+
+    // Instant framing (no tween) — used by deep-link / screenshot paths where
+    // a time-based animation can't settle (e.g. headless virtual-time capture).
+    if (instant) {
+      viewport.moveCenter(centreX, centreY);
+      viewport.setZoom(targetScale, true);
+      return;
+    }
 
     this.isAnimating = true;
     viewport.animate({
@@ -610,6 +619,10 @@ export class MapRenderer {
 
   rebuildEmpireShipStacks(): void {
     this.galaxy?.rebuildEmpireShipStacks();
+  }
+
+  rebuildEmpireInFlightShips(): void {
+    this.galaxy?.rebuildEmpireInFlightShips();
   }
 
   /** Remove resource indicator dots. */

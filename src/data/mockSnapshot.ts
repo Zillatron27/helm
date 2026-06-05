@@ -149,16 +149,20 @@ export function buildMockSnapshot(now: number = Date.now()): BridgeSnapshot {
       fuel: null,
     });
 
-    // In-flight ship travelling a real jump edge (hub → first neighbour) so
-    // galaxy-view interpolation rides an actual jump line. Departure in the
-    // past, arrival in the future ⇒ currently ~40% along the segment.
+    // Two in-flight ships exercise both views (Cap 4):
+    //  - "Far Strider" is mid-TRANSIT on a real hub→neighbour jump edge, so
+    //    its galaxy glyph rides the actual jump line. Its active segment is
+    //    cross-system, so it correctly shows nothing in any system view.
+    //  - "Orbital Lifter" is in its DEPARTURE phase off the hub's own planet,
+    //    so it shows in the hub's system view leaving that planet (and sits
+    //    near the hub star in galaxy view).
     const dest = neighbours[0];
     if (dest) {
       const destPlanet = firstPlanet(dest);
-      const departure = now - 4 * 60_000;
-      const arrival = now + 6 * 60_000;
+      const m = 60_000;
+
       ships.push({
-        shipId: "mock-ship-flight",
+        shipId: "mock-ship-transit",
         name: "Far Strider",
         registration: "AA-002",
         blueprintNaturalId: "BP-AA-002",
@@ -170,23 +174,89 @@ export function buildMockSnapshot(now: number = Date.now()): BridgeSnapshot {
         fuel: null,
       });
       flights.push({
-        flightId: "mock-flight-1",
-        shipId: "mock-ship-flight",
+        flightId: "mock-flight-transit",
+        shipId: "mock-ship-transit",
         originSystemNaturalId: hub.naturalId,
         destinationSystemNaturalId: dest.naturalId,
         originPlanetNaturalId: hubPlanet.natId,
         destinationPlanetNaturalId: destPlanet.natId,
-        departureTimestamp: departure,
-        arrivalTimestamp: arrival,
+        departureTimestamp: now - 12 * m,
+        arrivalTimestamp: now + 8 * m,
         segments: [
+          // Departure off the hub planet (already complete).
           {
-            type: "JUMP",
+            type: "DEPARTURE",
+            originSystemNaturalId: hub.naturalId,
+            destinationSystemNaturalId: hub.naturalId,
+            originPlanetNaturalId: hubPlanet.natId,
+            destinationPlanetNaturalId: null,
+            departureTimestamp: now - 12 * m,
+            arrivalTimestamp: now - 9 * m,
+          },
+          // Cross-system transit — active now ⇒ galaxy glyph mid jump line.
+          {
+            type: "TRANSIT",
             originSystemNaturalId: hub.naturalId,
             destinationSystemNaturalId: dest.naturalId,
-            originPlanetNaturalId: hubPlanet.natId,
+            originPlanetNaturalId: null,
+            destinationPlanetNaturalId: null,
+            departureTimestamp: now - 9 * m,
+            arrivalTimestamp: now + 5 * m,
+          },
+          // Approach to the destination planet (still ahead).
+          {
+            type: "APPROACH",
+            originSystemNaturalId: dest.naturalId,
+            destinationSystemNaturalId: dest.naturalId,
+            originPlanetNaturalId: null,
             destinationPlanetNaturalId: destPlanet.natId,
-            departureTimestamp: departure,
-            arrivalTimestamp: arrival,
+            departureTimestamp: now + 5 * m,
+            arrivalTimestamp: now + 8 * m,
+          },
+        ],
+        currentSegmentIndex: 1,
+      });
+
+      ships.push({
+        shipId: "mock-ship-departing",
+        name: "Orbital Lifter",
+        registration: "AA-003",
+        blueprintNaturalId: "BP-AA-003",
+        condition: 0.88,
+        status: "IN_FLIGHT",
+        locationSystemNaturalId: null,
+        locationPlanetNaturalId: null,
+        cargo: null,
+        fuel: null,
+      });
+      flights.push({
+        flightId: "mock-flight-departing",
+        shipId: "mock-ship-departing",
+        originSystemNaturalId: hub.naturalId,
+        destinationSystemNaturalId: dest.naturalId,
+        originPlanetNaturalId: hubPlanet.natId,
+        destinationPlanetNaturalId: destPlanet.natId,
+        departureTimestamp: now - 2 * m,
+        arrivalTimestamp: now + 20 * m,
+        segments: [
+          // Departure off the hub planet — active now ⇒ shows in hub system view.
+          {
+            type: "DEPARTURE",
+            originSystemNaturalId: hub.naturalId,
+            destinationSystemNaturalId: hub.naturalId,
+            originPlanetNaturalId: hubPlanet.natId,
+            destinationPlanetNaturalId: null,
+            departureTimestamp: now - 2 * m,
+            arrivalTimestamp: now + 6 * m,
+          },
+          {
+            type: "TRANSIT",
+            originSystemNaturalId: hub.naturalId,
+            destinationSystemNaturalId: dest.naturalId,
+            originPlanetNaturalId: null,
+            destinationPlanetNaturalId: null,
+            departureTimestamp: now + 6 * m,
+            arrivalTimestamp: now + 20 * m,
           },
         ],
         currentSegmentIndex: 0,
@@ -232,8 +302,11 @@ export function buildMockSnapshot(now: number = Date.now()): BridgeSnapshot {
 }
 
 /** Inject the fixture (or an override) by posting a real `helm-init` envelope,
- *  so reception + validation in bridge.ts runs exactly as for the extension. */
-export function injectMockSnapshot(override?: BridgeSnapshot): void {
+ *  so reception + validation in bridge.ts runs exactly as for the extension.
+ *  Returns the built snapshot so callers can read it synchronously (the posted
+ *  message is processed asynchronously, so getBridgeSnapshot() won't reflect it
+ *  on the next line). */
+export function injectMockSnapshot(override?: BridgeSnapshot): BridgeSnapshot {
   const snapshot = override ?? buildMockSnapshot();
   if (snapshot.sites.length === 0) {
     console.warn(
@@ -243,4 +316,5 @@ export function injectMockSnapshot(override?: BridgeSnapshot): void {
   }
   console.log("[Helm Mock] injecting helm-init snapshot", snapshot);
   window.postMessage({ type: "helm-init", snapshot }, window.location.origin);
+  return snapshot;
 }

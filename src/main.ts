@@ -6,7 +6,8 @@ import { SettingsPanel } from "./ui/SettingsPanel.js";
 import { ResourcePicker } from "./ui/resource/ResourcePicker.js";
 import { ResultsSidebar } from "./ui/sidebar/ResultsSidebar.js";
 import { setupControls } from "./ui/controls.js";
-import { onStateChange, getGatewaysVisible, setGatewaysVisible, getSettledVisible, getResourceFilters, getCogcFilter, getEmpireDim, setEmpireDim, onResourceFilterChange, onCogcFilterChange, getBridgeSnapshot, onBridgeSnapshotChange, getLicence, hasPro } from "./ui/state.js";
+import { onStateChange, getGatewaysVisible, setGatewaysVisible, getSettledVisible, getResourceFilters, getCogcFilter, getEmpireDim, setEmpireDim, onResourceFilterChange, onCogcFilterChange, getBridgeSnapshot, onBridgeSnapshotChange, getLicence, hasPro, setFocusedSystem, setViewLevel } from "./ui/state.js";
+import { getSystemUuidByNaturalId } from "./data/searchIndex.js";
 import { isResourceIndexReady, onResourceIndexReady, getSystemsWithAnyResource } from "./data/resourceIndex.js";
 import { getResourceSystemMatches, getResourcePlanetMatches, getCogcSystemMatches, getCogcPlanetMatches } from "./data/filterMatches.js";
 import { getEmpireSystemMatches, getEmpirePlanetMatches, onEmpireIndexChange } from "./data/empireIndex.js";
@@ -84,9 +85,40 @@ async function boot(): Promise<void> {
     // Dev-only: `?mock` auto-injects the mock empire snapshot now that the
     // universe is loaded (the fixture samples real systems). Lets the
     // screenshot tooling and manual testing exercise the empire overlay
-    // without a running game. DEV-gated, so it never ships.
-    if (import.meta.env.DEV && new URLSearchParams(location.search).has("mock")) {
-      void import("./data/mockSnapshot.js").then((m) => m.injectMockSnapshot());
+    // without a running game. `?mock&lens` additionally enables the empire-dim
+    // lens and frames the empire — handy for static screenshots where there's
+    // no pointer to click the toolbar button. DEV-gated, so it never ships.
+    if (import.meta.env.DEV) {
+      const params = new URLSearchParams(location.search);
+      if (params.has("mock")) {
+        void import("./data/mockSnapshot.js").then((m) => {
+          const injected = m.injectMockSnapshot();
+          if (params.has("system")) {
+            // Drop into the empire hub's system view, then re-inject once its
+            // planets have loaded so the fixture's planet ids match the real
+            // loaded ones (the first inject ran before any planets were cached).
+            // Lets the system-view in-flight glyph be exercised by URL alone.
+            const hubNat = injected.sites[0]?.systemNaturalId;
+            const uuid = hubNat ? getSystemUuidByNaturalId(hubNat) : null;
+            if (uuid) {
+              setFocusedSystem(uuid);
+              setViewLevel("system");
+              renderer.frameRoute([uuid], true);
+              setTimeout(() => {
+                m.injectMockSnapshot();
+                renderer.frameRoute([uuid], true);
+              }, 2500);
+            }
+          } else if (params.has("lens")) {
+            // Let the snapshot propagate (empire index build + overlay rebuild)
+            // before framing the now-known empire bbox.
+            setTimeout(() => {
+              setEmpireDim(true);
+              renderer.frameEmpire(true);
+            }, 200);
+          }
+        });
+      }
     }
 
     const searchBar = new SearchBar();
@@ -263,6 +295,7 @@ async function boot(): Promise<void> {
     const rebuildEmpireGalaxyOverlay = (): void => {
       renderer.rebuildEmpireRings();
       renderer.rebuildEmpireShipStacks();
+      renderer.rebuildEmpireInFlightShips();
     };
 
     renderer.onAfterRebuild(() => {
