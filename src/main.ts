@@ -14,6 +14,7 @@ import { yieldToMain } from "./util/yieldToMain.js";
 import { initTheme, getTheme } from "./ui/theme.js";
 import { createLoader } from "./ui/loader/LoaderAnimation.js";
 import { initBridge } from "./data/bridge.js";
+import type { BridgeSnapshot } from "./data/bridge-types.js";
 import "./ui/search/search.css";
 import "./ui/settings.css";
 import "./ui/resource/resource.css";
@@ -53,12 +54,23 @@ async function boot(): Promise<void> {
   // extension side per protocol §3.3.
   initBridge();
 
-  (window as unknown as { __helm: unknown }).__helm = {
+  (window as unknown as { __helm: Record<string, unknown> }).__helm = {
     getBridgeSnapshot,
     onBridgeSnapshotChange,
     getLicence,
     hasPro,
   };
+
+  // Dev-only: `__helm.setSnapshot()` injects a mock empire so the overlay
+  // features can be verified without a running game + extension. Lazy-imported
+  // and DEV-gated so the fixture never reaches the production bundle.
+  if (import.meta.env.DEV) {
+    (window as unknown as { __helm: Record<string, unknown> }).__helm.setSnapshot =
+      async (override?: BridgeSnapshot) => {
+        const { injectMockSnapshot } = await import("./data/mockSnapshot.js");
+        injectMockSnapshot(override);
+      };
+  }
 
   try {
     const helm = await createMap(container);
@@ -68,6 +80,14 @@ async function boot(): Promise<void> {
     loading.style.transition = "opacity 0.6s ease";
     loading.style.opacity = "0";
     loading.addEventListener("transitionend", () => loading.remove(), { once: true });
+
+    // Dev-only: `?mock` auto-injects the mock empire snapshot now that the
+    // universe is loaded (the fixture samples real systems). Lets the
+    // screenshot tooling and manual testing exercise the empire overlay
+    // without a running game. DEV-gated, so it never ships.
+    if (import.meta.env.DEV && new URLSearchParams(location.search).has("mock")) {
+      void import("./data/mockSnapshot.js").then((m) => m.injectMockSnapshot());
+    }
 
     const searchBar = new SearchBar();
     searchBar.init(renderer);
