@@ -1400,6 +1400,30 @@ export class GalaxyLayer {
     this.applyHighlightFilter();
   }
 
+  /**
+   * Snap every container restore() animates to its resting (non-dimmed) alpha.
+   * Used after tweens.clear() so a cancelled restore fade can't leave a
+   * container stranded mid-value (#31). Settled rings and resource dots rest at
+   * 0 when their layer is toggled off.
+   */
+  private resetContainerAlphasToResting(): void {
+    const settledAlpha = this.settledVisible ? 1 : 0;
+    const resourceAlpha = this.resourceIndicators.visible ? 1 : 0;
+    this.baseConnections.alpha = 1;
+    this.routeOverlay.alpha = 1;
+    this.glowContainer.alpha = 1;
+    this.gatewayArcs.alpha = 1;
+    this.gatewayIndicators.alpha = 1;
+    this.cxMarkers.alpha = 1;
+    this.settledRingsStatic.alpha = settledAlpha;
+    this.settledRingsAnimated.alpha = settledAlpha;
+    this.resourceIndicators.alpha = resourceAlpha;
+    this.empireBaseRings.alpha = 1;
+    this.empireShipStacks.alpha = 1;
+    this.empireInFlightShips.alpha = 1;
+    this.empireWarehouseMarkers.alpha = 1;
+  }
+
   private applyHighlightFilter(): void {
     const hl = this.highlightedSystems;
 
@@ -1407,6 +1431,14 @@ export class GalaxyLayer {
     // overwriting all star/glow/label alphas — stale tweens would
     // overwrite the values we're about to set.
     this.tweens.clear();
+
+    // #31: tweens.clear() can kill a restore() container-alpha fade mid-flight
+    // (e.g. a filter change landing within 0.4s of exiting system view),
+    // stranding gateway arcs / connections near-invisible. This path only runs
+    // when NOT dimmed for system view (setHighlightedSystems guards that), so
+    // the resting value is full alpha — reset the containers restore() owns so
+    // a killed fade can't leave them stuck.
+    this.resetContainerAlphasToResting();
 
     if (!hl) {
       // Clear filter — restore all to full alpha
