@@ -255,6 +255,10 @@ export class GalaxyLayer {
     ship: ShipSummary;
     flight: FlightSummary;
   }[] = [];
+  // Memoized set of "uuidA:uuidB" keys (uuids sorted) for system pairs joined
+  // by a gateway link — i.e. the pairs drawn as curved arcs. Built lazily on
+  // first in-flight update; gateway topology is fixed after load.
+  private gatewayPairKeysCache: Set<string> | null = null;
 
   // Generation counter — async concentration runs bail when superseded.
   private resourceConcentrationGen = 0;
@@ -1014,6 +1018,21 @@ export class GalaxyLayer {
    * same-system manoeuvre) collapse to the resolvable endpoint; fully
    * unresolvable segments hide the glyph rather than drawing it at the origin.
    */
+  /** Lazily-built set of gateway-linked system pairs, keyed "uuidA:uuidB" with
+   *  the two uuids sorted, matching the pairs `redrawGatewayArcs` draws. */
+  private gatewayPairKeys(): Set<string> {
+    if (this.gatewayPairKeysCache) return this.gatewayPairKeysCache;
+    const keys = new Set<string>();
+    for (const gw of getGalaxyGatewayConnections()) {
+      const [a, b] = gw.fromSystemId < gw.toSystemId
+        ? [gw.fromSystemId, gw.toSystemId]
+        : [gw.toSystemId, gw.fromSystemId];
+      keys.add(`${a}:${b}`);
+    }
+    this.gatewayPairKeysCache = keys;
+    return keys;
+  }
+
   updateInFlightShips(now: number): void {
     if (this.inFlightEntries.length === 0) return;
 
@@ -1034,6 +1053,37 @@ export class GalaxyLayer {
       const b = to ?? from;
       if (!a || !b) {
         glyph.visible = false;
+        continue;
+      }
+
+      // A gateway-jump segment crosses two gateway-linked systems, which the
+      // map draws as a curved arc (redrawGatewayArcs) rather than a straight
+      // line — there IS no direct jump line between them. Ride the same
+      // quadratic bezier so the ship tracks the visible arc. Same-system
+      // segments (a === b) and ordinary STL jumps fall through to the line.
+      const pairKey = a.id < b.id ? `${a.id}:${b.id}` : `${b.id}:${a.id}`;
+      if (a !== b && this.gatewayPairKeys().has(pairKey)) {
+        // Control point matches redrawGatewayArcs exactly: midpoint of the two
+        // systems pushed by arcHeight toward -Y (in-game "up"). It is
+        // order-independent, so origin/dest order doesn't change the curve.
+        const midX = (a.worldX + b.worldX) / 2;
+        const midY = (a.worldY + b.worldY) / 2;
+        const spanX = b.worldX - a.worldX;
+        const spanY = b.worldY - a.worldY;
+        const dist = Math.sqrt(spanX * spanX + spanY * spanY);
+        const arcHeight = Math.min(dist * GATEWAY_ARC_HEIGHT_FACTOR, GATEWAY_ARC_HEIGHT_MAX);
+        const cx = midX;
+        const cy = midY - arcHeight;
+        const t = active.t;
+        const mt = 1 - t;
+        // Quadratic bezier B(t): P0 = a (t=0), control = (cx,cy), P2 = b (t=1).
+        glyph.x = mt * mt * a.worldX + 2 * mt * t * cx + t * t * b.worldX;
+        glyph.y = mt * mt * a.worldY + 2 * mt * t * cy + t * t * b.worldY;
+        // Heading = curve tangent B'(t).
+        const tanX = 2 * mt * (cx - a.worldX) + 2 * t * (b.worldX - cx);
+        const tanY = 2 * mt * (cy - a.worldY) + 2 * t * (b.worldY - cy);
+        if (tanX !== 0 || tanY !== 0) glyph.rotation = Math.atan2(tanY, tanX);
+        glyph.visible = true;
         continue;
       }
 

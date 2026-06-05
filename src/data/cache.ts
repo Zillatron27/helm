@@ -52,6 +52,10 @@ const pendingFetches: Map<string, Promise<Planet[]>> = new Map();
 
 // CX stations keyed by SystemId
 const cxBySystem: Map<string, FioCxStation> = new Map();
+// CX stations keyed by SystemNaturalId — for label lookups that start from a
+// natural id (e.g. a flight destination or docked-ship location) rather than a
+// resolved system UUID.
+const cxBySystemNaturalId: Map<string, FioCxStation> = new Map();
 
 // Material ticker lookup: MaterialId → Ticker
 const materialTickers: Map<string, string> = new Map();
@@ -463,12 +467,24 @@ export async function loadCxStations(): Promise<void> {
   const stations = await fetchCxStations();
   for (const s of stations) {
     cxBySystem.set(s.SystemId, s);
+    cxBySystemNaturalId.set(s.SystemNaturalId, s);
   }
   console.log(`Loaded ${stations.length} CX stations`);
 }
 
 export function getCxForSystem(systemId: string): FioCxStation | null {
   return cxBySystem.get(systemId) ?? null;
+}
+
+/**
+ * Display label for a system in CX-context panels (ship flight destinations,
+ * docked-ship locations). A commodity-exchange system is referred to by its CX
+ * code — "ANT", "MOR", "BEN" — never the raw system natural id ("ZV-307"),
+ * matching the map, which already replaces a CX system's name label with its
+ * code. Non-CX systems fall back to the natural id unchanged.
+ */
+export function cxSystemLabel(systemNaturalId: string): string {
+  return cxBySystemNaturalId.get(systemNaturalId)?.NaturalId ?? systemNaturalId;
 }
 
 export function getAllCxStations(): FioCxStation[] {

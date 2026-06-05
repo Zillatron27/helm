@@ -2,6 +2,7 @@ import type { ShipSummary, FlightSummary } from "./bridge-types.js";
 import type { MapTooltipContent } from "../ui/MapTooltip.js";
 import { STATIONARY, segmentStatus } from "./shipStatus.js";
 import { activeSegment } from "./flightInterp.js";
+import { cxSystemLabel } from "./cache.js";
 
 const MAX_ROWS = 6;
 
@@ -32,7 +33,7 @@ export function formatInFlightShipTooltip(
   const eta = formatEta(flight.arrivalTimestamp - now);
 
   const lines = [`${phase.icon} ${phase.label}`];
-  if (dest) lines.push(`→ ${dest}`);
+  if (dest) lines.push(`→ ${cxSystemLabel(dest)}`);
   lines.push(`ETA ${eta}`);
 
   return { header: `${ship.name} (${ship.registration})`, lines };
@@ -57,7 +58,7 @@ export function formatDockedShipTooltip(
 ): MapTooltipContent {
   const noun = ships.length === 1 ? "ship" : "ships";
   const header = context?.systemNaturalId
-    ? `${ships.length} ${noun} docked in ${context.systemNaturalId}`
+    ? `${ships.length} ${noun} docked in ${cxSystemLabel(context.systemNaturalId)}`
     : `${ships.length} ${noun} docked`;
 
   const visible = ships.slice(0, MAX_ROWS);

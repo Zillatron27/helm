@@ -119,6 +119,21 @@ async function boot(): Promise<void> {
             )?.systemNaturalId;
             const uuid = whNat ? getSystemUuidByNaturalId(whNat) : null;
             if (uuid) setTimeout(() => renderer.frameRoute([uuid], true), 200);
+          } else if (params.has("gw")) {
+            // Instant-frame both ends of the mock gateway flight so the
+            // in-flight glyph riding the curved arc is visible in one shot.
+            const gwFlight = injected.flights.find(
+              (f) => f.flightId === "mock-flight-gateway",
+            );
+            const a = gwFlight
+              ? getSystemUuidByNaturalId(gwFlight.originSystemNaturalId ?? "")
+              : null;
+            const b = gwFlight
+              ? getSystemUuidByNaturalId(gwFlight.destinationSystemNaturalId ?? "")
+              : null;
+            if (a && b) {
+              setTimeout(() => renderer.frameRoute([a, b], true), 200);
+            }
           } else if (params.has("lens")) {
             // Let the snapshot propagate (empire index build + overlay rebuild)
             // before framing the now-known empire bbox.
@@ -243,6 +258,24 @@ async function boot(): Promise<void> {
     }
     onBridgeSnapshotChange(syncEmpireDimVisibility);
     syncEmpireDimVisibility();
+
+    // If the empire lens was left enabled (persisted) when the page loads,
+    // frame the empire once its data arrives instead of sitting at the default
+    // galaxy zoom — mirrors what toggling the lens on does. One-shot: later
+    // snapshot updates must not yank the camera, and manual toggles already
+    // frame themselves. Fires on whichever of snapshot/index lands the empire
+    // set first, and commits only once that set is actually populated.
+    let didInitialEmpireFrame = false;
+    function frameEmpireOnLoad(): void {
+      if (didInitialEmpireFrame || !getEmpireDim()) return;
+      const empire = getEmpireSystemMatches();
+      if (!empire || empire.size === 0) return;
+      didInitialEmpireFrame = true;
+      renderer.frameEmpire();
+    }
+    onBridgeSnapshotChange(frameEmpireOnLoad);
+    onEmpireIndexChange(frameEmpireOnLoad);
+    frameEmpireOnLoad();
 
     // --- Dim composition ---
     // Intersect the active (non-null) match sets into a single bright set.

@@ -31,6 +31,7 @@ import {
   getSystemById,
   getPlanetsForSystem,
   getAllCxStations,
+  getGalaxyGatewayConnections,
 } from "./cache.js";
 
 /** Resolve a representative planet for a system from real loaded data where
@@ -276,6 +277,51 @@ export function buildMockSnapshot(now: number = Date.now()): BridgeSnapshot {
             destinationPlanetNaturalId: null,
             departureTimestamp: now + 6 * m,
             arrivalTimestamp: now + 20 * m,
+          },
+        ],
+        currentSegmentIndex: 0,
+      });
+    }
+
+    // A ship mid gateway-jump, riding a REAL gateway edge so the galaxy glyph
+    // tracks the curved arc (not a straight chord). Anchored on the first
+    // loaded gateway connection; skipped if the universe has no gateways.
+    const gw = getGalaxyGatewayConnections()[0];
+    const gwFrom = gw ? getSystemById(gw.fromSystemId) : undefined;
+    const gwTo = gw ? getSystemById(gw.toSystemId) : undefined;
+    if (gwFrom && gwTo) {
+      const m = 60_000;
+      ships.push({
+        shipId: "mock-ship-gateway",
+        name: "Gate Runner",
+        registration: "AA-004",
+        blueprintNaturalId: "BP-AA-004",
+        condition: 0.95,
+        status: "OPERATIONAL",
+        locationSystemNaturalId: null,
+        locationPlanetNaturalId: null,
+        cargo: null,
+        fuel: null,
+      });
+      flights.push({
+        flightId: "mock-flight-gateway",
+        shipId: "mock-ship-gateway",
+        originSystemNaturalId: gwFrom.naturalId,
+        destinationSystemNaturalId: gwTo.naturalId,
+        originPlanetNaturalId: null,
+        destinationPlanetNaturalId: null,
+        departureTimestamp: now - 2 * m,
+        arrivalTimestamp: now + 8 * m,
+        segments: [
+          // Single gateway-jump segment, active now ⇒ glyph rides the arc.
+          {
+            type: "JUMP_GATEWAY",
+            originSystemNaturalId: gwFrom.naturalId,
+            destinationSystemNaturalId: gwTo.naturalId,
+            originPlanetNaturalId: null,
+            destinationPlanetNaturalId: null,
+            departureTimestamp: now - 2 * m,
+            arrivalTimestamp: now + 8 * m,
           },
         ],
         currentSegmentIndex: 0,

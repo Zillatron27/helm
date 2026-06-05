@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.0-rc.4 — feature/hud
+
+Three empire-overlay polish fixes from in-game testing.
+
+### Fixed
+
+- **Empire lens frames the empire on load.** When the empire lens was left enabled (persisted in `helm-empire-dim`), reloading kept the default galaxy zoom instead of framing the empire. A one-shot in `boot()` now frames the empire once its data arrives — mirroring what toggling the lens on does — guarded so later snapshot updates don't yank the camera and manual toggles still frame themselves.
+- **In-flight ships ride the gateway arc.** A ship mid gateway-jump was interpolated along a straight origin→destination line that doesn't exist on the map; it now follows the same quadratic-bezier arc the gateway link is drawn as (`updateInFlightShips`), with heading taken from the curve tangent. Detected by the segment's endpoints being a gateway-linked pair (the exact condition under which the arc is drawn), so the glyph always tracks the visible curve. Ordinary STL jumps and same-system manoeuvres are unchanged.
+- **CX systems referenced by their code in ship panels.** A ship bound for the Antares exchange showed "→ ZV-307" (the host system) instead of "→ ANT". Commodity-exchange systems are now labelled by their CX code (`ANT`, `MOR`, `BEN`…) in flight-destination and docked-ship panels via `cxSystemLabel()`, matching the map, which already replaces a CX system's name label with its code. Non-CX systems are unchanged.
+
 ## 0.11.0-rc.3 — feature/hud
 
 Two empire-overlay rendering fixes surfaced during in-game testing. Both were masked by the dev mock fabricating data that matched the broken code paths.
