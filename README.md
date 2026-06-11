@@ -6,13 +6,13 @@ Interactive galaxy map for [Prosperous Universe](https://prosperousuniverse.com/
 **Project page:** [27bit.dev/helm](https://27bit.dev/helm/)
 
 Helm operates in 2 modes:
-- **Standalone** (no extenstion): Open in a browser tab or a XIT WEB buffer to show the universe map including public FIO data.
-- **Helm Extension**: With the browser extension installed, Helm will display base markers, ships etc directly on the map. If the map is opened in a XIT WEB buffer you can additionally interact directly with PrUn buffers, without switching screens. 
+- **Standalone** (no extension): Open in a browser tab or a XIT WEB buffer to show the universe map including public FIO data.
+- **Helm Extension**: With the browser extension installed, Helm additionally displays your own empire — base markers, ships and warehouses — directly on the map.
 
 
 ## Features
 
-- **Resource Filter** — Pick a material and Helm shows the way. Every system with that resource gets highlighted and shows the concentration factor. Useful for scouting base locations without opening a pile of PLI buffers.
+- **Resource Filter** — Pick one or more materials and Helm shows the way. Every system with a selected resource gets highlighted with its concentration factor, and a sortable results sidebar ranks every contributing planet by factor and CX distance. Useful for scouting base locations without opening a pile of PLI buffers.
 - **Route Planner** — Quickly highlight the shortest path between any two systems, gateway-aware.
 - **Planet & System Data** — Detail panels for every system and planet. Resources, environment, fertility, gravity, temperature — plus infrastructure data showing population tiers, happiness and more. Planet panel links directly to [PRUNPlanner](https://prunplanner.org) for base planning.
 - **CX Distances & Prices** — System detail panel shows jump count to all 6 CX's with gateway use flagged. Available resources shown with the most recent ask price at that nearest CX (via FIO).
@@ -21,21 +21,14 @@ Helm operates in 2 modes:
 - **5 Colour Themes** — DryDock, CRT Terminal, PrUn Classic, Vivid and Colorblind Safe.
 - **Keyboard-Enabled** — `/` to search, `G` for gateways, `S` for settled, `R` for resources, `Escape` cascades through close → exit.
 
-Additinally with the Helm extesnsion installed:
-- **Empire overlay** — owned systems highlighted with burn-coloured rings (green/amber/red) on the galaxy map and in system view
-- **Live ship tracking** — idle ship and fleet markers at systems, in-transit ships interpolated along flight paths in real time
-- **Burn Status Panel** (B key) — per-base burn status (configurable thresholds), expandable material-level detail, urgency filtering, sort by urgency or system name.
-- **Fleet Overview** (F key) — all ships with cargo/fuel bars, IDLE/TRANSIT filters, sort by ETA/name/cargo, click-to-zoom into any ship
-- **Fleet Detail** (key here) — ship detail and controls   
-- **CX Warehouse indicators** — orange dots at CX stations where you have a warehouse
-- **CX Warehouse dropdown** (W key) — quick access to CX warehouse inventories
-- **Empire highlight** (E key) — dims the galaxy to highlight only systems where you have bases and nearby CXs
-- **Base panels** — click any owned planet in system view for production, storage, burn overviews and BS/INV/PROD shortcuts
-- **Screen switching** — assign existing APEX screens to planet panels for quick navigation
-- **Ship panels** — click any ship for cargo manifest, fuel, flight segment progress and Fly/Cargo/Fuel shortcuts
-- **Buffer bridging** — panel buttons open the corresponding APEX buffer directly (BS, INV, PROD, SHP, CXM, FLT etc.)
-- **rprun detection** — detects Refined PrUn and offers ACTS button integration (can be disabled)
-- **Pro subscription detection** — detects if you are a Pro subscriber and adjust buffer bridging accordingly
+Additionally, with the [Helm Extension](https://github.com/Zillatron27/helm-extension) installed:
+- **Empire base markers** — accent rings on every system and planet where you have a base, in galaxy and system view
+- **Live ship tracking** — docked-ship markers at planets and exchanges, in-flight ships interpolated along their flight paths in real time, with flight-phase status and ETA on hover
+- **Empire lens** (`E` key) — dims the galaxy to your empire and frames it; persists across visits
+- **CX warehouse indicators** — a crate marker at every commodity exchange where you hold warehouse space
+- **CX-coded ship panels** — ships at or bound for an exchange read as the CX code (`ANT`, `MOR`, `BEN`…), matching the map
+
+Empire overview panels (burn status, fleet overview, buffer bridging, screen switching) are the next phase — follow the [issues](https://github.com/Zillatron27/helm/issues) for progress.
 
 ## Controls
 
@@ -47,6 +40,7 @@ Additinally with the Helm extesnsion installed:
 | `G` | Toggle gateway connections on/off |
 | `S` | Toggle settled systems overlay |
 | `R` | Open resource filter picker |
+| `E` | Toggle empire lens (with extension) |
 | Arrow keys | Pan the map |
 | `+` / `−` | Zoom in / out |
 | Click star | Select system, open detail panel |
@@ -65,7 +59,7 @@ Additinally with the Helm extesnsion installed:
 
 ## Data Sources
 
-Public data comes from [FIO REST API](https://rest.fnar.net/), empire specific data is collected and rendered in the client brwoser only. 
+Public data comes from [FIO REST API](https://rest.fnar.net/); empire-specific data is collected and rendered in the client browser only.
 
 ## Getting Started
 
