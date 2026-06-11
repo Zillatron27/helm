@@ -95,17 +95,9 @@ const INBOUND_TYPES = new Set<string>([
   "helm-update",
 ]);
 
-// Longer than the extension's own HANDSHAKE_TIMEOUT_MS (3000) because this
-// window has to cover SW wake + runtime.sendMessage relay + extension-side
-// handshake on a cold reload path. Logs when we haven't seen a hello in
-// this long, which is a meaningful "extension probably not installed" signal.
-const HANDSHAKE_DIAGNOSTIC_TIMEOUT_MS = 10000;
-
 let initialized = false;
 let parentSource: Window | null = null;
 let parentOrigin: string | null = null;
-let handshakeComplete = false;
-let diagnosticTimer: ReturnType<typeof setTimeout> | null = null;
 
 function detectTier(): 2 | 3 {
   return window.self !== window.top ? 3 : 2;
@@ -123,32 +115,12 @@ export function initBridge(): void {
   // before attaching the real listener. The bootstrap's own listener is
   // removed inside drain(), so there's no double-dispatch window.
   const w = window as unknown as { __helmBridgeBootstrap?: BridgeBootstrap };
-  console.log("[Helm Bridge] initBridge: bootstrap present =", !!w.__helmBridgeBootstrap);
   const buffered = w.__helmBridgeBootstrap?.drain() ?? [];
   delete w.__helmBridgeBootstrap;
 
   window.addEventListener("message", handleMessage);
 
-  console.log("[Helm Bridge] replaying", buffered.length, "buffered events");
   for (const ev of buffered) handleMessage(ev);
-
-  // Local diagnostic timer — NOT a protocol timeout. The protocol §3.3
-  // timeout is enforced extension-side. Cleared by handleHello on success;
-  // if it fires, distinguishes "bridge active via replay" (hello missed,
-  // but init arrived) from "no extension" (genuinely absent).
-  diagnosticTimer = setTimeout(() => {
-    diagnosticTimer = null;
-    if (handshakeComplete) return;
-    if (getBridgeSnapshot() !== null) {
-      console.log(
-        "[Helm Bridge] bridge active but hello was not acked — extension detected via replay",
-      );
-      return;
-    }
-    console.log(
-      `[Helm Bridge] no extension detected after ${HANDSHAKE_DIAGNOSTIC_TIMEOUT_MS / 1000}s (tier-1 standalone path)`,
-    );
-  }, HANDSHAKE_DIAGNOSTIC_TIMEOUT_MS);
 }
 
 function handleMessage(event: MessageEvent): void {
@@ -207,15 +179,7 @@ function handleHello(event: MessageEvent, msg: HelmExtensionHelloMessage): void 
     parentOrigin = event.origin;
   }
 
-  console.log(
-    `[Helm Bridge] received helm-extension-hello ${msg.version}; replying ack tier=${tier}`,
-  );
   sendAck(tier);
-  handshakeComplete = true;
-  if (diagnosticTimer !== null) {
-    clearTimeout(diagnosticTimer);
-    diagnosticTimer = null;
-  }
 }
 
 function sendAck(tier: 2 | 3): void {
@@ -241,7 +205,6 @@ function handleInit(msg: HelmInitMessage): void {
     );
     return;
   }
-  console.log("[Helm Bridge] received helm-init", msg.snapshot);
   setBridgeSnapshot(msg.snapshot);
 }
 
@@ -260,9 +223,6 @@ function handleUpdate(msg: HelmUpdateMessage): void {
     );
     return;
   }
-  console.log(
-    `[Helm Bridge] received helm-update entityType=${msg.update.entityType}`,
-  );
   const merged = {
     ...current,
     [msg.update.entityType]: msg.update.data,
