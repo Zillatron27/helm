@@ -21,7 +21,7 @@ Helm operates in 2 modes:
 - **5 Colour Themes** — DryDock, CRT Terminal, PrUn Classic, Vivid and Colorblind Safe.
 - **Keyboard-Enabled** — `/` to search, `G` for gateways, `S` for settled, `R` for resources, `Escape` cascades through close → exit.
 
-Additionally, with the [Helm Extension](https://github.com/Zillatron27/helm-extension) installed:
+Additionally, with the Helm Extension installed (awaiting store review — install links coming soon):
 - **Empire base markers** — accent rings on every system and planet where you have a base, in galaxy and system view
 - **Live ship tracking** — docked-ship markers at planets and exchanges, in-flight ships interpolated along their flight paths in real time, with flight-phase status and ETA on hover
 - **Empire lens** (`E` key) — dims the galaxy to your empire and frames it; persists across visits
@@ -71,7 +71,7 @@ npm run build      # Production build → dist/
 
 ## With the Helm Extension
 
-When the [Helm Extension](https://github.com/Zillatron27/helm-extension) is installed, Helm becomes the desktop empire-overview surface for Prosperous Universe. The extension reads live game state from APEX and feeds it across the Helm Bridge; Helm draws empire overlays on the map (your bases, ships, CX inventory presence) and renders overview panels (burn, fleet, etc.). Helm remains fully useful standalone without the extension — it's an additive enhancement, not a dependency.
+When the Helm Extension is installed, Helm becomes the desktop empire-overview surface for Prosperous Universe. The extension reads live game state from APEX and feeds it across the Helm Bridge; Helm draws empire overlays on the map (your bases, ships, CX inventory presence) and renders overview panels (burn, fleet, etc.). Helm remains fully useful standalone without the extension — it's an additive enhancement, not a dependency.
 
 ## Acknowledgements
 
