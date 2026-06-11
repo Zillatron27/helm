@@ -38,7 +38,6 @@ Empire overview panels (burn status, fleet overview, buffer bridging, screen swi
 | `Tab` | Accept top search suggestion |
 | `Escape` | Cascade: close panel → exit system view → universe view |
 | `G` | Toggle gateway connections on/off |
-| `S` | Toggle settled systems overlay |
 | `R` | Open resource filter picker |
 | `E` | Toggle empire lens (with extension) |
 | Arrow keys | Pan the map |
